@@ -1,0 +1,10 @@
+build/
+cmake-build-*/
+.vs/
+*.user
+*.suo
+CMakeSettings.json
+.idea/
+*.swp
+*.swo
+*~
