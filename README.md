@@ -1,5 +1,5 @@
 <!-- GitHub metadata: topics should be set in repo Settings > About -->
-<!-- Suggested topics: daw, digital-audio-workstation, audio, music-production, qt6, juce, tracktion-engine, cpp, windows, open-source, audio-editor, music-software -->
+<!-- Suggested topics: daw, digital-audio-workstation, audio, music-production, midi, piano-roll, vst, qt6, juce, tracktion-engine, cpp, windows, open-source, audio-editor, music-software -->
 
 <div align="center">
 
@@ -14,7 +14,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 Built with **Qt 6** for the UI and **Tracktion Engine** (JUCE) for the audio backend.
-Drag in samples, press play, add reverb with one click.
+Audio and MIDI tracks, a built-in piano roll, VST3 instrument support, 8 built-in effects, and more — all free and open source.
 
 </div>
 
@@ -24,14 +24,43 @@ Drag in samples, press play, add reverb with one click.
 
 ### Timeline / Arrangement
 
-- Multi-track audio arrangement with horizontal scrolling
-- Drag-and-drop audio files (`.wav`, `.mp3`, `.flac`, `.ogg`, `.aiff`) from the built-in file browser onto any track
-- Waveform display on clips
+- Starts with **4 audio tracks** by default
+- Multi-track audio and MIDI arrangement with horizontal scrolling
+- Drag-and-drop audio files (`.wav`, `.mp3`, `.flac`, `.ogg`, `.aiff`) and MIDI files (`.mid`, `.midi`) from the built-in file browser onto any track
+- Waveform display on audio clips; note preview on MIDI clips
 - Move clips by dragging -- snaps to the grid horizontally and locks to track lanes vertically
 - Move clips between tracks by dragging up/down
+- Split clips at the playhead (S key or toolbar button)
+- Delete selected clips (Delete / Backspace)
+- Clip context menu: Edit in Piano Roll, Quantize, Duplicate, Delete
+- Timeline context menu: Add Audio Track, Add MIDI Track, Create Empty MIDI Clip, Remove Track
 - Grid snapping with 5 modes: Off, 1/4 Beat, 1/2 Beat, Beat, Bar
 - Horizontal and vertical zoom (Ctrl+= / Ctrl+-)
 - Animated playhead cursor that tracks playback in real time
+
+### MIDI & Piano Roll
+
+- Add MIDI tracks via Edit > Add MIDI Track (Ctrl+Shift+T)
+- Create empty MIDI clips or import `.mid` / `.midi` files by dragging them onto a track
+- Multi-track MIDI file import with automatic merge
+- Full **Piano Roll editor** (docked as a tab alongside the Mixer):
+  - Add notes with Ctrl+click or double-click
+  - Move and resize notes by dragging
+  - Delete notes with Delete / Backspace
+  - Select all notes (Ctrl+A)
+  - Quantize notes to grid
+  - Velocity lane for per-note velocity editing
+  - Snap modes: Off, 1/4 Beat, 1/2 Beat, Beat, Bar
+  - Zoom in / out
+  - Right-click context menu: Select All, Delete Selected, Quantize, Add Note Here
+
+### VST3 Instrument Support
+
+- Scan for installed VST3 plugins (Edit > Scan VST Plugins)
+- Plugin list cached to `%AppData%/FreeDaw/plugin-cache.xml`
+- Assign VST3 instruments to MIDI tracks via a searchable selector dialog
+- Open native plugin editor windows for full parameter control
+- Instrument button on MIDI track headers and mixer channel strips (click to open editor, right-click to change instrument)
 
 ### Transport
 
@@ -45,6 +74,7 @@ Drag in samples, press play, add reverb with one click.
 ### Track Headers (left panel)
 
 - Per-track controls: name, Mute (M), Solo (S), Record Arm (R)
+- Instrument button on MIDI tracks (opens VST editor)
 - Horizontal volume slider and pan knob per track
 - Real-time level meters (green/yellow/red) that react to playback audio
 - Vertically synchronized with the timeline scroll
@@ -53,6 +83,7 @@ Drag in samples, press play, add reverb with one click.
 
 - Channel strip per track with: vertical volume fader, pan knob, Mute/Solo/Record Arm, level meter
 - Master channel strip on the right
+- Instrument selector on MIDI track channel strips
 - Two FX insert slots per track (quick-add Reverb, EQ, Compressor)
 - Always left-aligned, horizontally scrollable
 
@@ -80,15 +111,17 @@ Add any of these to a track with one click from the Effects panel or mixer FX sl
 
 ### File Browser (right panel, tabbed)
 
-- Browse your file system filtered to audio files
+- Browse your file system filtered to audio and MIDI files
 - Quick-jump locations: Desktop, Music, Documents, Home
 - Drag files directly from the browser onto timeline tracks
 
 ### Project Management
 
-- File > New Project -- start fresh
+- File > New Project -- start fresh with 4 empty audio tracks
 - File > Open Project -- load a `.tracktionedit` file
 - File > Save / Save As -- save your arrangement
+- Edit > Add Audio Track / Add MIDI Track / Remove Selected Track
+- View > Toggle Mixer, Toggle Browser, Toggle Effects
 
 ---
 
@@ -122,7 +155,7 @@ All commands are for **PowerShell on Windows**.
 ### 1. Clone the repository with submodules
 
 ```powershell
-git clone --recurse-submodules https://github.com/your-username/AudioMixer.git
+git clone --recurse-submodules https://github.com/grhod/AudioMixer.git
 cd AudioMixer
 ```
 
@@ -184,7 +217,7 @@ c:\qt\6.10.2\msvc2022_64\bin\windeployqt.exe .\build\FreeDaw_artefacts\Debug\Fre
 
 ### Getting started
 
-1. **Launch FreeDaw.** The window opens with one empty audio track, a transport bar at the top, track headers on the left, the timeline in the center, the mixer at the bottom, and the file browser / effects panel tabbed on the right.
+1. **Launch FreeDaw.** The window opens with 4 empty audio tracks, a transport bar at the top, track headers on the left, the timeline in the center, the mixer at the bottom, and the file browser / effects panel tabbed on the right.
 
 2. **Set your tempo.** In the transport bar, adjust the BPM spinner (default 120). Change the time signature with the two spinners next to it (default 4/4).
 
@@ -192,13 +225,13 @@ c:\qt\6.10.2\msvc2022_64\bin\windeployqt.exe .\build\FreeDaw_artefacts\Debug\Fre
 
 ### Adding audio to the timeline
 
-1. In the **Browser** tab (right panel), navigate to a folder containing audio files. Use the dropdown at the top for quick access to Desktop, Music, Documents, or Home.
+1. In the **Browser** tab (right panel), navigate to a folder containing audio or MIDI files. Use the dropdown at the top for quick access to Desktop, Music, Documents, or Home.
 
-2. **Drag an audio file** from the browser and **drop it onto a track lane** in the timeline. The clip will snap to the grid at the drop position.
+2. **Drag an audio file** (`.wav`, `.mp3`, `.flac`, `.ogg`, `.aiff`) or **MIDI file** (`.mid`, `.midi`) from the browser and **drop it onto a track lane** in the timeline. The clip will snap to the grid at the drop position.
 
-3. The clip appears with its waveform. You can **drag it** to reposition -- it snaps horizontally to the grid and vertically to track lanes.
+3. Audio clips display their waveform; MIDI clips display a note preview. You can **drag any clip** to reposition -- it snaps horizontally to the grid and vertically to track lanes.
 
-4. To **add more tracks**, go to Edit > Add Audio Track (Ctrl+T).
+4. To **add more tracks**, go to Edit > Add Audio Track (Ctrl+T) or Edit > Add MIDI Track (Ctrl+Shift+T).
 
 ### Playback
 
@@ -227,6 +260,21 @@ Each track has controls in two places:
 - **FX 1 / FX 2** dropdowns -- quick-add Reverb, EQ, or Compressor
 - **Master strip** on the far right -- controls overall output level
 
+### Working with MIDI
+
+1. **Add a MIDI track** via Edit > Add MIDI Track (Ctrl+Shift+T).
+2. **Create a MIDI clip** by right-clicking a MIDI track lane and selecting "Create Empty MIDI Clip", or drag a `.mid` file from the browser.
+3. **Open the Piano Roll** by double-clicking a MIDI clip (or right-click > Edit in Piano Roll).
+4. **Add notes** with Ctrl+click or double-click on the grid. **Drag** notes to move them, **drag edges** to resize.
+5. **Edit velocity** in the velocity lane at the bottom of the Piano Roll -- drag the bars up/down.
+6. **Quantize** notes from the right-click context menu or the Piano Roll toolbar.
+
+### Using VST3 instruments
+
+1. **Scan for plugins** via Edit > Scan VST Plugins. This only needs to be done once (results are cached).
+2. **Assign an instrument** to a MIDI track by clicking the instrument button on the track header or mixer channel strip.
+3. **Open the plugin editor** by clicking the instrument button on a MIDI track that already has an instrument assigned. Right-click to change the instrument.
+
 ### Adding effects
 
 **Quick method:** In the mixer, use the FX 1 or FX 2 dropdown on any track's channel strip and select Reverb, EQ, or Compressor.
@@ -247,17 +295,31 @@ Each track has controls in two places:
 
 ### Keyboard shortcuts
 
+**Global**
+
 | Shortcut | Action |
 |----------|--------|
 | Space | Play / Pause |
 | R | Record |
+| S | Split clip at playhead |
+| Delete / Backspace | Delete selected clips |
 | Ctrl+T | Add audio track |
+| Ctrl+Shift+T | Add MIDI track |
 | Ctrl+N | New project |
 | Ctrl+O | Open project |
 | Ctrl+S | Save project |
 | Ctrl+Shift+S | Save As |
+| Ctrl+Q | Quit |
 | Ctrl+= | Zoom in (timeline) |
 | Ctrl+- | Zoom out (timeline) |
+
+**Piano Roll**
+
+| Shortcut | Action |
+|----------|--------|
+| Ctrl+click / Double-click | Add note |
+| Delete / Backspace | Delete selected notes |
+| Ctrl+A | Select all notes |
 
 ---
 
@@ -267,6 +329,8 @@ Each track has controls in two places:
 AudioMixer/
   CMakeLists.txt                          Root build configuration
   README.md                               This file
+  LICENSE                                 GPLv3 license
+  CONTRIBUTING.md                         Contribution guidelines
   libs/
     JUCE/                                 JUCE framework (git submodule)
     tracktion_engine/                     Tracktion Engine (git submodule)
@@ -276,21 +340,27 @@ AudioMixer/
       FreeDawApplication.h/cpp            Application lifecycle
       JuceQtBridge.h/cpp                  QTimer-based JUCE message pump
     engine/
-      AudioEngine.h/cpp                   Wraps tracktion::engine::Engine
+      AudioEngine.h/cpp                   Wraps tracktion::engine::Engine, MIDI device enumeration
       EditManager.h/cpp                   Manages the current Edit (project)
-      PluginScanner.h/cpp                 VST plugin scanning (stub)
+      PluginScanner.h/cpp                 VST3 plugin scanning and cache
     ui/
       MainWindow.h/cpp                    Main window with menus, docks, toolbar
       timeline/
         TimelineView.h/cpp                Arrangement view with track headers
         TimeRuler.h/cpp                   Beat/bar ruler with click and drag
-        TrackHeaderWidget.h/cpp           Per-track controls and level meter
+        TrackHeaderWidget.h/cpp           Per-track controls, level meter, instrument button
         TrackLane.h/cpp                   Track lane data model
-        ClipItem.h/cpp                    Audio clip with snapped dragging
+        ClipItem.h/cpp                    Audio/MIDI clip with snapped dragging
         GridSnapper.h/cpp                 Snap-to-grid logic
+      pianoroll/
+        PianoRollEditor.h/cpp             Piano roll dock widget container
+        NoteGrid.h/cpp                    Note editing grid (add, move, resize, delete)
+        NoteItem.h/cpp                    Individual MIDI note graphics item
+        VelocityLane.h/cpp                Per-note velocity editor
+        PianoKeyboard.h/cpp               Piano keyboard sidebar
       mixer/
         MixerView.h/cpp                   Horizontal mixer panel
-        ChannelStrip.h/cpp                Per-track mixer strip
+        ChannelStrip.h/cpp                Per-track mixer strip with instrument selector
       transport/
         TransportBar.h/cpp                Play/Stop/Record/Loop/BPM controls
       controls/
@@ -301,6 +371,8 @@ AudioMixer/
       effects/
         EffectChainWidget.h/cpp           Per-track effect chain editor
         EffectSelectorDialog.h/cpp        Effect picker dialog
+        PluginEditorWindow.h/cpp          Native VST plugin editor window
+        VstSelectorDialog.h/cpp           Searchable VST instrument selector
       browser/
         FileBrowserPanel.h/cpp            File system browser with drag support
     utils/
