@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QSlider>
+#include <QFrame>
 #include <QTimer>
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -52,6 +53,7 @@ private:
     QSlider* volumeSlider_;
     RotaryKnob* panKnob_;
     LevelMeter* meter_;
+    QFrame* rowSeparator_ = nullptr;
     QTimer meterTimer_;
 
     te::LevelMeasurer::Client meterClient_;

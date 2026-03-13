@@ -424,13 +424,16 @@ void TimelineView::rebuildClips()
     for (auto* item : clipItems_) scene_->removeItem(item);
     for (auto* item : trackBgItems_) scene_->removeItem(item);
     for (auto* item : gridLineItems_) scene_->removeItem(item);
+    for (auto* item : trackSeparatorItems_) scene_->removeItem(item);
 
     qDeleteAll(clipItems_);
     qDeleteAll(trackBgItems_);
     qDeleteAll(gridLineItems_);
+    qDeleteAll(trackSeparatorItems_);
     clipItems_.clear();
     trackBgItems_.clear();
     gridLineItems_.clear();
+    trackSeparatorItems_.clear();
 
     if (!editMgr_ || !editMgr_->edit()) return;
 
@@ -461,6 +464,15 @@ void TimelineView::rebuildClips()
                                         QPen(Qt::NoPen), QBrush(bg));
         bgItem->setZValue(-2);
         trackBgItems_.push_back(bgItem);
+    }
+
+    // Horizontal track separators so row boundaries are always clear.
+    QPen separatorPen(theme.border.lighter(120), 1.0);
+    for (int i = 0; i <= numTracks; ++i) {
+        const double y = i * trackHeight_;
+        auto* line = scene_->addLine(0, y, sceneWidth, y, separatorPen);
+        line->setZValue(-0.5);
+        trackSeparatorItems_.push_back(line);
     }
 
     drawGridLines();

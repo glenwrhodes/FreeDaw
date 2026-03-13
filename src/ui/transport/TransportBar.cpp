@@ -87,8 +87,10 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
     layout->addWidget(sep2);
 
     // BPM
-    auto* bpmLabel = new QLabel("BPM:", this);
-    bpmLabel->setStyleSheet(QString("color: %1;").arg(theme.text.name()));
+    auto* bpmLabel = new QLabel("BPM", this);
+    bpmLabel->setStyleSheet(
+        QString("QLabel { color: %1; background: transparent; border: none; }")
+            .arg(theme.text.name()));
     bpmSpin_ = new QDoubleSpinBox(this);
     bpmSpin_->setAccessibleName("Tempo BPM");
     bpmSpin_->setRange(20.0, 300.0);
@@ -103,8 +105,10 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
     layout->addWidget(bpmSpin_);
 
     // Time Signature
-    auto* tsLabel = new QLabel("Time:", this);
-    tsLabel->setStyleSheet(QString("color: %1;").arg(theme.text.name()));
+    auto* tsLabel = new QLabel("Time", this);
+    tsLabel->setStyleSheet(
+        QString("QLabel { color: %1; background: transparent; border: none; }")
+            .arg(theme.text.name()));
     timeSigNumSpin_ = new QSpinBox(this);
     timeSigNumSpin_->setAccessibleName("Time Signature Numerator");
     timeSigNumSpin_->setRange(1, 16);
@@ -115,7 +119,9 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
             this, &TransportBar::onTimeSigNumChanged);
 
     auto* slash = new QLabel("/", this);
-    slash->setStyleSheet(QString("color: %1;").arg(theme.text.name()));
+    slash->setStyleSheet(
+        QString("QLabel { color: %1; background: transparent; border: none; }")
+            .arg(theme.text.name()));
 
     timeSigDenSpin_ = new QSpinBox(this);
     timeSigDenSpin_->setAccessibleName("Time Signature Denominator");
@@ -138,8 +144,10 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
     layout->addWidget(sep3);
 
     // Snap mode
-    auto* snapLabel = new QLabel("Snap:", this);
-    snapLabel->setStyleSheet(QString("color: %1;").arg(theme.text.name()));
+    auto* snapLabel = new QLabel("Snap", this);
+    snapLabel->setStyleSheet(
+        QString("QLabel { color: %1; background: transparent; border: none; }")
+            .arg(theme.text.name()));
     snapCombo_ = new QComboBox(this);
     snapCombo_->setAccessibleName("Grid Snap Mode");
     snapCombo_->addItem("Off",     int(SnapMode::Off));

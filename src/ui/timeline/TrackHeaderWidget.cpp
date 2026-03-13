@@ -151,7 +151,7 @@ TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr
     panKnob_->setAccessibleName("Pan");
     panKnob_->setRange(-1.0, 1.0);
     panKnob_->setValue(0.0);
-    panKnob_->setLabel("Pan");
+    panKnob_->setLabel(QString());
     panKnob_->setFixedSize(36, 40);
     connect(panKnob_, &RotaryKnob::valueChanged, this, [this](double v) {
         if (!track_) return;
@@ -197,6 +197,15 @@ TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr
     mainLayout->addLayout(controlRow);
     mainLayout->addStretch();
 
+    rowSeparator_ = new QFrame(this);
+    rowSeparator_->setAccessibleName("Track Row Separator");
+    rowSeparator_->setFrameShape(QFrame::NoFrame);
+    rowSeparator_->setFixedHeight(1);
+    rowSeparator_->setStyleSheet(
+        QString("background: %1;")
+            .arg(theme.border.lighter(145).name()));
+    mainLayout->addWidget(rowSeparator_);
+
     levelMeterPlugin_ = track_->getLevelMeterPlugin();
     if (levelMeterPlugin_)
         levelMeterPlugin_->measurer.addClient(meterClient_);
@@ -234,13 +243,16 @@ void TrackHeaderWidget::updateSelectionStyle()
             "border-left: 3px solid %2; "
             "border-top: 1px solid %3; "
             "border-right: 1px solid %3; "
-            "border-bottom: 1px solid %3;")
+            "border-bottom: 0px solid transparent;")
                 .arg(selectedBg.name(), theme.meterGreen.name(),
                      theme.border.lighter(115).name()));
     } else {
         setStyleSheet(QString(
             "background: %1; "
-            "border: 1px solid transparent;")
+            "border-left: 1px solid transparent; "
+            "border-top: 1px solid transparent; "
+            "border-right: 1px solid transparent; "
+            "border-bottom: 0px solid transparent;")
                 .arg(theme.surface.name()));
         QPalette pal;
         pal.setColor(QPalette::Window, theme.surface);

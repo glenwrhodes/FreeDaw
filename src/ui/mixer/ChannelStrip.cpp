@@ -114,7 +114,7 @@ void ChannelStrip::setupUI()
     panKnob_->setAccessibleName("Pan");
     panKnob_->setRange(-1.0, 1.0);
     panKnob_->setValue(0.0);
-    panKnob_->setLabel("Pan");
+    panKnob_->setLabel(QString());
     panKnob_->setFixedSize(48, 48);
     auto* panRow = new QHBoxLayout();
     panRow->addStretch();

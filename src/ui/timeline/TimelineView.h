@@ -110,6 +110,7 @@ private:
     std::vector<ClipItem*> clipItems_;
     std::vector<QGraphicsRectItem*> trackBgItems_;
     std::vector<QGraphicsLineItem*> gridLineItems_;
+    std::vector<QGraphicsLineItem*> trackSeparatorItems_;
     std::vector<TrackHeaderWidget*> trackHeaders_;
     te::AudioTrack* selectedTrack_ = nullptr;
 

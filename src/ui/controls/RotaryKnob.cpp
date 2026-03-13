@@ -42,19 +42,24 @@ void RotaryKnob::paintEvent(QPaintEvent*)
     QRectF knobRect(margin, margin, side - 2 * margin, side - 2 * margin);
     knobRect.moveCenter(QPointF(width() / 2.0, height() / 2.0 - 6));
 
-    // Background arc
-    const double startAngle = 225.0;
-    const double spanAngle  = -270.0;
+    // Background arc: 270-degree travel with center at 12 o'clock.
+    const double minAngle = 225.0;   // bottom-left
+    const double maxAngle = -45.0;   // bottom-right
+    const double centerAngle = 90.0; // straight up (pan = 0)
+    const double fullSpan = maxAngle - minAngle;
+    const double angle = minAngle + fullSpan * normalised();
+    const bool isBipolar = (min_ < 0.0 && max_ > 0.0);
 
     QPen arcPen(theme.border, 3.0, Qt::SolidLine, Qt::RoundCap);
     p.setPen(arcPen);
-    p.drawArc(knobRect, int(startAngle * 16), int(spanAngle * 16));
+    p.drawArc(knobRect, int(minAngle * 16), int(fullSpan * 16));
 
-    // Value arc
-    double valueSpan = spanAngle * normalised();
+    // Value arc: bipolar controls (e.g. pan) fill from center to current value.
+    const double valueStart = isBipolar ? centerAngle : minAngle;
+    const double valueSpan = isBipolar ? (angle - centerAngle) : (angle - minAngle);
     QPen valuePen(theme.accent, 3.0, Qt::SolidLine, Qt::RoundCap);
     p.setPen(valuePen);
-    p.drawArc(knobRect, int(startAngle * 16), int(valueSpan * 16));
+    p.drawArc(knobRect, int(valueStart * 16), int(valueSpan * 16));
 
     // Knob body
     double knobInset = side * 0.22;
@@ -68,14 +73,14 @@ void RotaryKnob::paintEvent(QPaintEvent*)
     p.drawEllipse(innerRect);
 
     // Indicator line
-    double angle = (startAngle + valueSpan) * M_PI / 180.0;
+    const double angleRad = angle * M_PI / 180.0;
     QPointF center = innerRect.center();
     double r = innerRect.width() / 2.0 - 2.0;
     // Qt's y-axis is downward, so use +cos/-sin to match arc direction.
-    QPointF tip(center.x() + r * std::cos(angle),
-                center.y() - r * std::sin(angle));
-    QPointF base(center.x() + (r * 0.3) * std::cos(angle),
-                 center.y() - (r * 0.3) * std::sin(angle));
+    QPointF tip(center.x() + r * std::cos(angleRad),
+                center.y() - r * std::sin(angleRad));
+    QPointF base(center.x() + (r * 0.3) * std::cos(angleRad),
+                 center.y() - (r * 0.3) * std::sin(angleRad));
 
     p.setPen(QPen(theme.accentLight, 2.0, Qt::SolidLine, Qt::RoundCap));
     p.drawLine(base, tip);
