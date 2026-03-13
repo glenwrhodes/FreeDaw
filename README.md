@@ -8,7 +8,7 @@
 **A free, open-source Digital Audio Workstation for Windows**
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg?logo=windows)](https://github.com/grhod/AudioMixer)
+[![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg?logo=windows)](https://github.com/glenwrhodes/FreeDaw)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg?logo=cplusplus)](https://en.cppreference.com/w/cpp/20)
 [![Qt 6](https://img.shields.io/badge/Qt-6.8%2B-41CD52.svg?logo=qt)](https://www.qt.io/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -21,6 +21,17 @@ Audio and MIDI tracks, a built-in piano roll, VST3 instrument support, 8 built-i
 <img src="resources/splash.png" alt="FreeDaw splash screen" width="600">
 
 </div>
+
+---
+
+## Download
+
+Grab the latest release from the **[Releases page](https://github.com/glenwrhodes/FreeDaw/releases/latest)**:
+
+| Download | Description |
+|----------|-------------|
+| **FreeDaw-v*x.x.x*-setup.exe** | Windows installer with Start Menu shortcut and uninstaller |
+| **FreeDaw-v*x.x.x*-portable.zip** | Portable build — unzip and run, no installation needed |
 
 ---
 
@@ -335,6 +346,11 @@ AudioMixer/
   README.md                               This file
   LICENSE                                 GPLv3 license
   CONTRIBUTING.md                         Contribution guidelines
+  .github/
+    workflows/
+      release.yml                         CI/CD: build + release on tag push
+  installer/
+    freedaw.iss                           Inno Setup installer script
   resources/
     splash.png                            Splash screen artwork
   libs/

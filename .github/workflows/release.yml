@@ -1,0 +1,88 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Pin JUCE to required commit
+        run: |
+          cd libs/JUCE
+          git fetch origin 7c89e11f6b7316c369f3d3f22227c60e816e738b
+          git checkout 7c89e11f6b7316c369f3d3f22227c60e816e738b
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.0'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+          cache: true
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure CMake
+        run: >
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}"
+          -DCMAKE_C_COMPILER=cl
+          -DCMAKE_CXX_COMPILER=cl
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Deploy Qt runtime
+        shell: pwsh
+        run: |
+          $exe = "build/FreeDaw_artefacts/Release/FreeDaw.exe"
+          & "${{ env.Qt6_DIR }}/bin/windeployqt.exe" --release --no-translations --no-opengl-sw $exe
+
+      - name: Package portable ZIP
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          Compress-Archive -Path "build/FreeDaw_artefacts/Release/*" -DestinationPath "FreeDaw-v${version}-portable.zip"
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' `
+            /DMyAppVersion="$version" `
+            /DSourceDir="$PWD\build\FreeDaw_artefacts\Release" `
+            /DOutputDir="$PWD" `
+            /DLicenseDir="$PWD" `
+            "installer\freedaw.iss"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: FreeDaw v${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            FreeDaw-v${{ steps.version.outputs.VERSION }}-portable.zip
+            FreeDaw-v${{ steps.version.outputs.VERSION }}-setup.exe
