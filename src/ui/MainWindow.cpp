@@ -210,17 +210,84 @@ void MainWindow::createMenus()
 
 void MainWindow::createToolBar()
 {
-    mainToolBar_ = addToolBar("Main");
-    mainToolBar_->setAccessibleName("Main Toolbar");
+    transportToolBar_ = addToolBar("Transport");
+    transportToolBar_->setAccessibleName("Transport Toolbar");
+    transportToolBar_->setMovable(false);
+    transportToolBar_->setFloatable(false);
+    transportToolBar_->setIconSize(QSize(20, 20));
+    transportToolBar_->addWidget(transportBar_);
+
+    addToolBarBreak(Qt::TopToolBarArea);
+
+    mainToolBar_ = addToolBar("Tools");
+    mainToolBar_->setAccessibleName("Tools Toolbar");
     mainToolBar_->setMovable(false);
     mainToolBar_->setFloatable(false);
-    mainToolBar_->setIconSize(QSize(20, 20));
+    mainToolBar_->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    mainToolBar_->setIconSize(QSize(18, 18));
 
-    mainToolBar_->addWidget(transportBar_);
+    auto* newProjectAction = mainToolBar_->addAction(
+        style()->standardIcon(QStyle::SP_FileIcon), "New Project",
+        this, &MainWindow::onNewProject);
+    newProjectAction->setToolTip("New Project");
+
+    auto* openProjectAction = mainToolBar_->addAction(
+        style()->standardIcon(QStyle::SP_DialogOpenButton), "Open Project",
+        this, &MainWindow::onOpenProject);
+    openProjectAction->setToolTip("Open Project");
+
+    auto* saveProjectAction = mainToolBar_->addAction(
+        style()->standardIcon(QStyle::SP_DialogSaveButton), "Save Project",
+        this, &MainWindow::onSaveProject);
+    saveProjectAction->setToolTip("Save Project");
+
+    mainToolBar_->addSeparator();
+
+    auto* addAudioTrackAction = mainToolBar_->addAction(
+        style()->standardIcon(QStyle::SP_FileDialogNewFolder), "Add Audio Track",
+        this, &MainWindow::onAddTrack);
+    addAudioTrackAction->setToolTip("Add Audio Track");
+
+    auto* addMidiTrackAction = mainToolBar_->addAction(
+        style()->standardIcon(QStyle::SP_MediaVolume), "Add MIDI Track",
+        this, &MainWindow::onAddMidiTrack);
+    addMidiTrackAction->setToolTip("Add MIDI Track");
+
+    auto* removeTrackAction = mainToolBar_->addAction(
+        style()->standardIcon(QStyle::SP_TrashIcon), "Remove Track",
+        this, &MainWindow::onRemoveTrack);
+    removeTrackAction->setToolTip("Remove Track");
+
     if (splitClipAction_) {
+        splitClipAction_->setIcon(style()->standardIcon(QStyle::SP_ArrowRight));
+        splitClipAction_->setText("Split Clip");
         mainToolBar_->addAction(splitClipAction_);
-        if (auto* splitButton = mainToolBar_->widgetForAction(splitClipAction_))
-            splitButton->setAccessibleName("Split Clip");
+    }
+
+    auto* scanPluginsAction = mainToolBar_->addAction(
+        style()->standardIcon(QStyle::SP_BrowserReload), "Scan VST Plugins",
+        this, &MainWindow::onScanVstPlugins);
+    scanPluginsAction->setToolTip("Scan VST Plugins");
+
+    mainToolBar_->addSeparator();
+
+    if (mixerDock_) {
+        auto* mixerToggle = mixerDock_->toggleViewAction();
+        mixerToggle->setIcon(style()->standardIcon(QStyle::SP_ComputerIcon));
+        mixerToggle->setToolTip("Toggle Mixer");
+        mainToolBar_->addAction(mixerToggle);
+    }
+    if (browserDock_) {
+        auto* browserToggle = browserDock_->toggleViewAction();
+        browserToggle->setIcon(style()->standardIcon(QStyle::SP_DirIcon));
+        browserToggle->setToolTip("Toggle Browser");
+        mainToolBar_->addAction(browserToggle);
+    }
+    if (effectsDock_) {
+        auto* effectsToggle = effectsDock_->toggleViewAction();
+        effectsToggle->setIcon(style()->standardIcon(QStyle::SP_FileDialogContentsView));
+        effectsToggle->setToolTip("Toggle Effects");
+        mainToolBar_->addAction(effectsToggle);
     }
 }
 

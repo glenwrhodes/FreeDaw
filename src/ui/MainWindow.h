@@ -59,6 +59,7 @@ private:
     QDockWidget* browserDock_         = nullptr;
     QDockWidget* pianoRollDock_       = nullptr;
 
+    QToolBar* transportToolBar_       = nullptr;
     QToolBar* mainToolBar_            = nullptr;
     QAction* splitClipAction_         = nullptr;
 };

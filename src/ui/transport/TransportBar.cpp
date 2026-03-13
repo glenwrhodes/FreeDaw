@@ -2,9 +2,47 @@
 #include "ui/timeline/GridSnapper.h"
 #include "utils/ThemeManager.h"
 #include <QStyle>
+#include <QPainter>
+#include <QPainterPath>
 #include <cmath>
 
 namespace freedaw {
+namespace {
+QIcon makeRecordIcon(const QColor& color, int size = 18)
+{
+    QPixmap pix(size, size);
+    pix.fill(Qt::transparent);
+
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setPen(Qt::NoPen);
+    p.setBrush(color);
+    p.drawEllipse(QRectF(2.0, 2.0, size - 4.0, size - 4.0));
+    return QIcon(pix);
+}
+
+QIcon makeLoopIcon(const QColor& color, int size = 18)
+{
+    QPixmap pix(size, size);
+    pix.fill(Qt::transparent);
+
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setPen(QPen(color, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+
+    QRectF r(2.5, 3.0, size - 7.0, size - 7.0);
+    p.drawArc(r, 40 * 16, 260 * 16);
+
+    QPainterPath arrow;
+    const QPointF tip(r.right() + 1.0, r.center().y() - 1.0);
+    arrow.moveTo(tip);
+    arrow.lineTo(tip + QPointF(-4.5, -1.5));
+    arrow.lineTo(tip + QPointF(-3.0, 3.0));
+    arrow.closeSubpath();
+    p.fillPath(arrow, color);
+    return QIcon(pix);
+}
+}
 
 TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
     : QWidget(parent), editMgr_(editMgr)
@@ -22,44 +60,48 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
     layout->setContentsMargins(8, 4, 8, 4);
     layout->setSpacing(6);
 
-    // Transport buttons
-    stopBtn_ = new QPushButton("Stop", this);
+    // Transport buttons (icon-only)
+    const QSize transportButtonSize(34, 32);
+    const QSize transportIconSize(18, 18);
+
+    stopBtn_ = new QPushButton(this);
     stopBtn_->setAccessibleName("Stop");
-    stopBtn_->setFixedSize(56, 32);
+    stopBtn_->setToolTip("Stop");
+    stopBtn_->setFixedSize(transportButtonSize);
+    stopBtn_->setIcon(style()->standardIcon(QStyle::SP_MediaStop));
+    stopBtn_->setIconSize(transportIconSize);
     applyButtonStyle(stopBtn_, theme.transportStop);
     connect(stopBtn_, &QPushButton::clicked, this, &TransportBar::onStop);
 
-    playBtn_ = new QPushButton("Play", this);
+    playBtn_ = new QPushButton(this);
     playBtn_->setAccessibleName("Play");
+    playBtn_->setToolTip("Play");
     playBtn_->setCheckable(true);
-    playBtn_->setFixedSize(56, 32);
+    playBtn_->setFixedSize(transportButtonSize);
+    playBtn_->setIcon(style()->standardIcon(QStyle::SP_MediaPlay));
+    playBtn_->setIconSize(transportIconSize);
     applyButtonStyle(playBtn_, theme.transportPlay);
     connect(playBtn_, &QPushButton::clicked, this, &TransportBar::onPlay);
 
-    recordBtn_ = new QPushButton("Rec", this);
+    recordBtn_ = new QPushButton(this);
     recordBtn_->setAccessibleName("Record");
+    recordBtn_->setToolTip("Record");
     recordBtn_->setCheckable(true);
-    recordBtn_->setFixedSize(48, 32);
+    recordBtn_->setFixedSize(transportButtonSize);
+    recordBtn_->setIcon(makeRecordIcon(theme.transportRecord));
+    recordBtn_->setIconSize(transportIconSize);
     applyButtonStyle(recordBtn_, theme.transportRecord);
     connect(recordBtn_, &QPushButton::clicked, this, &TransportBar::onRecord);
 
-    loopBtn_ = new QPushButton("Loop", this);
+    loopBtn_ = new QPushButton(this);
     loopBtn_->setAccessibleName("Loop Toggle");
+    loopBtn_->setToolTip("Loop");
     loopBtn_->setCheckable(true);
-    loopBtn_->setFixedSize(48, 32);
+    loopBtn_->setFixedSize(transportButtonSize);
+    loopBtn_->setIcon(makeLoopIcon(theme.accentLight));
+    loopBtn_->setIconSize(transportIconSize);
     applyButtonStyle(loopBtn_, theme.accent);
     connect(loopBtn_, &QPushButton::clicked, this, &TransportBar::onLoop);
-
-    layout->addWidget(stopBtn_);
-    layout->addWidget(playBtn_);
-    layout->addWidget(recordBtn_);
-    layout->addWidget(loopBtn_);
-
-    // Separator
-    auto* sep1 = new QFrame(this);
-    sep1->setFrameShape(QFrame::VLine);
-    sep1->setStyleSheet(QString("color: %1;").arg(theme.border.name()));
-    layout->addWidget(sep1);
 
     // Position display
     positionLabel_ = new QLabel("00:00.000", this);
@@ -81,6 +123,17 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
     layout->addWidget(beatLabel_);
 
     // Separator
+    auto* sep1 = new QFrame(this);
+    sep1->setFrameShape(QFrame::VLine);
+    sep1->setStyleSheet(QString("color: %1;").arg(theme.border.name()));
+    layout->addWidget(sep1);
+
+    // Transport controls: right of time displays, left of BPM/Time/Snap.
+    layout->addWidget(stopBtn_);
+    layout->addWidget(playBtn_);
+    layout->addWidget(recordBtn_);
+    layout->addWidget(loopBtn_);
+
     auto* sep2 = new QFrame(this);
     sep2->setFrameShape(QFrame::VLine);
     sep2->setStyleSheet(sep1->styleSheet());
@@ -136,12 +189,6 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
     layout->addWidget(timeSigNumSpin_);
     layout->addWidget(slash);
     layout->addWidget(timeSigDenSpin_);
-
-    // Separator
-    auto* sep3 = new QFrame(this);
-    sep3->setFrameShape(QFrame::VLine);
-    sep3->setStyleSheet(sep1->styleSheet());
-    layout->addWidget(sep3);
 
     // Snap mode
     auto* snapLabel = new QLabel("Snap", this);
