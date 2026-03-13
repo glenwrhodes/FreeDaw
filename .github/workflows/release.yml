@@ -46,7 +46,7 @@ jobs:
         run: >
           cmake -B build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}"
+          -DCMAKE_PREFIX_PATH="${{ env.QT_ROOT_DIR }}"
           -DCMAKE_C_COMPILER=cl
           -DCMAKE_CXX_COMPILER=cl
 
@@ -57,7 +57,7 @@ jobs:
         shell: pwsh
         run: |
           $exe = "build/FreeDaw_artefacts/Release/FreeDaw.exe"
-          & "${{ env.Qt6_DIR }}/bin/windeployqt.exe" --release --no-translations --no-opengl-sw $exe
+          windeployqt --release --no-translations --no-opengl-sw $exe
 
       - name: Package portable ZIP
         shell: pwsh
