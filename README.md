@@ -1,10 +1,26 @@
+<!-- GitHub metadata: topics should be set in repo Settings > About -->
+<!-- Suggested topics: daw, digital-audio-workstation, audio, music-production, qt6, juce, tracktion-engine, cpp, windows, open-source, audio-editor, music-software -->
+
+<div align="center">
+
 # FreeDaw
 
-A free, open-source Digital Audio Workstation (DAW) for Windows, built with **Qt 6** for the UI and **Tracktion Engine** (JUCE) for the audio backend. FreeDaw aims to be powerful yet simple enough for non-engineers -- drag in samples, press play, add reverb with one click.
+**A free, open-source Digital Audio Workstation for Windows**
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg?logo=windows)](https://github.com/grhod/AudioMixer)
+[![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg?logo=cplusplus)](https://en.cppreference.com/w/cpp/20)
+[![Qt 6](https://img.shields.io/badge/Qt-6.8%2B-41CD52.svg?logo=qt)](https://www.qt.io/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+Built with **Qt 6** for the UI and **Tracktion Engine** (JUCE) for the audio backend.
+Drag in samples, press play, add reverb with one click.
+
+</div>
 
 ---
 
-## Features (MVP)
+## Features
 
 ### Timeline / Arrangement
 
@@ -303,7 +319,26 @@ A `QTimer` pumps JUCE's `MessageManager` every 10ms from Qt's event loop, allowi
 
 ---
 
+## Contributing
+
+Contributions are welcome! Whether it's bug reports, feature requests, or pull requests — all help is appreciated.
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for details on how to get started, coding conventions, and the PR process.
+
+---
+
 ## License
 
-This project uses **Tracktion Engine** (GPLv3) and **JUCE** (AGPLv3).
-FreeDaw is licensed under **GPLv3**.
+This project is licensed under the **GNU General Public License v3.0** — see the [LICENSE](LICENSE) file for details.
+
+FreeDaw uses [Tracktion Engine](https://github.com/Tracktion/tracktion_engine) (GPLv3) and [JUCE](https://juce.com/) (AGPLv3), both of which are compatible with this license.
+
+---
+
+<div align="center">
+
+Made with care for musicians and producers everywhere.
+
+If FreeDaw is useful to you, consider giving it a star on GitHub.
+
+</div>

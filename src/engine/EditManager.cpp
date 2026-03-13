@@ -1,5 +1,6 @@
 #include "EditManager.h"
 #include <juce_audio_formats/juce_audio_formats.h>
+#include <QDebug>
 
 namespace freedaw {
 
@@ -22,12 +23,33 @@ EditManager::EditManager(AudioEngine& engine, QObject* parent)
 
 EditManager::~EditManager() = default;
 
+void EditManager::teardownCurrentEdit()
+{
+    if (!edit_) return;
+
+    qDebug() << "[teardown] emitting aboutToChangeEdit";
+    emit aboutToChangeEdit();
+
+    qDebug() << "[teardown] stopping transport";
+    auto& transport = edit_->getTransport();
+    if (transport.isPlaying())
+        transport.stop(false, false);
+
+    qDebug() << "[teardown] freeing playback context";
+    transport.freePlaybackContext();
+
+    midiTrackIds_.clear();
+    qDebug() << "[teardown] complete";
+}
+
 void EditManager::createDefaultEdit()
 {
+    teardownCurrentEdit();
     auto& eng = audioEngine_.engine();
     edit_ = te::createEmptyEdit(eng, juce::File());
     edit_->ensureNumberOfAudioTracks(4);
     ensureLevelMetersOnAllTracks();
+    edit_->getTransport().ensureContextAllocated();
     currentFile_ = juce::File();
     emit editChanged();
     emit tracksChanged();
@@ -43,15 +65,38 @@ bool EditManager::loadEdit(const juce::File& file)
     if (!file.existsAsFile())
         return false;
 
+    qDebug() << "[loadEdit] teardown start";
+    teardownCurrentEdit();
+    qDebug() << "[loadEdit] teardown done, loading file...";
+
     auto& eng = audioEngine_.engine();
-    edit_ = te::loadEditFromFile(eng, file);
-    if (!edit_)
+    auto newEdit = te::loadEditFromFile(eng, file);
+    if (!newEdit)
         return false;
 
+    qDebug() << "[loadEdit] file loaded, assigning edit";
+    edit_ = std::move(newEdit);
+
+    qDebug() << "[loadEdit] ensuring level meters";
     ensureLevelMetersOnAllTracks();
+
+    qDebug() << "[loadEdit] detecting MIDI tracks";
+    for (auto* track : te::getAudioTracks(*edit_)) {
+        if (hasInstrumentPlugin(track))
+            midiTrackIds_.insert(track->itemID.getRawID());
+    }
+
     currentFile_ = file;
+
+    qDebug() << "[loadEdit] allocating playback context";
+    edit_->getTransport().ensureContextAllocated();
+    qDebug() << "[loadEdit] playback context ready";
+
+    qDebug() << "[loadEdit] emitting editChanged";
     emit editChanged();
+    qDebug() << "[loadEdit] emitting tracksChanged";
     emit tracksChanged();
+    qDebug() << "[loadEdit] done";
     return true;
 }
 

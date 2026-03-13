@@ -7,7 +7,9 @@
 #include <QUrl>
 #include <QScrollBar>
 #include <QWheelEvent>
+#include <QKeyEvent>
 #include <QMenu>
+#include <QDebug>
 #include <cmath>
 
 namespace freedaw {
@@ -39,6 +41,14 @@ void TimelineScene::dropEvent(QGraphicsSceneDragDropEvent* event)
         emit fileDropped(path, pos.x(), int(pos.y()));
     }
     event->acceptProposedAction();
+}
+
+void TimelineScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        emit backgroundClicked(event->scenePos().x(), event->scenePos().y());
+    }
+    QGraphicsScene::mousePressEvent(event);
 }
 
 void TimelineScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
@@ -184,6 +194,15 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
     connect(scene_, &TimelineScene::fileDropped,
             this, &TimelineView::handleFileDrop);
 
+    // Click on timeline background -> select track
+    connect(scene_, &TimelineScene::backgroundClicked,
+            this, [this](double, double sceneY) {
+                int trackIdx = static_cast<int>(sceneY / trackHeight_);
+                auto tracks = editMgr_->getAudioTracks();
+                if (trackIdx >= 0 && trackIdx < tracks.size())
+                    selectTrack(tracks[trackIdx]);
+            });
+
     // Double-click on empty area -> create blank MIDI clip on MIDI tracks
     connect(scene_, &TimelineScene::emptyAreaDoubleClicked,
             this, &TimelineView::handleEmptyAreaDoubleClick);
@@ -238,6 +257,19 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
     snapper_.setTimeSig(editMgr_->getTimeSigNumerator(),
                         editMgr_->getTimeSigDenominator());
 
+    connect(editMgr_, &EditManager::aboutToChangeEdit, this, [this]() {
+        qDebug() << "[TimelineView] aboutToChangeEdit - clearing widgets";
+        for (auto* h : trackHeaders_) {
+            headerVLayout_->removeWidget(h);
+            delete h;
+        }
+        trackHeaders_.clear();
+
+        for (auto* item : clipItems_) scene_->removeItem(item);
+        qDeleteAll(clipItems_);
+        clipItems_.clear();
+    });
+
     connect(editMgr_, &EditManager::tracksChanged,
             this, &TimelineView::onTracksChanged);
     connect(editMgr_, &EditManager::editChanged,
@@ -267,27 +299,38 @@ void TimelineView::zoomVerticalOut() { setTrackHeight(trackHeight_ / 1.2); }
 
 bool TimelineView::eventFilter(QObject* watched, QEvent* event)
 {
-    if (watched == graphicsView_->viewport() && event->type() == QEvent::Wheel) {
-        auto* wheelEvent = static_cast<QWheelEvent*>(event);
+    if (watched == graphicsView_->viewport()) {
+        if (event->type() == QEvent::Wheel) {
+            auto* wheelEvent = static_cast<QWheelEvent*>(event);
 
-        if (wheelEvent->modifiers() & Qt::ControlModifier) {
-            const QPoint delta = wheelEvent->angleDelta();
-            if (delta.y() != 0) {
-                const double viewX = wheelEvent->position().x();
-                const int oldScrollX = graphicsView_->horizontalScrollBar()->value();
-                const double beatAtCursor = (oldScrollX + viewX) / pixelsPerBeat_;
+            if (wheelEvent->modifiers() & Qt::ControlModifier) {
+                const QPoint delta = wheelEvent->angleDelta();
+                if (delta.y() != 0) {
+                    const double viewX = wheelEvent->position().x();
+                    const int oldScrollX = graphicsView_->horizontalScrollBar()->value();
+                    const double beatAtCursor = (oldScrollX + viewX) / pixelsPerBeat_;
 
-                const double zoomSteps = static_cast<double>(delta.y()) / 120.0;
-                const double zoomFactor = std::pow(1.15, zoomSteps);
-                setPixelsPerBeat(pixelsPerBeat_ * zoomFactor);
+                    const double zoomSteps = static_cast<double>(delta.y()) / 120.0;
+                    const double zoomFactor = std::pow(1.15, zoomSteps);
+                    setPixelsPerBeat(pixelsPerBeat_ * zoomFactor);
 
-                const int newScrollX = static_cast<int>(
-                    std::round(beatAtCursor * pixelsPerBeat_ - viewX));
-                graphicsView_->horizontalScrollBar()->setValue(newScrollX);
+                    const int newScrollX = static_cast<int>(
+                        std::round(beatAtCursor * pixelsPerBeat_ - viewX));
+                    graphicsView_->horizontalScrollBar()->setValue(newScrollX);
+                }
+
+                wheelEvent->accept();
+                return true;
             }
+        }
 
-            wheelEvent->accept();
-            return true;
+        if (event->type() == QEvent::KeyPress) {
+            auto* keyEvent = static_cast<QKeyEvent*>(event);
+            if (keyEvent->key() == Qt::Key_Delete || keyEvent->key() == Qt::Key_Backspace) {
+                deleteSelectedClips();
+                keyEvent->accept();
+                return true;
+            }
         }
     }
 
@@ -301,40 +344,53 @@ void TimelineView::onTransportPositionChanged()
 
 void TimelineView::onEditChanged()
 {
+    qDebug() << "[TimelineView] onEditChanged start";
     snapper_.setBpm(editMgr_->getBpm());
     snapper_.setTimeSig(editMgr_->getTimeSigNumerator(),
                         editMgr_->getTimeSigDenominator());
     ruler_->setBpm(editMgr_->getBpm());
     ruler_->setTimeSig(editMgr_->getTimeSigNumerator(),
                        editMgr_->getTimeSigDenominator());
+    qDebug() << "[TimelineView] about to rebuildClips";
     rebuildClips();
+    qDebug() << "[TimelineView] onEditChanged done";
 }
 
 void TimelineView::onTracksChanged()
 {
+    qDebug() << "[TimelineView] onTracksChanged start";
     onEditChanged();
+    qDebug() << "[TimelineView] about to rebuildTrackHeaders";
     rebuildTrackHeaders();
+    qDebug() << "[TimelineView] onTracksChanged done";
 }
 
 void TimelineView::rebuildTrackHeaders()
 {
+    qDebug() << "[rebuildTrackHeaders] start";
     for (auto* h : trackHeaders_) {
         headerVLayout_->removeWidget(h);
-        h->deleteLater();
+        delete h;
     }
     trackHeaders_.clear();
 
     if (!editMgr_ || !editMgr_->edit()) return;
 
     auto tracks = editMgr_->getAudioTracks();
-    for (auto* track : tracks) {
+    for (int i = 0; i < tracks.size(); ++i) {
+        auto* track = tracks[i];
+        qDebug() << "[rebuildTrackHeaders] creating header" << i
+                 << QString::fromStdString(track->getName().toStdString());
         auto* header = new TrackHeaderWidget(track, editMgr_, headerContainer_);
         header->setTrackHeight(int(trackHeight_));
         connect(header, &TrackHeaderWidget::instrumentSelectRequested,
                 this, &TimelineView::instrumentSelectRequested);
+        connect(header, &TrackHeaderWidget::trackSelected,
+                this, &TimelineView::selectTrack);
         headerVLayout_->addWidget(header);
         trackHeaders_.push_back(header);
     }
+    qDebug() << "[rebuildTrackHeaders] done";
 }
 
 void TimelineView::syncHeaderScroll()
@@ -345,6 +401,7 @@ void TimelineView::syncHeaderScroll()
 
 void TimelineView::rebuildClips()
 {
+    qDebug() << "[rebuildClips] start";
     auto& theme = ThemeManager::instance().current();
 
     for (auto* item : clipItems_) scene_->removeItem(item);
@@ -362,15 +419,15 @@ void TimelineView::rebuildClips()
 
     auto tracks = editMgr_->getAudioTracks();
     int numTracks = tracks.size();
+    qDebug() << "[rebuildClips] numTracks:" << numTracks;
 
-    // Keep a sensible minimum range (~50 bars in 4/4), but grow to fit loaded clips.
     double totalBeats = 200.0;
     for (auto* track : tracks) {
         for (auto* clip : track->getClips()) {
             auto& ts = clip->edit.tempoSequence;
             auto endTime = clip->getPosition().getEnd();
             const double endBeat = ts.toBeats(endTime).inBeats();
-            totalBeats = std::max(totalBeats, endBeat + 16.0); // add right-side scroll headroom
+            totalBeats = std::max(totalBeats, endBeat + 16.0);
         }
     }
     double sceneWidth = totalBeats * pixelsPerBeat_;
@@ -390,28 +447,37 @@ void TimelineView::rebuildClips()
     }
 
     drawGridLines();
+    qDebug() << "[rebuildClips] grid done, building clip items";
 
     for (int ti = 0; ti < numTracks; ++ti) {
         auto* track = tracks[ti];
+        int clipIdx = 0;
         for (auto* clip : track->getClips()) {
+            qDebug() << "[rebuildClips] track" << ti << "clip" << clipIdx
+                     << QString::fromStdString(clip->getName().toStdString());
             auto* item = new ClipItem(clip, ti, pixelsPerBeat_, trackHeight_);
             item->setDragContext(&snapper_, editMgr_,
                                 &pixelsPerBeat_, &trackHeight_, numTracks,
                                 [this]() { rebuildClips(); });
             if (item->isMidiClip()) {
+                qDebug() << "[rebuildClips]   -> loadMidiPreview";
                 item->loadMidiPreview();
             } else {
+                qDebug() << "[rebuildClips]   -> loadWaveform";
                 const int waveformPoints = std::clamp(
                     static_cast<int>(std::max(50.0, item->rect().width() / 2.0)),
                     50, 4096);
                 item->loadWaveform(waveformPoints);
             }
+            qDebug() << "[rebuildClips]   -> loaded ok";
             item->updateGeometry(pixelsPerBeat_, trackHeight_, 0);
             item->setZValue(1);
             scene_->addItem(item);
             clipItems_.push_back(item);
+            ++clipIdx;
         }
     }
+    qDebug() << "[rebuildClips] done";
 }
 
 void TimelineView::drawGridLines()
@@ -509,6 +575,32 @@ void TimelineView::splitSelectedClipsAtPlayhead()
 
     if (didSplitAny)
         rebuildClips();
+}
+
+void TimelineView::deleteSelectedClips()
+{
+    if (!editMgr_ || !editMgr_->edit()) return;
+
+    std::vector<te::Clip*> toDelete;
+    for (auto* item : clipItems_) {
+        if (item && item->isSelected() && item->clip())
+            toDelete.push_back(item->clip());
+    }
+
+    if (toDelete.empty()) return;
+
+    for (auto* clip : toDelete)
+        clip->removeFromParent();
+
+    rebuildClips();
+}
+
+void TimelineView::selectTrack(te::AudioTrack* track)
+{
+    for (auto* h : trackHeaders_)
+        h->setSelected(h->track() == track);
+
+    emit trackSelected(track);
 }
 
 void TimelineView::handleEmptyAreaDoubleClick(double sceneX, double sceneY)

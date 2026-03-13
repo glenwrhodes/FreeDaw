@@ -24,17 +24,25 @@ public:
 
     te::AudioTrack* track() const { return track_; }
     void setTrackHeight(int h);
+    void setSelected(bool sel);
+    bool isSelected() const { return selected_; }
 
 signals:
+    void trackSelected(te::AudioTrack* track);
     void effectInsertRequested(te::AudioTrack* track);
     void instrumentSelectRequested(te::AudioTrack* track);
 
+protected:
+    void mousePressEvent(QMouseEvent* event) override;
+
 private:
     void updateMeter();
+    void updateSelectionStyle();
     void applyToggleStyle(QPushButton* btn, const QColor& activeColor);
 
     te::AudioTrack* track_;
     EditManager* editMgr_;
+    bool selected_ = false;
 
     QLabel* nameLabel_;
     QPushButton* instrumentBtn_ = nullptr;

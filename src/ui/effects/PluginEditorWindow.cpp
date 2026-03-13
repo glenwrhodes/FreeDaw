@@ -7,21 +7,31 @@ std::vector<std::unique_ptr<PluginEditorWindow>> PluginEditorWindow::openWindows
 PluginEditorWindow::PluginEditorWindow(te::ExternalPlugin& plugin)
     : juce::DocumentWindow(plugin.getName(),
                            juce::Colours::darkgrey,
-                           juce::DocumentWindow::closeButton
-                           | juce::DocumentWindow::minimiseButton),
+                           juce::DocumentWindow::allButtons),
       plugin_(plugin)
 {
+    setUsingNativeTitleBar(true);
+
+    constrainer_.setMinimumOnscreenAmounts(40, 30, 40, 40);
+    setConstrainer(&constrainer_);
+    setResizable(true, true);
+
     if (auto* instance = plugin.getAudioPluginInstance()) {
         if (auto* editor = instance->createEditorIfNeeded()) {
             setContentOwned(editor, true);
         }
     }
 
-    setUsingNativeTitleBar(true);
-    setResizable(true, false);
-    centreWithSize(getWidth(), getHeight());
+    setTopLeftPosition(0, 0);
     setVisible(true);
     toFront(true);
+}
+
+void PluginEditorWindow::moved()
+{
+    auto pos = getPosition();
+    if (pos.y < 0)
+        setTopLeftPosition(pos.x, 0);
 }
 
 PluginEditorWindow::~PluginEditorWindow()

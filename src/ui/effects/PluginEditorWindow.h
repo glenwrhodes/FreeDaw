@@ -14,6 +14,7 @@ public:
     ~PluginEditorWindow() override;
 
     void closeButtonPressed() override;
+    void moved() override;
 
     te::ExternalPlugin& getPlugin() { return plugin_; }
 
@@ -23,6 +24,7 @@ public:
 
 private:
     te::ExternalPlugin& plugin_;
+    juce::ComponentBoundsConstrainer constrainer_;
 
     static std::vector<std::unique_ptr<PluginEditorWindow>> openWindows_;
 };

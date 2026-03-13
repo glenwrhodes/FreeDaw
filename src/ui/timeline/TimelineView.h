@@ -33,9 +33,12 @@ protected:
     void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
     void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
 
+    void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
+
 signals:
     void fileDropped(const QString& filePath, double beat, int trackIndex);
     void emptyAreaDoubleClicked(double sceneX, double sceneY);
+    void backgroundClicked(double sceneX, double sceneY);
     void backgroundRightClicked(QPointF scenePos, QPoint screenPos);
 };
 
@@ -64,12 +67,14 @@ public:
 signals:
     void snapModeChanged(SnapMode mode);
     void instrumentSelectRequested(te::AudioTrack* track);
+    void trackSelected(te::AudioTrack* track);
 
 public slots:
     void onTracksChanged();
     void onEditChanged();
     void onTransportPositionChanged();
     void splitSelectedClipsAtPlayhead();
+    void deleteSelectedClips();
 
 private:
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -79,6 +84,7 @@ private:
     void syncHeaderScroll();
     void handleFileDrop(const QString& path, double beat, int trackIndex);
     void handleEmptyAreaDoubleClick(double sceneX, double sceneY);
+    void selectTrack(te::AudioTrack* track);
 
     EditManager* editMgr_;
 

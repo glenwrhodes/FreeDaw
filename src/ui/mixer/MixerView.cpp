@@ -50,6 +50,14 @@ MixerView::MixerView(EditManager* editMgr, QWidget* parent)
     masterStrip_ = ChannelStrip::createMasterStrip(editMgr_, this);
     mainLayout->addWidget(masterStrip_);
 
+    connect(editMgr_, &EditManager::aboutToChangeEdit, this, [this]() {
+        for (auto* s : strips_) {
+            stripLayout_->removeWidget(s);
+            delete s;
+        }
+        strips_.clear();
+    });
+
     connect(editMgr_, &EditManager::tracksChanged,
             this, &MixerView::rebuildStrips);
 
@@ -60,7 +68,7 @@ void MixerView::rebuildStrips()
 {
     for (auto* s : strips_) {
         stripLayout_->removeWidget(s);
-        s->deleteLater();
+        delete s;
     }
     strips_.clear();
 

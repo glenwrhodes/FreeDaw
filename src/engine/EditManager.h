@@ -57,12 +57,14 @@ public:
     juce::File currentFile() const { return currentFile_; }
 
 signals:
+    void aboutToChangeEdit();
     void editChanged();
     void tracksChanged();
     void transportStateChanged();
     void midiClipDoubleClicked(te::MidiClip* clip);
 
 private:
+    void teardownCurrentEdit();
     void createDefaultEdit();
     void ensureLevelMetersOnAllTracks();
 

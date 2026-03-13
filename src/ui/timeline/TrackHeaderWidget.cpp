@@ -1,7 +1,10 @@
 #include "TrackHeaderWidget.h"
+#include "ui/effects/PluginEditorWindow.h"
 #include "utils/ThemeManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QMouseEvent>
+#include <QMenu>
 #include <cmath>
 
 namespace {
@@ -67,17 +70,42 @@ TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr
             ? QString::fromStdString(instrument->getName().toStdString())
             : "No Instrument";
         instrumentBtn_ = new QPushButton(instrName, this);
-        instrumentBtn_->setAccessibleName("Select Instrument");
+        instrumentBtn_->setAccessibleName("Instrument");
+        instrumentBtn_->setToolTip("Click to open VST UI, right-click to change instrument");
         instrumentBtn_->setFixedHeight(18);
+        instrumentBtn_->setContextMenuPolicy(Qt::CustomContextMenu);
         instrumentBtn_->setStyleSheet(
             QString("QPushButton { background: %1; color: %2; border: 1px solid %3; "
                     "border-radius: 2px; font-size: 8px; padding: 1px 3px; }"
                     "QPushButton:hover { background: %4; }")
                 .arg(theme.background.name(), theme.text.name(),
                      theme.border.name(), theme.surfaceLight.name()));
+
         connect(instrumentBtn_, &QPushButton::clicked, this, [this]() {
-            emit instrumentSelectRequested(track_);
+            auto* instr = editMgr_->getTrackInstrument(track_);
+            if (auto* ext = dynamic_cast<te::ExternalPlugin*>(instr)) {
+                PluginEditorWindow::showForPlugin(*ext);
+            } else {
+                emit instrumentSelectRequested(track_);
+            }
         });
+
+        connect(instrumentBtn_, &QPushButton::customContextMenuRequested,
+                this, [this](const QPoint& pos) {
+                    QMenu menu;
+                    menu.setAccessibleName("Instrument Menu");
+                    menu.addAction("Change Instrument...", [this]() {
+                        emit instrumentSelectRequested(track_);
+                    });
+                    auto* instr = editMgr_->getTrackInstrument(track_);
+                    if (auto* ext = dynamic_cast<te::ExternalPlugin*>(instr)) {
+                        menu.addAction("Open VST Editor", [ext]() {
+                            PluginEditorWindow::showForPlugin(*ext);
+                        });
+                    }
+                    menu.exec(instrumentBtn_->mapToGlobal(pos));
+                });
+
         mainLayout->addWidget(instrumentBtn_);
     }
 
@@ -185,6 +213,34 @@ TrackHeaderWidget::~TrackHeaderWidget()
 void TrackHeaderWidget::setTrackHeight(int h)
 {
     setFixedHeight(h);
+}
+
+void TrackHeaderWidget::setSelected(bool sel)
+{
+    if (selected_ == sel) return;
+    selected_ = sel;
+    updateSelectionStyle();
+}
+
+void TrackHeaderWidget::updateSelectionStyle()
+{
+    auto& theme = ThemeManager::instance().current();
+    if (selected_) {
+        setStyleSheet(
+            QString("TrackHeaderWidget { border-left: 3px solid %1; background: %2; }")
+                .arg(theme.soloButton.name(), theme.surfaceLight.name()));
+    } else {
+        setStyleSheet(QString());
+        QPalette pal;
+        pal.setColor(QPalette::Window, theme.surface);
+        setPalette(pal);
+    }
+}
+
+void TrackHeaderWidget::mousePressEvent(QMouseEvent* event)
+{
+    emit trackSelected(track_);
+    QWidget::mousePressEvent(event);
 }
 
 void TrackHeaderWidget::updateMeter()

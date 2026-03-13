@@ -42,6 +42,13 @@ MainWindow::MainWindow(FreeDawApplication& app, QWidget* parent)
     connect(timelineView_, &TimelineView::instrumentSelectRequested,
             this, &MainWindow::onInstrumentSelectRequested);
 
+    connect(timelineView_, &TimelineView::trackSelected,
+            this, [this](te::AudioTrack* track) {
+                if (track && effectChain_) {
+                    effectChain_->setTrack(track);
+                }
+            });
+
     createDocks();
     createMenus();
     createToolBar();
@@ -238,6 +245,11 @@ void MainWindow::createDocks()
 
     connect(pianoRoll_, &PianoRollEditor::notesChanged,
             timelineView_, &TimelineView::rebuildClips);
+
+    connect(&editMgr_, &EditManager::editChanged, this, [this]() {
+        if (pianoRoll_)
+            pianoRoll_->setClip(nullptr);
+    });
     tabifyDockWidget(mixerDock_, pianoRollDock_);
     mixerDock_->raise();
 
