@@ -8,6 +8,7 @@
 #include <QScrollBar>
 #include <QWheelEvent>
 #include <QKeyEvent>
+#include <QCoreApplication>
 #include <QMenu>
 #include <QDebug>
 #include <QLineF>
@@ -205,6 +206,8 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
     graphicsView_->viewport()->setFocusPolicy(Qt::StrongFocus);
     graphicsView_->installEventFilter(this);
     graphicsView_->viewport()->installEventFilter(this);
+    headerScrollArea_->installEventFilter(this);
+    headerScrollArea_->viewport()->installEventFilter(this);
     bodyLayout_->addWidget(graphicsView_, 1);
 
     outerLayout->addWidget(bodyRow, 1);
@@ -342,7 +345,10 @@ void TimelineView::setPixelsPerBeat(double ppb)
 
 void TimelineView::setTrackHeight(double h)
 {
-    trackHeight_ = std::clamp(h, 30.0, 250.0);
+    double minH = 80.0;
+    for (auto* hdr : trackHeaders_)
+        minH = std::max(minH, double(hdr->minimumSizeHint().height()));
+    trackHeight_ = std::clamp(h, minH, 250.0);
     rebuildClips();
     rebuildTrackHeaders();
 }
@@ -396,6 +402,13 @@ bool TimelineView::eventFilter(QObject* watched, QEvent* event)
                 keyEvent->accept();
                 return true;
             }
+        }
+    }
+
+    if (watched == headerScrollArea_ || watched == headerScrollArea_->viewport()) {
+        if (event->type() == QEvent::Wheel) {
+            QCoreApplication::sendEvent(graphicsView_->viewport(), event);
+            return true;
         }
     }
 
@@ -460,7 +473,6 @@ void TimelineView::rebuildTrackHeaders()
         qDebug() << "[rebuildTrackHeaders] creating header" << i
                  << QString::fromStdString(track->getName().toStdString());
         auto* header = new TrackHeaderWidget(track, editMgr_, headerContainer_);
-        header->setTrackHeight(int(trackHeight_));
         connect(header, &TrackHeaderWidget::instrumentSelectRequested,
                 this, &TimelineView::instrumentSelectRequested);
         connect(header, &TrackHeaderWidget::trackSelected,
@@ -469,7 +481,20 @@ void TimelineView::rebuildTrackHeaders()
         headerVLayout_->addWidget(header);
         trackHeaders_.push_back(header);
     }
-    qDebug() << "[rebuildTrackHeaders] done";
+
+    int minNeeded = 0;
+    for (auto* h : trackHeaders_)
+        minNeeded = std::max(minNeeded, h->minimumSizeHint().height());
+
+    if (trackHeight_ < minNeeded) {
+        trackHeight_ = minNeeded;
+        rebuildClips();
+    }
+
+    for (auto* h : trackHeaders_)
+        h->setTrackHeight(int(trackHeight_));
+
+    qDebug() << "[rebuildTrackHeaders] done, trackHeight =" << trackHeight_;
 }
 
 void TimelineView::syncHeaderScroll()

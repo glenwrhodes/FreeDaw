@@ -6,6 +6,7 @@
 #include <QWidget>
 #include <QLabel>
 #include <QComboBox>
+#include <QPushButton>
 #include <QSplitter>
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -30,13 +31,15 @@ private:
     void syncKeyboardScroll();
     void syncVelocityScroll();
     void onSnapModeChanged(int index);
-    void onEditModeChanged(int index);
+    void onDrawModeToggled(bool checked);
+    void onEditModeToggled(bool checked);
     void onNotesChanged();
 
     te::MidiClip* clip_ = nullptr;
 
     QLabel* clipNameLabel_;
-    QComboBox* modeCombo_;
+    QPushButton* drawModeBtn_ = nullptr;
+    QPushButton* editModeBtn_ = nullptr;
     QComboBox* snapCombo_;
     PianoKeyboard* keyboard_;
     NoteGrid* noteGrid_;

@@ -7,6 +7,7 @@
 #include <QWidget>
 #include <QVBoxLayout>
 #include <QPushButton>
+#include <QComboBox>
 #include <QLabel>
 #include <QTimer>
 #include <tracktion_engine/tracktion_engine.h>
@@ -43,12 +44,16 @@ private:
     void updateSelectionStyle();
     void applyToggleStyle(QPushButton* btn, const QColor& activeColor);
     void updateMonoButtonVisual(bool mono);
+    void populateInputCombo();
+    void onInputComboChanged(int index);
+    void onArmToggled(bool armed);
 
     te::AudioTrack* track_ = nullptr;
     EditManager* editMgr_;
     bool isMaster_ = false;
     bool selected_ = false;
 
+    QComboBox* inputCombo_ = nullptr;
     QLabel* nameLabel_ = nullptr;
     QPushButton* instrumentBtn_ = nullptr;
     VolumeFader* fader_ = nullptr;

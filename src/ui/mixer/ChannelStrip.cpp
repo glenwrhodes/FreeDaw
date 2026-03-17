@@ -76,9 +76,28 @@ void ChannelStrip::setupUI()
     layout->setContentsMargins(4, 4, 4, 4);
     layout->setSpacing(3);
 
-    // ── Top section: name, instrument, pan ──
+    // ── Top section: input routing, name, instrument, pan ──
 
     bool isMidi = track_ && editMgr_ && editMgr_->isMidiTrack(track_);
+
+    inputCombo_ = new QComboBox(this);
+    inputCombo_->setAccessibleName("Input Source");
+    inputCombo_->setToolTip("Select audio input source");
+    inputCombo_->setFixedHeight(20);
+    inputCombo_->setStyleSheet(
+        QString("QComboBox { background: %1; color: %2; border: 1px solid %3; "
+                "border-radius: 2px; font-size: 8px; padding: 1px 2px; }"
+                "QComboBox:hover { border: 1px solid %4; }"
+                "QComboBox::drop-down { width: 12px; }"
+                "QComboBox QAbstractItemView { background: %1; color: %2; "
+                "selection-background-color: %5; font-size: 8px; }")
+            .arg(theme.background.name(), theme.text.name(),
+                 theme.border.name(), theme.accent.name(),
+                 theme.surfaceLight.name()));
+    populateInputCombo();
+    connect(inputCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &ChannelStrip::onInputComboChanged);
+    layout->addWidget(inputCombo_);
 
     nameLabel_ = new QLabel(this);
     nameLabel_->setAccessibleName("Track Name");
@@ -211,6 +230,7 @@ void ChannelStrip::setupUI()
     armBtn_->setFont(icons::fontAudio(13));
     armBtn_->setText(QString(icons::fa::Armrecording));
     applyToggleStyle(armBtn_, theme.recordArm);
+    connect(armBtn_, &QPushButton::toggled, this, &ChannelStrip::onArmToggled);
 
     monoBtn_ = new QPushButton(this);
     monoBtn_->setAccessibleName("Mono Or Stereo");
@@ -268,6 +288,8 @@ void ChannelStrip::setupMasterUI()
         }
     }
 
+    if (inputCombo_)
+        inputCombo_->setVisible(false);
     if (armBtn_)
         armBtn_->setVisible(false);
     if (monoBtn_)
@@ -294,6 +316,12 @@ void ChannelStrip::refresh()
         monoBtn_->setChecked(mono);
         updateMonoButtonVisual(mono);
     }
+    if (editMgr_ && armBtn_) {
+        QSignalBlocker block(armBtn_);
+        armBtn_->setChecked(editMgr_->isTrackRecordEnabled(track_));
+    }
+    if (editMgr_ && inputCombo_)
+        populateInputCombo();
 }
 
 void ChannelStrip::updateMeter()
@@ -356,6 +384,59 @@ void ChannelStrip::updateMonoButtonVisual(bool mono)
 
     monoBtn_->setText(QString(mono ? icons::fa::Mono : icons::fa::Stereo));
     monoBtn_->setToolTip(mono ? "Track is mono" : "Track is stereo");
+}
+
+void ChannelStrip::populateInputCombo()
+{
+    if (!inputCombo_ || !editMgr_) return;
+
+    QSignalBlocker block(inputCombo_);
+    inputCombo_->clear();
+    inputCombo_->addItem("No Input", QString());
+
+    auto sources = editMgr_->getAvailableInputSources();
+    for (const auto& src : sources)
+        inputCombo_->addItem(src.displayName,
+                             QString::fromStdString(src.deviceName.toStdString()));
+
+    QString currentInput = track_ ? editMgr_->getTrackInputName(track_) : QString();
+    if (currentInput.isEmpty()) {
+        inputCombo_->setCurrentIndex(0);
+    } else {
+        int idx = inputCombo_->findData(currentInput);
+        inputCombo_->setCurrentIndex(idx >= 0 ? idx : 0);
+    }
+}
+
+void ChannelStrip::onInputComboChanged(int index)
+{
+    if (!track_ || !editMgr_ || index < 0) return;
+
+    QString deviceName = inputCombo_->itemData(index).toString();
+    if (deviceName.isEmpty()) {
+        editMgr_->clearTrackInput(*track_);
+        if (armBtn_) {
+            QSignalBlocker block(armBtn_);
+            armBtn_->setChecked(false);
+        }
+    } else {
+        editMgr_->assignInputToTrack(*track_,
+            juce::String(deviceName.toStdString()));
+    }
+}
+
+void ChannelStrip::onArmToggled(bool armed)
+{
+    if (!track_ || !editMgr_) return;
+
+    QString currentInput = editMgr_->getTrackInputName(track_);
+    if (armed && currentInput.isEmpty()) {
+        QSignalBlocker block(armBtn_);
+        armBtn_->setChecked(false);
+        return;
+    }
+
+    editMgr_->setTrackRecordEnabled(*track_, armed);
 }
 
 void ChannelStrip::updateSelectionStyle()

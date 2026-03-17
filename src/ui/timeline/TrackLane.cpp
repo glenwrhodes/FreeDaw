@@ -27,10 +27,8 @@ bool TrackLane::isSoloed() const
 
 bool TrackLane::isArmed() const
 {
-    if (!track_) return false;
-    for (auto* dev : track_->edit.getEditInputDevices().getDevicesForTargetTrack(*track_))
-        (void)dev;
-    return false;
+    if (!track_ || !editMgr_) return false;
+    return editMgr_->isTrackRecordEnabled(track_);
 }
 
 void TrackLane::setMuted(bool m)
@@ -52,7 +50,7 @@ void TrackLane::setSoloed(bool s)
 void TrackLane::setArmed(bool a)
 {
     if (!track_ || !editMgr_) return;
-    (void)a;
+    editMgr_->setTrackRecordEnabled(*track_, a);
     emit armChanged(a);
 }
 

@@ -1,4 +1,5 @@
 #include "PianoRollEditor.h"
+#include "utils/IconFont.h"
 #include "utils/ThemeManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -18,14 +19,14 @@ PianoRollEditor::PianoRollEditor(QWidget* parent)
     mainLayout->setSpacing(0);
 
     auto* toolbar = new QWidget(this);
-    toolbar->setFixedHeight(30);
+    toolbar->setFixedHeight(34);
     toolbar->setAutoFillBackground(true);
     QPalette tbPal;
     tbPal.setColor(QPalette::Window, theme.surface);
     toolbar->setPalette(tbPal);
 
     auto* tbLayout = new QHBoxLayout(toolbar);
-    tbLayout->setContentsMargins(6, 2, 6, 2);
+    tbLayout->setContentsMargins(6, 3, 6, 3);
     tbLayout->setSpacing(8);
 
     clipNameLabel_ = new QLabel("No clip selected", toolbar);
@@ -37,19 +38,40 @@ PianoRollEditor::PianoRollEditor(QWidget* parent)
 
     tbLayout->addStretch();
 
-    auto* modeLabel = new QLabel("Mode:", toolbar);
-    modeLabel->setStyleSheet(QString("color: %1;").arg(theme.textDim.name()));
-    tbLayout->addWidget(modeLabel);
+    const int modeIconSize = 16;
+    const int modeButtonSize = 24;
+    const auto modeFont = icons::fontAudio(modeIconSize);
+    const QString modeButtonStyle = QString(
+        "QPushButton { min-width: 24px; min-height: 24px; font-size: 12px; }"
+        "QPushButton:checked { background: %1; border-color: %2; }")
+        .arg(theme.surfaceLight.name(), theme.accent.name());
 
-    modeCombo_ = new QComboBox(toolbar);
-    modeCombo_->setAccessibleName("Piano Roll Edit Mode");
-    modeCombo_->addItem("Draw");
-    modeCombo_->addItem("Edit");
-    modeCombo_->setCurrentIndex(1);
-    modeCombo_->setFixedWidth(90);
-    connect(modeCombo_, qOverload<int>(&QComboBox::currentIndexChanged),
-            this, &PianoRollEditor::onEditModeChanged);
-    tbLayout->addWidget(modeCombo_);
+    editModeBtn_ = new QPushButton(toolbar);
+    editModeBtn_->setAccessibleName("Edit Mode");
+    editModeBtn_->setCheckable(true);
+    editModeBtn_->setChecked(true);
+    editModeBtn_->setFont(modeFont);
+    editModeBtn_->setText(QString(icons::fa::Pointer));
+    editModeBtn_->setToolTip("Edit mode");
+    editModeBtn_->setFixedSize(modeButtonSize, modeButtonSize);
+    editModeBtn_->setStyleSheet(modeButtonStyle);
+    tbLayout->addWidget(editModeBtn_);
+
+    drawModeBtn_ = new QPushButton(toolbar);
+    drawModeBtn_->setAccessibleName("Draw Mode");
+    drawModeBtn_->setCheckable(true);
+    drawModeBtn_->setChecked(false);
+    drawModeBtn_->setFont(modeFont);
+    drawModeBtn_->setText(QString(icons::fa::Pen));
+    drawModeBtn_->setToolTip("Draw mode");
+    drawModeBtn_->setFixedSize(modeButtonSize, modeButtonSize);
+    drawModeBtn_->setStyleSheet(modeButtonStyle);
+    tbLayout->addWidget(drawModeBtn_);
+
+    connect(drawModeBtn_, &QPushButton::toggled,
+            this, &PianoRollEditor::onDrawModeToggled);
+    connect(editModeBtn_, &QPushButton::toggled,
+            this, &PianoRollEditor::onEditModeToggled);
 
     auto* snapLabel = new QLabel("Snap:", toolbar);
     snapLabel->setStyleSheet(QString("color: %1;").arg(theme.textDim.name()));
@@ -139,7 +161,7 @@ PianoRollEditor::PianoRollEditor(QWidget* parent)
             this, [this]() { noteGrid_->rebuildNotes(); });
 
     onSnapModeChanged(3);
-    onEditModeChanged(1);
+    noteGrid_->setEditMode(NoteGrid::EditMode::Edit);
 }
 
 void PianoRollEditor::setClip(te::MidiClip* clip)
@@ -185,10 +207,30 @@ void PianoRollEditor::onSnapModeChanged(int index)
     noteGrid_->snapper().setMode(mode);
 }
 
-void PianoRollEditor::onEditModeChanged(int index)
+void PianoRollEditor::onDrawModeToggled(bool checked)
 {
-    auto mode = index == 0 ? NoteGrid::EditMode::Draw : NoteGrid::EditMode::Edit;
-    noteGrid_->setEditMode(mode);
+    if (!checked) {
+        if (!editModeBtn_->isChecked())
+            editModeBtn_->setChecked(true);
+        return;
+    }
+
+    if (editModeBtn_->isChecked())
+        editModeBtn_->setChecked(false);
+    noteGrid_->setEditMode(NoteGrid::EditMode::Draw);
+}
+
+void PianoRollEditor::onEditModeToggled(bool checked)
+{
+    if (!checked) {
+        if (!drawModeBtn_->isChecked())
+            drawModeBtn_->setChecked(true);
+        return;
+    }
+
+    if (drawModeBtn_->isChecked())
+        drawModeBtn_->setChecked(false);
+    noteGrid_->setEditMode(NoteGrid::EditMode::Edit);
 }
 
 void PianoRollEditor::onNotesChanged()

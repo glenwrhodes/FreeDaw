@@ -18,6 +18,11 @@ void AudioEngine::setDefaultAudioDevice()
 {
     auto& dm = engine_->getDeviceManager();
     dm.initialise(2, 2);
+
+    // DeviceManager creates WaveInputDevice/WaveOutputDevice objects
+    // asynchronously via triggerAsyncUpdate(). Pump the JUCE message
+    // loop now so they exist before the UI enumerates them.
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(200);
 }
 
 juce::StringArray AudioEngine::getAvailableInputDevices() const

@@ -113,6 +113,25 @@ TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr
         mainLayout->addWidget(instrumentBtn_);
     }
 
+    inputCombo_ = new QComboBox(this);
+    inputCombo_->setAccessibleName("Input Source");
+    inputCombo_->setToolTip("Select audio input source");
+    inputCombo_->setFixedHeight(18);
+    inputCombo_->setStyleSheet(
+        QString("QComboBox { background: %1; color: %2; border: 1px solid %3; "
+                "border-radius: 2px; font-size: 8px; padding: 1px 2px; }"
+                "QComboBox:hover { border: 1px solid %4; }"
+                "QComboBox::drop-down { width: 12px; }"
+                "QComboBox QAbstractItemView { background: %1; color: %2; "
+                "selection-background-color: %5; font-size: 8px; }")
+            .arg(theme.background.name(), theme.text.name(),
+                 theme.border.name(), theme.accent.name(),
+                 theme.surfaceLight.name()));
+    populateInputCombo();
+    connect(inputCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &TrackHeaderWidget::onInputComboChanged);
+    mainLayout->addWidget(inputCombo_);
+
     auto* btnRow = new QHBoxLayout();
     btnRow->setSpacing(2);
 
@@ -145,6 +164,7 @@ TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr
     armBtn_->setFont(icons::fontAudio(12));
     armBtn_->setText(QString(icons::fa::Armrecording));
     applyToggleStyle(armBtn_, theme.recordArm);
+    connect(armBtn_, &QPushButton::toggled, this, &TrackHeaderWidget::onArmToggled);
 
     monoBtn_ = new QPushButton(this);
     monoBtn_->setAccessibleName("Mono Or Stereo");
@@ -260,7 +280,15 @@ TrackHeaderWidget::~TrackHeaderWidget()
 
 void TrackHeaderWidget::setTrackHeight(int h)
 {
-    setFixedHeight(h);
+    int minH = minimumSizeHint().height();
+    setFixedHeight(std::max(h, minH));
+}
+
+QSize TrackHeaderWidget::minimumSizeHint() const
+{
+    if (auto* l = layout())
+        return QSize(width(), l->minimumSize().height());
+    return QWidget::minimumSizeHint();
 }
 
 void TrackHeaderWidget::setSelected(bool sel)
@@ -331,6 +359,59 @@ void TrackHeaderWidget::updateMonoButtonVisual(bool mono)
 
     monoBtn_->setText(QString(mono ? icons::fa::Mono : icons::fa::Stereo));
     monoBtn_->setToolTip(mono ? "Track is mono" : "Track is stereo");
+}
+
+void TrackHeaderWidget::populateInputCombo()
+{
+    if (!inputCombo_ || !editMgr_) return;
+
+    QSignalBlocker block(inputCombo_);
+    inputCombo_->clear();
+    inputCombo_->addItem("No Input", QString());
+
+    auto sources = editMgr_->getAvailableInputSources();
+    for (const auto& src : sources)
+        inputCombo_->addItem(src.displayName,
+                             QString::fromStdString(src.deviceName.toStdString()));
+
+    QString currentInput = track_ ? editMgr_->getTrackInputName(track_) : QString();
+    if (currentInput.isEmpty()) {
+        inputCombo_->setCurrentIndex(0);
+    } else {
+        int idx = inputCombo_->findData(currentInput);
+        inputCombo_->setCurrentIndex(idx >= 0 ? idx : 0);
+    }
+}
+
+void TrackHeaderWidget::onInputComboChanged(int index)
+{
+    if (!track_ || !editMgr_ || index < 0) return;
+
+    QString deviceName = inputCombo_->itemData(index).toString();
+    if (deviceName.isEmpty()) {
+        editMgr_->clearTrackInput(*track_);
+        if (armBtn_) {
+            QSignalBlocker block(armBtn_);
+            armBtn_->setChecked(false);
+        }
+    } else {
+        editMgr_->assignInputToTrack(*track_,
+            juce::String(deviceName.toStdString()));
+    }
+}
+
+void TrackHeaderWidget::onArmToggled(bool armed)
+{
+    if (!track_ || !editMgr_) return;
+
+    QString currentInput = editMgr_->getTrackInputName(track_);
+    if (armed && currentInput.isEmpty()) {
+        QSignalBlocker block(armBtn_);
+        armBtn_->setChecked(false);
+        return;
+    }
+
+    editMgr_->setTrackRecordEnabled(*track_, armed);
 }
 
 } // namespace freedaw

@@ -6,6 +6,7 @@
 #include <QWidget>
 #include <QLabel>
 #include <QPushButton>
+#include <QComboBox>
 #include <QSlider>
 #include <QFrame>
 #include <QTimer>
@@ -27,6 +28,7 @@ public:
     void setTrackHeight(int h);
     void setSelected(bool sel);
     bool isSelected() const { return selected_; }
+    QSize minimumSizeHint() const override;
 
 signals:
     void trackSelected(te::AudioTrack* track);
@@ -41,11 +43,15 @@ private:
     void updateSelectionStyle();
     void applyToggleStyle(QPushButton* btn, const QColor& activeColor);
     void updateMonoButtonVisual(bool mono);
+    void populateInputCombo();
+    void onInputComboChanged(int index);
+    void onArmToggled(bool armed);
 
     te::AudioTrack* track_;
     EditManager* editMgr_;
     bool selected_ = false;
 
+    QComboBox* inputCombo_ = nullptr;
     QLabel* nameLabel_;
     QPushButton* instrumentBtn_ = nullptr;
     QPushButton* muteBtn_;

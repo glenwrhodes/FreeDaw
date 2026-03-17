@@ -117,7 +117,7 @@ private:
     TimelineScene*  scene_;
 
     double pixelsPerBeat_ = 40.0;
-    double trackHeight_   = 80.0;
+    double trackHeight_   = 120.0;
     GridSnapper snapper_;
 
     QGraphicsLineItem* playheadLine_ = nullptr;

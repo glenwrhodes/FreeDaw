@@ -54,6 +54,7 @@ void EditManager::createDefaultEdit()
     edit_ = te::createEmptyEdit(eng, juce::File());
     edit_->ensureNumberOfAudioTracks(4);
     ensureLevelMetersOnAllTracks();
+    enableAllWaveInputDevices();
     edit_->getTransport().ensureContextAllocated();
     currentFile_ = juce::File();
     emit editChanged();
@@ -92,6 +93,9 @@ bool EditManager::loadEdit(const juce::File& file)
     }
 
     currentFile_ = file;
+
+    qDebug() << "[loadEdit] enabling wave input devices";
+    enableAllWaveInputDevices();
 
     qDebug() << "[loadEdit] allocating playback context";
     edit_->getTransport().ensureContextAllocated();
@@ -533,6 +537,104 @@ bool EditManager::isClipValid(te::Clip* clip) const
     for (auto* track : te::getAudioTracks(*edit_)) {
         for (auto* c : track->getClips())
             if (c == clip) return true;
+    }
+    return false;
+}
+
+void EditManager::enableAllWaveInputDevices()
+{
+    auto& dm = audioEngine_.engine().getDeviceManager();
+    qDebug() << "[enableAllWaveInputDevices] found"
+             << dm.getNumWaveInDevices() << "wave input devices";
+    for (int i = 0; i < dm.getNumWaveInDevices(); ++i) {
+        if (auto* dev = dm.getWaveInDevice(i)) {
+            qDebug() << "[enableAllWaveInputDevices] enabling:"
+                     << QString::fromStdString(dev->getName().toStdString());
+            dev->setEnabled(true);
+        }
+    }
+}
+
+QList<InputSource> EditManager::getAvailableInputSources() const
+{
+    QList<InputSource> sources;
+    auto& dm = audioEngine_.engine().getDeviceManager();
+    for (int i = 0; i < dm.getNumWaveInDevices(); ++i) {
+        if (auto* dev = dm.getWaveInDevice(i)) {
+            InputSource src;
+            src.deviceName = dev->getName();
+            src.displayName = QString::fromStdString(dev->getName().toStdString());
+            sources.append(src);
+        }
+    }
+    return sources;
+}
+
+void EditManager::assignInputToTrack(te::AudioTrack& track, const juce::String& deviceName)
+{
+    if (!edit_) return;
+
+    clearTrackInput(track);
+    edit_->getTransport().ensureContextAllocated();
+
+    for (auto* instance : edit_->getAllInputDevices()) {
+        if (instance->getInputDevice().getDeviceType() == te::InputDevice::waveDevice
+            && instance->getInputDevice().getName() == deviceName) {
+            auto result = instance->setTarget(track.itemID, true,
+                                              &edit_->getUndoManager(), 0);
+            (void)result;
+            break;
+        }
+    }
+
+    emit editChanged();
+}
+
+void EditManager::clearTrackInput(te::AudioTrack& track)
+{
+    if (!edit_) return;
+    edit_->getEditInputDevices().clearAllInputs(track, &edit_->getUndoManager());
+    emit editChanged();
+}
+
+QString EditManager::getTrackInputName(te::AudioTrack* track) const
+{
+    if (!edit_ || !track) return {};
+
+    auto devices = edit_->getEditInputDevices().getDevicesForTargetTrack(*track);
+    for (auto* instance : devices) {
+        if (instance->getInputDevice().getDeviceType() == te::InputDevice::waveDevice)
+            return QString::fromStdString(
+                instance->getInputDevice().getName().toStdString());
+    }
+    return {};
+}
+
+void EditManager::setTrackRecordEnabled(te::AudioTrack& track, bool enabled)
+{
+    if (!edit_) return;
+
+    edit_->getTransport().ensureContextAllocated();
+
+    auto devices = edit_->getEditInputDevices().getDevicesForTargetTrack(track);
+    for (auto* instance : devices) {
+        if (instance->getInputDevice().getDeviceType() == te::InputDevice::waveDevice) {
+            instance->setRecordingEnabled(track.itemID, enabled);
+            break;
+        }
+    }
+
+    emit editChanged();
+}
+
+bool EditManager::isTrackRecordEnabled(te::AudioTrack* track) const
+{
+    if (!edit_ || !track) return false;
+
+    auto devices = edit_->getEditInputDevices().getDevicesForTargetTrack(*track);
+    for (auto* instance : devices) {
+        if (instance->getInputDevice().getDeviceType() == te::InputDevice::waveDevice)
+            return instance->isRecordingEnabled(track->itemID);
     }
     return false;
 }

@@ -3,10 +3,17 @@
 #include "AudioEngine.h"
 #include <tracktion_engine/tracktion_engine.h>
 #include <QObject>
+#include <QString>
+#include <QList>
 #include <unordered_set>
 #include <memory>
 
 namespace freedaw {
+
+struct InputSource {
+    juce::String deviceName;
+    QString displayName;
+};
 
 class EditManager : public QObject {
     Q_OBJECT
@@ -53,6 +60,13 @@ public:
     void trimNotesToClipBounds(te::MidiClip& clip);
     bool isClipValid(te::Clip* clip) const;
 
+    QList<InputSource> getAvailableInputSources() const;
+    void assignInputToTrack(te::AudioTrack& track, const juce::String& deviceName);
+    void clearTrackInput(te::AudioTrack& track);
+    QString getTrackInputName(te::AudioTrack* track) const;
+    void setTrackRecordEnabled(te::AudioTrack& track, bool enabled);
+    bool isTrackRecordEnabled(te::AudioTrack* track) const;
+
     void undo();
     void redo();
 
@@ -77,6 +91,7 @@ private:
     void teardownCurrentEdit();
     void createDefaultEdit();
     void ensureLevelMetersOnAllTracks();
+    void enableAllWaveInputDevices();
 
     AudioEngine& audioEngine_;
     std::unique_ptr<te::Edit> edit_;
