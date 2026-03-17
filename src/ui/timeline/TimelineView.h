@@ -25,6 +25,7 @@ class TimelineScene : public QGraphicsScene {
 
 public:
     explicit TimelineScene(QObject* parent = nullptr);
+    void cancelBackgroundDrag();
 
 protected:
     void dragEnterEvent(QGraphicsSceneDragDropEvent* event) override;
@@ -32,14 +33,23 @@ protected:
     void dropEvent(QGraphicsSceneDragDropEvent* event) override;
     void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
     void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
-
     void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
+    void mouseMoveEvent(QGraphicsSceneMouseEvent* event) override;
+    void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
 
 signals:
     void fileDropped(const QString& filePath, double beat, int trackIndex);
     void emptyAreaDoubleClicked(double sceneX, double sceneY);
     void backgroundClicked(double sceneX, double sceneY);
     void backgroundRightClicked(QPointF scenePos, QPoint screenPos);
+    void backgroundDragStarted(QPointF startScenePos);
+    void backgroundDragUpdated(QPointF startScenePos, QPointF currentScenePos);
+    void backgroundDragFinished(QPointF startScenePos, QPointF endScenePos);
+
+private:
+    bool backgroundDragCandidate_ = false;
+    bool backgroundDragging_ = false;
+    QPointF backgroundDragStartScenePos_;
 };
 
 class TimelineView : public QWidget {
@@ -68,6 +78,7 @@ signals:
     void snapModeChanged(SnapMode mode);
     void instrumentSelectRequested(te::AudioTrack* track);
     void trackSelected(te::AudioTrack* track);
+    void selectedClipsDeleted();
 
 public slots:
     void onTracksChanged();
@@ -85,6 +96,11 @@ private:
     void syncHeaderScroll();
     void handleFileDrop(const QString& path, double beat, int trackIndex);
     void handleEmptyAreaDoubleClick(double sceneX, double sceneY);
+    void handleBackgroundDragStarted(QPointF startScenePos);
+    void handleBackgroundDragUpdated(QPointF startScenePos, QPointF currentScenePos);
+    void handleBackgroundDragFinished(QPointF startScenePos, QPointF endScenePos);
+    void clearMidiClipDrawPreview();
+    void selectClipItem(te::Clip* clip);
     void selectTrack(te::AudioTrack* track);
 
     EditManager* editMgr_;
@@ -112,6 +128,10 @@ private:
     std::vector<QGraphicsLineItem*> gridLineItems_;
     std::vector<QGraphicsLineItem*> trackSeparatorItems_;
     std::vector<TrackHeaderWidget*> trackHeaders_;
+    QGraphicsRectItem* midiClipDrawPreviewItem_ = nullptr;
+    te::AudioTrack* midiClipDrawTrack_ = nullptr;
+    double midiClipDrawStartBeat_ = 0.0;
+    bool isMidiClipDrawActive_ = false;
     te::AudioTrack* selectedTrack_ = nullptr;
 
     static constexpr int HEADER_WIDTH = 140;

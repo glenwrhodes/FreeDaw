@@ -1,4 +1,5 @@
 #include "EffectChainWidget.h"
+#include "DelayEffectWidget.h"
 #include "EffectSelectorDialog.h"
 #include "utils/ThemeManager.h"
 #include <QHBoxLayout>
@@ -184,14 +185,21 @@ void EffectChainWidget::rebuild()
     }
 
     for (auto* plugin : track_->pluginList.getPlugins()) {
-        // Skip internal plugins
         if (dynamic_cast<te::VolumeAndPanPlugin*>(plugin)) continue;
         if (dynamic_cast<te::LevelMeterPlugin*>(plugin)) continue;
 
-        auto* slot = new EffectSlotWidget(plugin, slotsContainer_);
-        connect(slot, &EffectSlotWidget::removeRequested,
-                this, &EffectChainWidget::removeEffectFromTrack);
-        slotsLayout_->addWidget(slot);
+        if (auto* delayPlugin = dynamic_cast<te::DelayPlugin*>(plugin)) {
+            auto* delayWidget = new DelayEffectWidget(
+                delayPlugin, editMgr_, slotsContainer_);
+            connect(delayWidget, &DelayEffectWidget::removeRequested,
+                    this, &EffectChainWidget::removeEffectFromTrack);
+            slotsLayout_->addWidget(delayWidget);
+        } else {
+            auto* slot = new EffectSlotWidget(plugin, slotsContainer_);
+            connect(slot, &EffectSlotWidget::removeRequested,
+                    this, &EffectChainWidget::removeEffectFromTrack);
+            slotsLayout_->addWidget(slot);
+        }
     }
     slotsLayout_->addStretch();
 }

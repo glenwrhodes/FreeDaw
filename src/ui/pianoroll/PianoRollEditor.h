@@ -20,6 +20,7 @@ public:
     explicit PianoRollEditor(QWidget* parent = nullptr);
 
     void setClip(te::MidiClip* clip);
+    void refresh();
     te::MidiClip* clip() const { return clip_; }
 
 signals:
@@ -29,11 +30,13 @@ private:
     void syncKeyboardScroll();
     void syncVelocityScroll();
     void onSnapModeChanged(int index);
+    void onEditModeChanged(int index);
     void onNotesChanged();
 
     te::MidiClip* clip_ = nullptr;
 
     QLabel* clipNameLabel_;
+    QComboBox* modeCombo_;
     QComboBox* snapCombo_;
     PianoKeyboard* keyboard_;
     NoteGrid* noteGrid_;

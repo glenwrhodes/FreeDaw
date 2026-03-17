@@ -1,10 +1,12 @@
 #include "TrackHeaderWidget.h"
 #include "ui/effects/PluginEditorWindow.h"
+#include "utils/IconFont.h"
 #include "utils/ThemeManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QMouseEvent>
 #include <QMenu>
+#include <QSignalBlocker>
 #include <cmath>
 
 namespace {
@@ -114,35 +116,70 @@ TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr
     auto* btnRow = new QHBoxLayout();
     btnRow->setSpacing(2);
 
-    muteBtn_ = new QPushButton("M", this);
+    muteBtn_ = new QPushButton(this);
     muteBtn_->setAccessibleName("Mute");
     muteBtn_->setCheckable(true);
     muteBtn_->setFixedSize(26, 20);
+    muteBtn_->setFont(icons::fontAudio(12));
+    muteBtn_->setText(QString(icons::fa::Mute));
     applyToggleStyle(muteBtn_, theme.muteButton);
     connect(muteBtn_, &QPushButton::toggled, this, [this](bool m) {
         if (track_) track_->setMute(m);
     });
 
-    soloBtn_ = new QPushButton("S", this);
+    soloBtn_ = new QPushButton(this);
     soloBtn_->setAccessibleName("Solo");
     soloBtn_->setCheckable(true);
     soloBtn_->setFixedSize(26, 20);
+    soloBtn_->setFont(icons::fontAudio(12));
+    soloBtn_->setText(QString(icons::fa::Solo));
     applyToggleStyle(soloBtn_, theme.soloButton);
     connect(soloBtn_, &QPushButton::toggled, this, [this](bool s) {
         if (track_) track_->setSolo(s);
     });
 
-    armBtn_ = new QPushButton("R", this);
+    armBtn_ = new QPushButton(this);
     armBtn_->setAccessibleName("Record Arm");
     armBtn_->setCheckable(true);
     armBtn_->setFixedSize(26, 20);
+    armBtn_->setFont(icons::fontAudio(12));
+    armBtn_->setText(QString(icons::fa::Armrecording));
     applyToggleStyle(armBtn_, theme.recordArm);
+
+    monoBtn_ = new QPushButton(this);
+    monoBtn_->setAccessibleName("Mono Or Stereo");
+    monoBtn_->setCheckable(true);
+    monoBtn_->setFixedSize(26, 20);
+    monoBtn_->setFont(icons::fontAudio(12));
+    applyToggleStyle(monoBtn_, theme.accent);
+    connect(monoBtn_, &QPushButton::toggled, this, [this](bool mono) {
+        if (!track_ || !editMgr_) return;
+        editMgr_->setTrackMono(*track_, mono);
+        updateMonoButtonVisual(mono);
+    });
 
     btnRow->addWidget(muteBtn_);
     btnRow->addWidget(soloBtn_);
     btnRow->addWidget(armBtn_);
+    btnRow->addWidget(monoBtn_);
     btnRow->addStretch();
     mainLayout->addLayout(btnRow);
+
+    const bool mono = editMgr_ && editMgr_->isTrackMono(track_);
+    {
+        QSignalBlocker block(monoBtn_);
+        monoBtn_->setChecked(mono);
+    }
+    updateMonoButtonVisual(mono);
+
+    connect(editMgr_, &EditManager::tracksChanged, this, [this]() {
+        if (!track_ || !monoBtn_ || !editMgr_)
+            return;
+        const bool isMono = editMgr_->isTrackMono(track_);
+        QSignalBlocker block(monoBtn_);
+        monoBtn_->setChecked(isMono);
+        updateMonoButtonVisual(isMono);
+    });
 
     auto* controlRow = new QHBoxLayout();
     controlRow->setSpacing(2);
@@ -285,6 +322,15 @@ void TrackHeaderWidget::applyToggleStyle(QPushButton* btn, const QColor& activeC
                 "QPushButton:checked { background: %4; color: #000; }")
             .arg(theme.surface.name(), theme.textDim.name(),
                  theme.border.name(), activeColor.name()));
+}
+
+void TrackHeaderWidget::updateMonoButtonVisual(bool mono)
+{
+    if (!monoBtn_)
+        return;
+
+    monoBtn_->setText(QString(mono ? icons::fa::Mono : icons::fa::Stereo));
+    monoBtn_->setToolTip(mono ? "Track is mono" : "Track is stereo");
 }
 
 } // namespace freedaw

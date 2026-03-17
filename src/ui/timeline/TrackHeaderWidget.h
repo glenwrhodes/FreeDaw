@@ -40,6 +40,7 @@ private:
     void updateMeter();
     void updateSelectionStyle();
     void applyToggleStyle(QPushButton* btn, const QColor& activeColor);
+    void updateMonoButtonVisual(bool mono);
 
     te::AudioTrack* track_;
     EditManager* editMgr_;
@@ -50,6 +51,7 @@ private:
     QPushButton* muteBtn_;
     QPushButton* soloBtn_;
     QPushButton* armBtn_;
+    QPushButton* monoBtn_ = nullptr;
     QSlider* volumeSlider_;
     RotaryKnob* panKnob_;
     LevelMeter* meter_;

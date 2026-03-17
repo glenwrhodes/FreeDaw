@@ -4,6 +4,11 @@
 
 namespace freedaw {
 
+namespace {
+constexpr const char* kMonoUtilityPluginType = "airwindows_monoam";
+constexpr float kMonoUtilityModeValue = 0.1875f; // Mo Noam: (int)(0.1875*7.999)=1 => kMONO
+}
+
 static bool hasInstrumentPlugin(te::AudioTrack* track)
 {
     if (!track) return false;
@@ -224,6 +229,22 @@ void EditManager::addAudioClipToTrack(te::AudioTrack& track,
     emit editChanged();
 }
 
+void EditManager::undo()
+{
+    if (!edit_) return;
+    edit_->getUndoManager().undo();
+    emit editChanged();
+    emit tracksChanged();
+}
+
+void EditManager::redo()
+{
+    if (!edit_) return;
+    edit_->getUndoManager().redo();
+    emit editChanged();
+    emit tracksChanged();
+}
+
 double EditManager::getBpm() const
 {
     if (!edit_)
@@ -370,6 +391,68 @@ bool EditManager::isMidiTrack(te::AudioTrack* track) const
     return hasInstrumentPlugin(track);
 }
 
+bool EditManager::isTrackMono(te::AudioTrack* track) const
+{
+    if (!track)
+        return false;
+
+    for (auto* plugin : track->pluginList.getPlugins()) {
+        if (plugin && plugin->getPluginType() == kMonoUtilityPluginType)
+            return true;
+    }
+
+    return false;
+}
+
+void EditManager::setTrackMono(te::AudioTrack& track, bool mono)
+{
+    if (!edit_)
+        return;
+
+    te::Plugin* monoPlugin = nullptr;
+    for (auto* plugin : track.pluginList.getPlugins()) {
+        if (plugin && plugin->getPluginType() == kMonoUtilityPluginType) {
+            monoPlugin = plugin;
+            break;
+        }
+    }
+
+    bool changed = false;
+
+    if (mono) {
+        if (!monoPlugin) {
+            if (auto p = edit_->getPluginCache().createNewPlugin(
+                    juce::String(kMonoUtilityPluginType), {})) {
+                int insertIndex = track.pluginList.size();
+                for (int i = 0; i < track.pluginList.size(); ++i) {
+                    if (dynamic_cast<te::LevelMeterPlugin*>(track.pluginList[i])) {
+                        insertIndex = i;
+                        break;
+                    }
+                }
+                track.pluginList.insertPlugin(p, insertIndex, nullptr);
+                monoPlugin = p.get();
+                changed = true;
+            }
+        }
+
+        if (monoPlugin) {
+            if (auto param = monoPlugin->getAutomatableParameter(0)) {
+                param->setParameter(kMonoUtilityModeValue, juce::sendNotificationSync);
+                changed = true;
+            }
+        }
+    } else if (monoPlugin) {
+        monoPlugin->deleteFromParent();
+        changed = true;
+    }
+
+    if (changed) {
+        emit editChanged();
+        emit tracksChanged();
+    }
+}
+
 te::Plugin* EditManager::getTrackInstrument(te::AudioTrack* track) const
 {
     if (!track) return nullptr;
@@ -411,6 +494,47 @@ void EditManager::markAsMidiTrack(te::AudioTrack* track)
         midiTrackIds_.insert(track->itemID.getRawID());
         emit tracksChanged();
     }
+}
+
+void EditManager::trimNotesToClipBounds(te::MidiClip& clip)
+{
+    if (!edit_) return;
+
+    auto& ts = edit_->tempoSequence;
+    const double clipStartBeat = ts.toBeats(clip.getPosition().getStart()).inBeats();
+    const double clipEndBeat   = ts.toBeats(clip.getPosition().getEnd()).inBeats();
+    const double clipLenBeats  = clipEndBeat - clipStartBeat;
+
+    auto& seq = clip.getSequence();
+    auto* um = &edit_->getUndoManager();
+
+    for (auto* note : seq.getNotes()) {
+        const double ns = note->getStartBeat().inBeats();
+        const double ne = ns + note->getLengthBeats().inBeats();
+        if (ns < clipLenBeats && ne > clipLenBeats) {
+            note->setStartAndLength(
+                note->getStartBeat(),
+                tracktion::BeatDuration::fromBeats(clipLenBeats - ns), um);
+        }
+    }
+
+    std::vector<te::MidiNote*> toRemove;
+    for (auto* note : seq.getNotes()) {
+        if (note->getStartBeat().inBeats() >= clipLenBeats)
+            toRemove.push_back(note);
+    }
+    for (auto* note : toRemove)
+        seq.removeNote(*note, um);
+}
+
+bool EditManager::isClipValid(te::Clip* clip) const
+{
+    if (!edit_ || !clip) return false;
+    for (auto* track : te::getAudioTracks(*edit_)) {
+        for (auto* c : track->getClips())
+            if (c == clip) return true;
+    }
+    return false;
 }
 
 void EditManager::ensureLevelMetersOnAllTracks()

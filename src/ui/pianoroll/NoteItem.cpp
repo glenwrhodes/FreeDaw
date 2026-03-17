@@ -2,6 +2,7 @@
 #include "ui/timeline/GridSnapper.h"
 #include "utils/ThemeManager.h"
 #include <QPainter>
+#include <QGraphicsScene>
 #include <QGraphicsSceneMouseEvent>
 #include <QCursor>
 #include <algorithm>
@@ -64,6 +65,9 @@ void NoteItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
         return;
     }
 
+    const bool additiveSelect = event->modifiers() & Qt::ShiftModifier;
+    if (!additiveSelect && scene())
+        scene()->clearSelection();
     setSelected(true);
     dragStartScene_ = event->scenePos();
     origStartBeat_ = note_->getStartBeat().inBeats();

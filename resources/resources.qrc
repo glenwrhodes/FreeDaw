@@ -1,5 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file>splash.png</file>
+        <file>fontaudio.ttf</file>
+        <file>MaterialSymbolsOutlined.ttf</file>
     </qresource>
 </RCC>

@@ -41,6 +41,7 @@ set(FREEDAW_SOURCES
     src/ui/controls/LevelMeter.h    src/ui/controls/LevelMeter.cpp
     src/ui/controls/WaveformWidget.h src/ui/controls/WaveformWidget.cpp
     src/ui/effects/EffectChainWidget.h   src/ui/effects/EffectChainWidget.cpp
+    src/ui/effects/DelayEffectWidget.h   src/ui/effects/DelayEffectWidget.cpp
     src/ui/effects/EffectSelectorDialog.h src/ui/effects/EffectSelectorDialog.cpp
     src/ui/effects/VstSelectorDialog.h    src/ui/effects/VstSelectorDialog.cpp
     src/ui/effects/PluginEditorWindow.h   src/ui/effects/PluginEditorWindow.cpp
@@ -53,6 +54,7 @@ set(FREEDAW_SOURCES
     src/ui/SplashScreen.h           src/ui/SplashScreen.cpp
     src/utils/WaveformCache.h       src/utils/WaveformCache.cpp
     src/utils/ThemeManager.h        src/utils/ThemeManager.cpp
+    src/utils/IconFont.h
 )
 
 # ── Create the FreeDaw JUCE GUI App target ───────────────────────────────────
@@ -66,7 +68,10 @@ juce_add_gui_app(FreeDaw
 juce_generate_juce_header(FreeDaw)
 
 target_sources(FreeDaw PRIVATE ${FREEDAW_SOURCES})
-qt_add_resources(FreeDaw "freedaw_resources" PREFIX "/" BASE resources FILES resources/splash.png)
+qt_add_resources(FreeDaw "freedaw_resources" PREFIX "/" BASE resources FILES
+    resources/splash.png
+    resources/fontaudio.ttf
+    resources/MaterialSymbolsOutlined.ttf)
 target_include_directories(FreeDaw PRIVATE src)
 
 target_compile_definitions(FreeDaw PRIVATE

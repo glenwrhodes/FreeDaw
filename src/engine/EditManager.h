@@ -41,12 +41,20 @@ public:
                                         double startBeat);
 
     bool isMidiTrack(te::AudioTrack* track) const;
+    bool isTrackMono(te::AudioTrack* track) const;
+    void setTrackMono(te::AudioTrack& track, bool mono);
     te::Plugin* getTrackInstrument(te::AudioTrack* track) const;
     void setTrackInstrument(te::AudioTrack& track,
                             const juce::PluginDescription& desc);
     void removeTrackInstrument(te::AudioTrack& track);
 
     void markAsMidiTrack(te::AudioTrack* track);
+
+    void trimNotesToClipBounds(te::MidiClip& clip);
+    bool isClipValid(te::Clip* clip) const;
+
+    void undo();
+    void redo();
 
     double getBpm() const;
     void   setBpm(double bpm);
@@ -62,6 +70,8 @@ signals:
     void tracksChanged();
     void transportStateChanged();
     void midiClipDoubleClicked(te::MidiClip* clip);
+    void midiClipSelected(te::MidiClip* clip);
+    void midiClipModified(te::MidiClip* clip);
 
 private:
     void teardownCurrentEdit();

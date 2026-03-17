@@ -37,6 +37,20 @@ PianoRollEditor::PianoRollEditor(QWidget* parent)
 
     tbLayout->addStretch();
 
+    auto* modeLabel = new QLabel("Mode:", toolbar);
+    modeLabel->setStyleSheet(QString("color: %1;").arg(theme.textDim.name()));
+    tbLayout->addWidget(modeLabel);
+
+    modeCombo_ = new QComboBox(toolbar);
+    modeCombo_->setAccessibleName("Piano Roll Edit Mode");
+    modeCombo_->addItem("Draw");
+    modeCombo_->addItem("Edit");
+    modeCombo_->setCurrentIndex(1);
+    modeCombo_->setFixedWidth(90);
+    connect(modeCombo_, qOverload<int>(&QComboBox::currentIndexChanged),
+            this, &PianoRollEditor::onEditModeChanged);
+    tbLayout->addWidget(modeCombo_);
+
     auto* snapLabel = new QLabel("Snap:", toolbar);
     snapLabel->setStyleSheet(QString("color: %1;").arg(theme.textDim.name()));
     tbLayout->addWidget(snapLabel);
@@ -117,12 +131,15 @@ PianoRollEditor::PianoRollEditor(QWidget* parent)
             this, &PianoRollEditor::syncKeyboardScroll);
     connect(noteGrid_, &NoteGrid::horizontalScrollChanged,
             this, &PianoRollEditor::syncVelocityScroll);
+    connect(noteGrid_, &NoteGrid::zoomChanged,
+            this, &PianoRollEditor::syncVelocityScroll);
     connect(noteGrid_, &NoteGrid::notesChanged,
             this, &PianoRollEditor::onNotesChanged);
     connect(velocityLane_, &VelocityLane::velocityChanged,
             this, [this]() { noteGrid_->rebuildNotes(); });
 
     onSnapModeChanged(3);
+    onEditModeChanged(1);
 }
 
 void PianoRollEditor::setClip(te::MidiClip* clip)
@@ -138,6 +155,15 @@ void PianoRollEditor::setClip(te::MidiClip* clip)
     } else {
         clipNameLabel_->setText("No clip selected");
     }
+}
+
+void PianoRollEditor::refresh()
+{
+    if (!clip_) return;
+    noteGrid_->rebuildNotes();
+    velocityLane_->setPixelsPerBeat(noteGrid_->pixelsPerBeat());
+    velocityLane_->refresh();
+    velocityLane_->repaint();
 }
 
 void PianoRollEditor::syncKeyboardScroll()
@@ -157,6 +183,12 @@ void PianoRollEditor::onSnapModeChanged(int index)
 {
     auto mode = static_cast<SnapMode>(index);
     noteGrid_->snapper().setMode(mode);
+}
+
+void PianoRollEditor::onEditModeChanged(int index)
+{
+    auto mode = index == 0 ? NoteGrid::EditMode::Draw : NoteGrid::EditMode::Edit;
+    noteGrid_->setEditMode(mode);
 }
 
 void PianoRollEditor::onNotesChanged()

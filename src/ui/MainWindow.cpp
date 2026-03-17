@@ -3,6 +3,7 @@
 #include "ui/effects/PluginEditorWindow.h"
 #include "ui/pianoroll/PianoRollEditor.h"
 #include "utils/ThemeManager.h"
+#include "utils/IconFont.h"
 #include <QFileDialog>
 #include <QAction>
 #include <QLabel>
@@ -50,6 +51,12 @@ MainWindow::MainWindow(FreeDawApplication& app, QWidget* parent)
                 if (mixerView_) {
                     mixerView_->setSelectedTrack(track);
                 }
+            });
+
+    connect(timelineView_, &TimelineView::selectedClipsDeleted,
+            this, [this]() {
+                if (pianoRoll_)
+                    pianoRoll_->setClip(nullptr);
             });
 
     createDocks();
@@ -210,11 +217,22 @@ void MainWindow::createMenus()
 
 void MainWindow::createToolBar()
 {
+    auto& theme = ThemeManager::instance().current();
+    const QColor ic = theme.text;
+    const QColor icAccent = theme.accentLight;
+    const int sz = 18;
+    const QFont faFont = icons::fontAudio(sz);
+    const QFont miFont = icons::materialIcons(sz);
+
+    auto faIcon = [&](const QChar& g) { return icons::glyphIcon(faFont, g, ic, sz); };
+    auto miIcon = [&](const QChar& g) { return icons::glyphIcon(miFont, g, ic, sz); };
+    auto faIconAccent = [&](const QChar& g) { return icons::glyphIcon(faFont, g, icAccent, sz); };
+
     transportToolBar_ = addToolBar("Transport");
     transportToolBar_->setAccessibleName("Transport Toolbar");
     transportToolBar_->setMovable(false);
     transportToolBar_->setFloatable(false);
-    transportToolBar_->setIconSize(QSize(20, 20));
+    transportToolBar_->setIconSize(QSize(sz, sz));
     transportToolBar_->addWidget(transportBar_);
 
     addToolBarBreak(Qt::TopToolBarArea);
@@ -224,48 +242,94 @@ void MainWindow::createToolBar()
     mainToolBar_->setMovable(false);
     mainToolBar_->setFloatable(false);
     mainToolBar_->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    mainToolBar_->setIconSize(QSize(18, 18));
+    mainToolBar_->setIconSize(QSize(sz, sz));
 
     auto* newProjectAction = mainToolBar_->addAction(
-        style()->standardIcon(QStyle::SP_FileIcon), "New Project",
+        miIcon(icons::mi::InsertDriveFile), "New Project",
         this, &MainWindow::onNewProject);
     newProjectAction->setToolTip("New Project");
 
     auto* openProjectAction = mainToolBar_->addAction(
-        style()->standardIcon(QStyle::SP_DialogOpenButton), "Open Project",
+        faIcon(icons::fa::Open), "Open Project",
         this, &MainWindow::onOpenProject);
     openProjectAction->setToolTip("Open Project");
 
     auto* saveProjectAction = mainToolBar_->addAction(
-        style()->standardIcon(QStyle::SP_DialogSaveButton), "Save Project",
+        faIcon(icons::fa::Save), "Save Project",
         this, &MainWindow::onSaveProject);
     saveProjectAction->setToolTip("Save Project");
 
     mainToolBar_->addSeparator();
 
+    auto* undoAction = mainToolBar_->addAction(
+        faIcon(icons::fa::Undo), "Undo",
+        this, [this]() { editMgr_.undo(); });
+    undoAction->setToolTip("Undo (Ctrl+Z)");
+    undoAction->setShortcut(QKeySequence::Undo);
+    undoAction->setShortcutContext(Qt::WindowShortcut);
+    addAction(undoAction);
+
+    auto* redoAction = mainToolBar_->addAction(
+        faIcon(icons::fa::Redo), "Redo",
+        this, [this]() { editMgr_.redo(); });
+    redoAction->setToolTip("Redo (Ctrl+Y)");
+    redoAction->setShortcut(QKeySequence::Redo);
+    redoAction->setShortcutContext(Qt::WindowShortcut);
+    addAction(redoAction);
+
+    mainToolBar_->addSeparator();
+
     auto* addAudioTrackAction = mainToolBar_->addAction(
-        style()->standardIcon(QStyle::SP_FileDialogNewFolder), "Add Audio Track",
+        faIconAccent(icons::fa::Waveform), "Add Audio Track",
         this, &MainWindow::onAddTrack);
     addAudioTrackAction->setToolTip("Add Audio Track");
 
     auto* addMidiTrackAction = mainToolBar_->addAction(
-        style()->standardIcon(QStyle::SP_MediaVolume), "Add MIDI Track",
+        faIconAccent(icons::fa::Keyboard), "Add MIDI Track",
         this, &MainWindow::onAddMidiTrack);
     addMidiTrackAction->setToolTip("Add MIDI Track");
 
     auto* removeTrackAction = mainToolBar_->addAction(
-        style()->standardIcon(QStyle::SP_TrashIcon), "Remove Track",
+        miIcon(icons::mi::Delete), "Remove Track",
         this, &MainWindow::onRemoveTrack);
     removeTrackAction->setToolTip("Remove Track");
 
+    mainToolBar_->addSeparator();
+
     if (splitClipAction_) {
-        splitClipAction_->setIcon(style()->standardIcon(QStyle::SP_ArrowRight));
+        splitClipAction_->setIcon(faIcon(icons::fa::Scissors));
         splitClipAction_->setText("Split Clip");
         mainToolBar_->addAction(splitClipAction_);
     }
 
+    auto* pointerAction = mainToolBar_->addAction(
+        faIcon(icons::fa::Pointer), "Pointer Tool");
+    pointerAction->setToolTip("Pointer Tool");
+
+    auto* penAction = mainToolBar_->addAction(
+        faIcon(icons::fa::Pen), "Pen Tool");
+    penAction->setToolTip("Pen Tool");
+
+    auto* eraserAction = mainToolBar_->addAction(
+        faIcon(icons::fa::Eraser), "Eraser Tool");
+    eraserAction->setToolTip("Eraser Tool");
+
+    mainToolBar_->addSeparator();
+
+    auto* zoomInAction = mainToolBar_->addAction(
+        faIcon(icons::fa::ZoomIn), "Zoom In",
+        timelineView_, &TimelineView::zoomIn);
+    zoomInAction->setToolTip("Zoom In");
+
+    auto* zoomOutAction = mainToolBar_->addAction(
+        faIcon(icons::fa::ZoomOut), "Zoom Out",
+        timelineView_, &TimelineView::zoomOut);
+    zoomOutAction->setToolTip("Zoom Out");
+
+    mainToolBar_->addSeparator();
+
     auto* scanPluginsAction = mainToolBar_->addAction(
-        style()->standardIcon(QStyle::SP_BrowserReload), "Scan VST Plugins",
+        miIcon(icons::mi::Refresh), "Scan VST Plugins",
         this, &MainWindow::onScanVstPlugins);
     scanPluginsAction->setToolTip("Scan VST Plugins");
 
@@ -273,19 +337,19 @@ void MainWindow::createToolBar()
 
     if (mixerDock_) {
         auto* mixerToggle = mixerDock_->toggleViewAction();
-        mixerToggle->setIcon(style()->standardIcon(QStyle::SP_ComputerIcon));
+        mixerToggle->setIcon(faIcon(icons::fa::Speaker));
         mixerToggle->setToolTip("Toggle Mixer");
         mainToolBar_->addAction(mixerToggle);
     }
     if (browserDock_) {
         auto* browserToggle = browserDock_->toggleViewAction();
-        browserToggle->setIcon(style()->standardIcon(QStyle::SP_DirIcon));
+        browserToggle->setIcon(miIcon(icons::mi::Folder));
         browserToggle->setToolTip("Toggle Browser");
         mainToolBar_->addAction(browserToggle);
     }
     if (effectsDock_) {
         auto* effectsToggle = effectsDock_->toggleViewAction();
-        effectsToggle->setIcon(style()->standardIcon(QStyle::SP_FileDialogContentsView));
+        effectsToggle->setIcon(miIcon(icons::mi::Tune));
         effectsToggle->setToolTip("Toggle Effects");
         mainToolBar_->addAction(effectsToggle);
     }
@@ -324,10 +388,32 @@ void MainWindow::createDocks()
     connect(pianoRoll_, &PianoRollEditor::notesChanged,
             timelineView_, &TimelineView::rebuildClips);
 
-    connect(&editMgr_, &EditManager::editChanged, this, [this]() {
+    connect(&editMgr_, &EditManager::aboutToChangeEdit, this, [this]() {
         if (pianoRoll_)
             pianoRoll_->setClip(nullptr);
     });
+
+    connect(&editMgr_, &EditManager::editChanged, this, [this]() {
+        if (pianoRoll_ && pianoRoll_->clip()) {
+            if (editMgr_.isClipValid(pianoRoll_->clip()))
+                pianoRoll_->refresh();
+            else
+                pianoRoll_->setClip(nullptr);
+        }
+    });
+
+    connect(&editMgr_, &EditManager::midiClipModified,
+            this, [this](te::MidiClip* clip) {
+                if (pianoRoll_ && pianoRoll_->clip() == clip)
+                    pianoRoll_->refresh();
+            });
+
+    connect(&editMgr_, &EditManager::midiClipSelected,
+            this, [this](te::MidiClip* clip) {
+                if (pianoRollDock_ && pianoRollDock_->isVisible() && pianoRoll_ && clip)
+                    pianoRoll_->setClip(clip);
+            });
+
     tabifyDockWidget(mixerDock_, pianoRollDock_);
     mixerDock_->raise();
 

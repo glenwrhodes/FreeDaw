@@ -401,6 +401,12 @@ void ClipItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
         }
 
         setSelected(true);
+
+        if (isMidiClip_ && editMgr_) {
+            if (auto* mc = dynamic_cast<te::MidiClip*>(clip_))
+                emit editMgr_->midiClipSelected(mc);
+        }
+
         event->accept();
     }
     QGraphicsRectItem::mousePressEvent(event);
@@ -486,10 +492,23 @@ void ClipItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
             }
 
             clip_->setEnd(ts.toTime(tracktion::BeatPosition::fromBeats(endBeat)), false);
+
+            if (isMidiClip_ && editMgr_) {
+                if (auto* mc = dynamic_cast<te::MidiClip*>(clip_)) {
+                    editMgr_->trimNotesToClipBounds(*mc);
+                    emit editMgr_->midiClipModified(mc);
+                }
+            }
+
             if (trackHeightPtr_)
                 updateGeometry(*pixelsPerBeatPtr_, *trackHeightPtr_, 0.0);
             if (editMgr_ && editMgr_->edit())
                 editMgr_->edit()->restartPlayback();
+        }
+
+        if (isMidiClip_ && requestRefresh_) {
+            auto refresh = requestRefresh_;
+            QTimer::singleShot(0, [refresh]() { refresh(); });
         }
 
         event->accept();

@@ -6,6 +6,7 @@
 #include "app/FreeDawApplication.h"
 #include "ui/MainWindow.h"
 #include "ui/SplashScreen.h"
+#include "utils/IconFont.h"
 
 static QFile* logFile = nullptr;
 
@@ -38,6 +39,8 @@ int main(int argc, char* argv[])
         logFile = &lf;
         qInstallMessageHandler(logMessageHandler);
     }
+
+    freedaw::icons::registerFonts();
 
     auto* splash = new freedaw::SplashScreen();
     splash->show();

@@ -10,6 +10,7 @@
 #include <QKeyEvent>
 #include <QMenu>
 #include <QDebug>
+#include <QLineF>
 #include <cmath>
 
 namespace freedaw {
@@ -17,6 +18,12 @@ namespace freedaw {
 // ── TimelineScene ───────────────────────────────────────────────────────────
 
 TimelineScene::TimelineScene(QObject* parent) : QGraphicsScene(parent) {}
+
+void TimelineScene::cancelBackgroundDrag()
+{
+    backgroundDragCandidate_ = false;
+    backgroundDragging_ = false;
+}
 
 void TimelineScene::dragEnterEvent(QGraphicsSceneDragDropEvent* event)
 {
@@ -51,10 +58,44 @@ void TimelineScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
         for (auto* item : hitItems) {
             if (dynamic_cast<ClipItem*>(item)) { hitClip = true; break; }
         }
-        if (!hitClip)
-            emit backgroundClicked(event->scenePos().x(), event->scenePos().y());
+        backgroundDragCandidate_ = !hitClip;
+        backgroundDragging_ = false;
+        if (backgroundDragCandidate_)
+            backgroundDragStartScenePos_ = event->scenePos();
     }
     QGraphicsScene::mousePressEvent(event);
+}
+
+void TimelineScene::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
+{
+    if (backgroundDragCandidate_) {
+        if (!backgroundDragging_) {
+            constexpr double dragThresholdPixels = 5.0;
+            if (QLineF(backgroundDragStartScenePos_, event->scenePos()).length() >= dragThresholdPixels) {
+                backgroundDragging_ = true;
+                emit backgroundDragStarted(backgroundDragStartScenePos_);
+            }
+        }
+
+        if (backgroundDragging_)
+            emit backgroundDragUpdated(backgroundDragStartScenePos_, event->scenePos());
+    }
+
+    QGraphicsScene::mouseMoveEvent(event);
+}
+
+void TimelineScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton && backgroundDragCandidate_) {
+        if (backgroundDragging_)
+            emit backgroundDragFinished(backgroundDragStartScenePos_, event->scenePos());
+        else
+            emit backgroundClicked(event->scenePos().x(), event->scenePos().y());
+    }
+
+    backgroundDragCandidate_ = false;
+    backgroundDragging_ = false;
+    QGraphicsScene::mouseReleaseEvent(event);
 }
 
 void TimelineScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
@@ -160,6 +201,9 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
     graphicsView_->setRenderHint(QPainter::Antialiasing, true);
     graphicsView_->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     graphicsView_->setBackgroundBrush(theme.background);
+    graphicsView_->setFocusPolicy(Qt::StrongFocus);
+    graphicsView_->viewport()->setFocusPolicy(Qt::StrongFocus);
+    graphicsView_->installEventFilter(this);
     graphicsView_->viewport()->installEventFilter(this);
     bodyLayout_->addWidget(graphicsView_, 1);
 
@@ -205,6 +249,13 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
             this, [this](double, double) {
                 selectTrack(nullptr);
             });
+
+    connect(scene_, &TimelineScene::backgroundDragStarted,
+            this, &TimelineView::handleBackgroundDragStarted);
+    connect(scene_, &TimelineScene::backgroundDragUpdated,
+            this, &TimelineView::handleBackgroundDragUpdated);
+    connect(scene_, &TimelineScene::backgroundDragFinished,
+            this, &TimelineView::handleBackgroundDragFinished);
 
     // Double-click on empty area -> create blank MIDI clip on MIDI tracks
     connect(scene_, &TimelineScene::emptyAreaDoubleClicked,
@@ -262,6 +313,7 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
 
     connect(editMgr_, &EditManager::aboutToChangeEdit, this, [this]() {
         qDebug() << "[TimelineView] aboutToChangeEdit - clearing widgets";
+        clearMidiClipDrawPreview();
         for (auto* h : trackHeaders_) {
             headerVLayout_->removeWidget(h);
             delete h;
@@ -302,7 +354,11 @@ void TimelineView::zoomVerticalOut() { setTrackHeight(trackHeight_ / 1.2); }
 
 bool TimelineView::eventFilter(QObject* watched, QEvent* event)
 {
-    if (watched == graphicsView_->viewport()) {
+    if (watched == graphicsView_ || watched == graphicsView_->viewport()) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            graphicsView_->setFocus(Qt::MouseFocusReason);
+        }
+
         if (event->type() == QEvent::Wheel) {
             auto* wheelEvent = static_cast<QWheelEvent*>(event);
 
@@ -329,6 +385,12 @@ bool TimelineView::eventFilter(QObject* watched, QEvent* event)
 
         if (event->type() == QEvent::KeyPress) {
             auto* keyEvent = static_cast<QKeyEvent*>(event);
+            if (keyEvent->key() == Qt::Key_Escape && isMidiClipDrawActive_) {
+                scene_->cancelBackgroundDrag();
+                clearMidiClipDrawPreview();
+                keyEvent->accept();
+                return true;
+            }
             if (keyEvent->key() == Qt::Key_Delete || keyEvent->key() == Qt::Key_Backspace) {
                 deleteSelectedClips();
                 keyEvent->accept();
@@ -425,6 +487,7 @@ void TimelineView::rebuildClips()
     for (auto* item : trackBgItems_) scene_->removeItem(item);
     for (auto* item : gridLineItems_) scene_->removeItem(item);
     for (auto* item : trackSeparatorItems_) scene_->removeItem(item);
+    clearMidiClipDrawPreview();
 
     qDeleteAll(clipItems_);
     qDeleteAll(trackBgItems_);
@@ -622,6 +685,7 @@ void TimelineView::deleteSelectedClips()
         clip->removeFromParent();
 
     rebuildClips();
+    emit selectedClipsDeleted();
 }
 
 void TimelineView::selectTrack(te::AudioTrack* track)
@@ -660,8 +724,129 @@ void TimelineView::handleEmptyAreaDoubleClick(double sceneX, double sceneY)
     auto* clip = editMgr_->addMidiClipToTrack(*track, barBeat, beatsPerBar);
     rebuildClips();
 
-    if (clip)
+    if (clip) {
+        selectClipItem(clip);
         emit editMgr_->midiClipDoubleClicked(clip);
+    }
+}
+
+void TimelineView::handleBackgroundDragStarted(QPointF startScenePos)
+{
+    clearMidiClipDrawPreview();
+    if (!editMgr_ || !editMgr_->edit())
+        return;
+
+    auto tracks = editMgr_->getAudioTracks();
+    if (tracks.isEmpty())
+        return;
+
+    const int trackIdx = static_cast<int>(startScenePos.y() / trackHeight_);
+    if (trackIdx < 0 || trackIdx >= tracks.size())
+        return;
+
+    auto* track = tracks[trackIdx];
+    if (!editMgr_->isMidiTrack(track))
+        return;
+
+    midiClipDrawTrack_ = track;
+    midiClipDrawStartBeat_ = snapper_.snapBeat(startScenePos.x() / pixelsPerBeat_);
+    if (midiClipDrawStartBeat_ < 0.0)
+        midiClipDrawStartBeat_ = 0.0;
+    isMidiClipDrawActive_ = true;
+
+    auto& theme = ThemeManager::instance().current();
+    QPen pen(theme.accent, 1.25, Qt::DashLine);
+    QColor fill = theme.midiClipBody;
+    fill.setAlpha(95);
+
+    midiClipDrawPreviewItem_ = scene_->addRect(0, 0, 1.0, trackHeight_ - 2.0, pen, QBrush(fill));
+    midiClipDrawPreviewItem_->setZValue(1.2);
+    midiClipDrawPreviewItem_->setPos(midiClipDrawStartBeat_ * pixelsPerBeat_,
+                                     trackIdx * trackHeight_);
+}
+
+void TimelineView::handleBackgroundDragUpdated(QPointF, QPointF currentScenePos)
+{
+    if (!isMidiClipDrawActive_ || !midiClipDrawPreviewItem_ || !midiClipDrawTrack_)
+        return;
+
+    auto tracks = editMgr_->getAudioTracks();
+    int trackIdx = -1;
+    for (int i = 0; i < tracks.size(); ++i) {
+        if (tracks[i] == midiClipDrawTrack_) {
+            trackIdx = i;
+            break;
+        }
+    }
+    if (trackIdx < 0) {
+        clearMidiClipDrawPreview();
+        return;
+    }
+
+    double endBeat = snapper_.snapBeat(currentScenePos.x() / pixelsPerBeat_);
+    if (endBeat < 0.0)
+        endBeat = 0.0;
+
+    const double leftBeat = std::min(midiClipDrawStartBeat_, endBeat);
+    const double rightBeat = std::max(midiClipDrawStartBeat_, endBeat);
+    const double widthPx = std::max(1.0, (rightBeat - leftBeat) * pixelsPerBeat_);
+
+    midiClipDrawPreviewItem_->setRect(0, 0, widthPx, trackHeight_ - 2.0);
+    midiClipDrawPreviewItem_->setPos(leftBeat * pixelsPerBeat_, trackIdx * trackHeight_);
+
+    const double rightEdgePx = rightBeat * pixelsPerBeat_ + 120.0;
+    QRectF sceneRect = scene_->sceneRect();
+    if (rightEdgePx > sceneRect.width())
+        scene_->setSceneRect(0, 0, rightEdgePx, sceneRect.height());
+}
+
+void TimelineView::handleBackgroundDragFinished(QPointF, QPointF endScenePos)
+{
+    if (!editMgr_ || !editMgr_->edit() || !isMidiClipDrawActive_ || !midiClipDrawTrack_) {
+        clearMidiClipDrawPreview();
+        return;
+    }
+
+    double endBeat = snapper_.snapBeat(endScenePos.x() / pixelsPerBeat_);
+    if (endBeat < 0.0)
+        endBeat = 0.0;
+
+    const double startBeat = std::min(midiClipDrawStartBeat_, endBeat);
+    const double draggedLengthBeats = std::abs(endBeat - midiClipDrawStartBeat_);
+    double minLengthBeats = snapper_.gridIntervalBeats();
+    if (minLengthBeats <= 0.0)
+        minLengthBeats = 0.25;
+    const double clipLengthBeats = std::max(draggedLengthBeats, minLengthBeats);
+
+    auto* clip = editMgr_->addMidiClipToTrack(*midiClipDrawTrack_, startBeat, clipLengthBeats);
+    clearMidiClipDrawPreview();
+    rebuildClips();
+
+    if (clip) {
+        selectClipItem(clip);
+        emit editMgr_->midiClipDoubleClicked(clip);
+    }
+}
+
+void TimelineView::clearMidiClipDrawPreview()
+{
+    if (midiClipDrawPreviewItem_ && scene_) {
+        scene_->removeItem(midiClipDrawPreviewItem_);
+        delete midiClipDrawPreviewItem_;
+    }
+    midiClipDrawPreviewItem_ = nullptr;
+    midiClipDrawTrack_ = nullptr;
+    midiClipDrawStartBeat_ = 0.0;
+    isMidiClipDrawActive_ = false;
+}
+
+void TimelineView::selectClipItem(te::Clip* clip)
+{
+    for (auto* item : clipItems_) {
+        if (!item)
+            continue;
+        item->setSelected(item->clip() == clip);
+    }
 }
 
 } // namespace freedaw

@@ -42,6 +42,7 @@ private:
     void reconnectLevelMeterSource();
     void updateSelectionStyle();
     void applyToggleStyle(QPushButton* btn, const QColor& activeColor);
+    void updateMonoButtonVisual(bool mono);
 
     te::AudioTrack* track_ = nullptr;
     EditManager* editMgr_;
@@ -56,6 +57,7 @@ private:
     QPushButton* muteBtn_ = nullptr;
     QPushButton* soloBtn_ = nullptr;
     QPushButton* armBtn_ = nullptr;
+    QPushButton* monoBtn_ = nullptr;
 
     QTimer meterTimer_;
     te::LevelMeasurer::Client meterClient_;

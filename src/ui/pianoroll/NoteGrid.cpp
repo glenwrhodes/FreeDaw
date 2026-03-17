@@ -3,8 +3,11 @@
 #include <QScrollBar>
 #include <QWheelEvent>
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QMenu>
+#include <QShowEvent>
 #include <QTimer>
+#include <QGraphicsRectItem>
 #include <QGraphicsSceneMouseEvent>
 #include <cmath>
 
@@ -14,35 +17,11 @@ NoteGridScene::NoteGridScene(QObject* parent) : QGraphicsScene(parent) {}
 
 void NoteGridScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
-    if (event->button() == Qt::LeftButton && event->modifiers() & Qt::ControlModifier) {
-        auto hitItems = this->items(event->scenePos());
-        bool hitNote = false;
-        for (auto* item : hitItems) {
-            if (dynamic_cast<NoteItem*>(item)) { hitNote = true; break; }
-        }
-        if (!hitNote) {
-            emit emptyAreaClicked(event->scenePos().x(), static_cast<int>(event->scenePos().y()));
-            event->accept();
-            return;
-        }
-    }
     QGraphicsScene::mousePressEvent(event);
 }
 
 void NoteGridScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 {
-    if (event->button() == Qt::LeftButton) {
-        auto hitItems = this->items(event->scenePos());
-        bool hitNote = false;
-        for (auto* item : hitItems) {
-            if (dynamic_cast<NoteItem*>(item)) { hitNote = true; break; }
-        }
-        if (!hitNote) {
-            emit emptyAreaDoubleClicked(event->scenePos().x(), event->scenePos().y());
-            event->accept();
-            return;
-        }
-    }
     QGraphicsScene::mouseDoubleClickEvent(event);
 }
 
@@ -56,6 +35,8 @@ NoteGrid::NoteGrid(QWidget* parent) : QGraphicsView(parent)
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     setAlignment(Qt::AlignLeft | Qt::AlignTop);
     setRenderHint(QPainter::Antialiasing, false);
+    setFocusPolicy(Qt::StrongFocus);
+    viewport()->setFocusPolicy(Qt::StrongFocus);
 
     auto& theme = ThemeManager::instance().current();
     setBackgroundBrush(theme.pianoRollBackground);
@@ -65,37 +46,7 @@ NoteGrid::NoteGrid(QWidget* parent) : QGraphicsView(parent)
     connect(horizontalScrollBar(), &QScrollBar::valueChanged,
             this, &NoteGrid::horizontalScrollChanged);
 
-    auto addNoteAtScenePos = [this](double xPos, double yPos) {
-        if (!clip_) return;
-        double beat = xPos / pixelsPerBeat_;
-        beat = snapper_.snapBeat(beat);
-        if (beat < 0) beat = 0;
-
-        int row = static_cast<int>(yPos / noteRowHeight_);
-        int pitch = (TOTAL_NOTES - 1) - row;
-        pitch = std::clamp(pitch, 0, 127);
-
-        double length = std::max(0.25, snapper_.gridIntervalBeats());
-        auto& seq = clip_->getSequence();
-        auto* um = &clip_->edit.getUndoManager();
-        seq.addNote(pitch,
-                    tracktion::BeatPosition::fromBeats(beat),
-                    tracktion::BeatDuration::fromBeats(length),
-                    100, 0, um);
-        rebuildNotes();
-        emit notesChanged();
-    };
-
-    connect(scene_, &NoteGridScene::emptyAreaClicked,
-            this, [addNoteAtScenePos](double xPos, int yPos) {
-                addNoteAtScenePos(xPos, static_cast<double>(yPos));
-            });
-
-    connect(scene_, &NoteGridScene::emptyAreaDoubleClicked,
-            this, [addNoteAtScenePos](double xPos, double yPos) {
-                addNoteAtScenePos(xPos, yPos);
-            });
-
+    setEditMode(EditMode::Edit);
     updateSceneSize();
 }
 
@@ -110,6 +61,7 @@ void NoteGrid::setPixelsPerBeat(double ppb)
     pixelsPerBeat_ = std::clamp(ppb, 10.0, 300.0);
     updateSceneSize();
     rebuildNotes();
+    emit zoomChanged();
 }
 
 void NoteGrid::setNoteRowHeight(double h)
@@ -117,6 +69,15 @@ void NoteGrid::setNoteRowHeight(double h)
     noteRowHeight_ = std::clamp(h, 6.0, 40.0);
     updateSceneSize();
     rebuildNotes();
+}
+
+void NoteGrid::setEditMode(EditMode mode)
+{
+    editMode_ = mode;
+    setDragMode(editMode_ == EditMode::Edit ? QGraphicsView::RubberBandDrag
+                                            : QGraphicsView::NoDrag);
+    if (editMode_ != EditMode::Draw)
+        clearDrawPreview();
 }
 
 void NoteGrid::updateSceneSize()
@@ -261,8 +222,53 @@ void NoteGrid::rebuildNotes()
     }
 }
 
+void NoteGrid::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton)
+        setFocus(Qt::MouseFocusReason);
+
+    if (editMode_ == EditMode::Draw && event->button() == Qt::LeftButton) {
+        beginDrawPreview(mapToScene(event->pos()));
+        event->accept();
+        return;
+    }
+
+    QGraphicsView::mousePressEvent(event);
+}
+
+void NoteGrid::mouseMoveEvent(QMouseEvent* event)
+{
+    if (editMode_ == EditMode::Draw && isDrawingNote_) {
+        updateDrawPreview(mapToScene(event->pos()));
+        event->accept();
+        return;
+    }
+
+    QGraphicsView::mouseMoveEvent(event);
+}
+
+void NoteGrid::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (editMode_ == EditMode::Draw && event->button() == Qt::LeftButton && isDrawingNote_) {
+        commitDrawPreview(mapToScene(event->pos()));
+        event->accept();
+        return;
+    }
+
+    QGraphicsView::mouseReleaseEvent(event);
+}
+
 void NoteGrid::wheelEvent(QWheelEvent* event)
 {
+    if (editMode_ == EditMode::Draw && isDrawingNote_) {
+        const int velocityStep = std::max(1, event->angleDelta().y() / 120);
+        drawVelocity_ = std::clamp(drawVelocity_ + velocityStep * 4, 1, 127);
+        defaultDrawVelocity_ = drawVelocity_;
+        updateDrawPreviewAppearance();
+        event->accept();
+        return;
+    }
+
     if (event->modifiers() & Qt::ControlModifier) {
         double factor = std::pow(1.15, event->angleDelta().y() / 120.0);
         setPixelsPerBeat(pixelsPerBeat_ * factor);
@@ -319,6 +325,15 @@ void NoteGrid::quantizeNotes()
     emit notesChanged();
 }
 
+void NoteGrid::scrollToMidiNote(int midiNote)
+{
+    midiNote = std::clamp(midiNote, 0, TOTAL_NOTES - 1);
+    const int row = (TOTAL_NOTES - 1) - midiNote;
+    const int targetY = static_cast<int>(row * noteRowHeight_ + noteRowHeight_ * 0.5);
+    const int centeredValue = targetY - viewport()->height() / 2;
+    verticalScrollBar()->setValue(std::max(0, centeredValue));
+}
+
 void NoteGrid::keyPressEvent(QKeyEvent* event)
 {
     if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
@@ -370,6 +385,150 @@ void NoteGrid::contextMenuEvent(QContextMenuEvent* event)
     }
 
     menu.exec(event->globalPos());
+}
+
+void NoteGrid::showEvent(QShowEvent* event)
+{
+    QGraphicsView::showEvent(event);
+
+    if (!initialVerticalScrollSet_) {
+        scrollToMidiNote(60); // Middle C
+        initialVerticalScrollSet_ = true;
+        emit verticalScrollChanged(verticalScrollBar()->value());
+    }
+}
+
+void NoteGrid::beginDrawPreview(const QPointF& scenePos)
+{
+    if (!clip_) return;
+
+    double beat = scenePos.x() / pixelsPerBeat_;
+    beat = snapper_.snapBeat(beat);
+    if (beat < 0.0) beat = 0.0;
+
+    const int row = static_cast<int>(scenePos.y() / noteRowHeight_);
+    drawPitch_ = std::clamp((TOTAL_NOTES - 1) - row, 0, 127);
+    drawVelocity_ = std::clamp(defaultDrawVelocity_, 1, 127);
+    drawStartBeat_ = beat;
+    drawCurrentBeat_ = beat;
+    isDrawingNote_ = true;
+
+    if (!drawPreviewItem_) {
+        auto& theme = ThemeManager::instance().current();
+        drawPreviewItem_ = scene_->addRect(0, 0, 1.0, std::max(1.0, noteRowHeight_ - 1.0),
+                                           QPen(theme.pianoRollNoteSelected.lighter(120), 1.0, Qt::DashLine),
+                                           QBrush(theme.pianoRollNote));
+        drawPreviewItem_->setZValue(3.5);
+    }
+    if (!drawPreviewText_) {
+        drawPreviewText_ = scene_->addSimpleText("");
+        drawPreviewText_->setZValue(3.6);
+    }
+
+    updateDrawPreview(scenePos);
+}
+
+void NoteGrid::updateDrawPreview(const QPointF& scenePos)
+{
+    if (!isDrawingNote_ || !drawPreviewItem_) return;
+
+    double beat = scenePos.x() / pixelsPerBeat_;
+    beat = snapper_.snapBeat(beat);
+    if (beat < 0.0) beat = 0.0;
+    drawCurrentBeat_ = beat;
+
+    double minLength = snapper_.gridIntervalBeats();
+    if (minLength <= 0.0) minLength = 0.25;
+
+    const double leftBeat = std::min(drawStartBeat_, drawCurrentBeat_);
+    const double rightBeat = std::max(drawStartBeat_, drawCurrentBeat_);
+    const double lengthBeats = std::max(minLength, rightBeat - leftBeat);
+
+    const double x = leftBeat * pixelsPerBeat_;
+    const int row = (TOTAL_NOTES - 1) - drawPitch_;
+    const double y = row * noteRowHeight_;
+    const double width = std::max(1.0, lengthBeats * pixelsPerBeat_);
+    const double height = std::max(1.0, noteRowHeight_ - 1.0);
+
+    drawPreviewItem_->setRect(0, 0, width, height);
+    drawPreviewItem_->setPos(x, y);
+    updateDrawPreviewAppearance();
+}
+
+void NoteGrid::commitDrawPreview(const QPointF& scenePos)
+{
+    if (!clip_ || !isDrawingNote_) {
+        clearDrawPreview();
+        return;
+    }
+
+    updateDrawPreview(scenePos);
+
+    double minLength = snapper_.gridIntervalBeats();
+    if (minLength <= 0.0) minLength = 0.25;
+
+    const double leftBeat = std::min(drawStartBeat_, drawCurrentBeat_);
+    const double rightBeat = std::max(drawStartBeat_, drawCurrentBeat_);
+    const double lengthBeats = std::max(minLength, rightBeat - leftBeat);
+
+    auto& seq = clip_->getSequence();
+    auto* um = &clip_->edit.getUndoManager();
+    seq.addNote(drawPitch_,
+                tracktion::BeatPosition::fromBeats(leftBeat),
+                tracktion::BeatDuration::fromBeats(lengthBeats),
+                drawVelocity_, 0, um);
+
+    clearDrawPreview();
+    rebuildNotes();
+    emit notesChanged();
+}
+
+void NoteGrid::clearDrawPreview()
+{
+    isDrawingNote_ = false;
+
+    if (drawPreviewItem_) {
+        scene_->removeItem(drawPreviewItem_);
+        delete drawPreviewItem_;
+        drawPreviewItem_ = nullptr;
+    }
+    if (drawPreviewText_) {
+        scene_->removeItem(drawPreviewText_);
+        delete drawPreviewText_;
+        drawPreviewText_ = nullptr;
+    }
+}
+
+QString NoteGrid::midiNoteName(int midiNote) const
+{
+    static const char* kNames[12] = {
+        "C", "C#", "D", "D#", "E", "F",
+        "F#", "G", "G#", "A", "A#", "B"
+    };
+    midiNote = std::clamp(midiNote, 0, 127);
+    const int octave = (midiNote / 12) - 1;
+    const int semitone = midiNote % 12;
+    return QString("%1%2").arg(kNames[semitone]).arg(octave);
+}
+
+void NoteGrid::updateDrawPreviewAppearance()
+{
+    if (!drawPreviewItem_ || !drawPreviewText_) return;
+
+    auto& theme = ThemeManager::instance().current();
+    QColor noteColor = theme.pianoRollNoteSelected;
+    noteColor.setAlphaF(0.35 + 0.55 * (drawVelocity_ / 127.0));
+
+    drawPreviewItem_->setBrush(QBrush(noteColor));
+    drawPreviewItem_->setPen(QPen(theme.pianoRollNoteSelected.lighter(130), 1.0, Qt::DashLine));
+
+    const QString previewText = QString("%1  Vel %2")
+        .arg(midiNoteName(drawPitch_))
+        .arg(drawVelocity_);
+    drawPreviewText_->setText(previewText);
+    drawPreviewText_->setBrush(theme.text);
+    drawPreviewText_->setPos(drawPreviewItem_->pos().x() + 4.0,
+                             drawPreviewItem_->pos().y() - 16.0);
 }
 
 } // namespace freedaw
