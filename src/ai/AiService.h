@@ -84,6 +84,9 @@ private:
 
     static constexpr int MAX_TOOL_ROUNDS = 20;
     int toolRoundCount_ = 0;
+
+    QSet<QString> executedToolIds_;
+    void pruneHistory();
 };
 
 } // namespace freedaw

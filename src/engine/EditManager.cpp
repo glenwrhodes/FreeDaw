@@ -216,13 +216,19 @@ void EditManager::addAudioClipToTrack(te::AudioTrack& track,
                                        const juce::File& audioFile,
                                        double startBeat)
 {
-    double fileDurationSecs = 5.0;
-
     juce::AudioFormatManager formatManager;
     formatManager.registerBasicFormats();
-    if (auto reader = std::unique_ptr<juce::AudioFormatReader>(
-            formatManager.createReaderFor(audioFile))) {
-        fileDurationSecs = double(reader->lengthInSamples) / reader->sampleRate;
+    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+        formatManager.createReaderFor(audioFile));
+    if (!reader) {
+        qWarning() << "[addAudioClipToTrack] cannot read file:"
+                    << QString::fromStdString(audioFile.getFullPathName().toStdString());
+        return;
+    }
+    double fileDurationSecs = double(reader->lengthInSamples) / reader->sampleRate;
+    if (fileDurationSecs <= 0.0) {
+        qWarning() << "[addAudioClipToTrack] file has zero duration";
+        return;
     }
 
     auto& ts = edit_->tempoSequence;
@@ -372,15 +378,12 @@ te::MidiClip* EditManager::importMidiFileToTrack(te::AudioTrack& track,
     double lengthBeats = (totalDuration / 60.0) * bpm;
     lengthBeats = std::max(lengthBeats, 1.0);
 
-    auto* clip = addMidiClipToTrack(track, startBeat, lengthBeats);
-    if (!clip) return nullptr;
+    auto importToTrack = [&](te::AudioTrack& destTrack, const juce::MidiMessageSequence* midiTrack) -> te::MidiClip* {
+        auto* clip = addMidiClipToTrack(destTrack, startBeat, lengthBeats);
+        if (!clip) return nullptr;
 
-    auto& seq = clip->getSequence();
-    seq.removeAllNotes(nullptr);
-
-    for (int t = 0; t < midi.getNumTracks(); ++t) {
-        auto* midiTrack = midi.getTrack(t);
-        if (!midiTrack) continue;
+        auto& seq = clip->getSequence();
+        seq.removeAllNotes(nullptr);
 
         for (int ei = 0; ei < midiTrack->getNumEvents(); ++ei) {
             auto msg = midiTrack->getEventPointer(ei)->message;
@@ -404,13 +407,67 @@ te::MidiClip* EditManager::importMidiFileToTrack(te::AudioTrack& track,
                         tracktion::BeatDuration::fromBeats(noteLengthBeats),
                         velocity, 0, nullptr);
         }
+
+        if (!isMidiTrack(&destTrack))
+            markAsMidiTrack(&destTrack);
+        return clip;
+    };
+
+    int noteTrackCount = 0;
+    for (int t = 0; t < midi.getNumTracks(); ++t) {
+        auto* mt = midi.getTrack(t);
+        if (!mt) continue;
+        bool hasNotes = false;
+        for (int ei = 0; ei < mt->getNumEvents(); ++ei) {
+            if (mt->getEventPointer(ei)->message.isNoteOn()) { hasNotes = true; break; }
+        }
+        if (hasNotes) noteTrackCount++;
     }
 
-    if (!isMidiTrack(&track))
-        markAsMidiTrack(&track);
+    te::MidiClip* firstClip = nullptr;
+    if (noteTrackCount <= 1) {
+        for (int t = 0; t < midi.getNumTracks(); ++t) {
+            auto* mt = midi.getTrack(t);
+            if (!mt) continue;
+            bool hasNotes = false;
+            for (int ei = 0; ei < mt->getNumEvents(); ++ei) {
+                if (mt->getEventPointer(ei)->message.isNoteOn()) { hasNotes = true; break; }
+            }
+            if (hasNotes) {
+                firstClip = importToTrack(track, mt);
+                break;
+            }
+        }
+        if (!firstClip)
+            firstClip = importToTrack(track, midi.getTrack(0));
+    } else {
+        bool usedFirst = false;
+        for (int t = 0; t < midi.getNumTracks(); ++t) {
+            auto* mt = midi.getTrack(t);
+            if (!mt) continue;
+            bool hasNotes = false;
+            for (int ei = 0; ei < mt->getNumEvents(); ++ei) {
+                if (mt->getEventPointer(ei)->message.isNoteOn()) { hasNotes = true; break; }
+            }
+            if (!hasNotes) continue;
+
+            te::AudioTrack* destTrack;
+            if (!usedFirst) {
+                destTrack = &track;
+                usedFirst = true;
+            } else {
+                destTrack = addMidiTrack();
+                if (!destTrack) continue;
+            }
+
+            auto* clip = importToTrack(*destTrack, mt);
+            if (clip && !firstClip)
+                firstClip = clip;
+        }
+    }
 
     emit editChanged();
-    return clip;
+    return firstClip;
 }
 
 bool EditManager::isMidiTrack(te::AudioTrack* track) const
@@ -674,6 +731,23 @@ bool EditManager::isTrackRecordEnabled(te::AudioTrack* track) const
 
 // ── Output routing ───────────────────────────────────────────────────────────
 
+bool EditManager::wouldCreateCycle(te::AudioTrack* src, te::AudioTrack* dest) const
+{
+    if (!src || !dest) return false;
+    if (src == dest) return true;
+
+    std::unordered_set<uint64_t> visited;
+    visited.insert(src->itemID.getRawID());
+    auto* current = dest;
+    while (current) {
+        if (visited.count(current->itemID.getRawID()))
+            return true;
+        visited.insert(current->itemID.getRawID());
+        current = current->getOutput().getDestinationTrack();
+    }
+    return false;
+}
+
 void EditManager::setTrackOutputToMaster(te::AudioTrack& track)
 {
     if (!edit_) return;
@@ -687,6 +761,10 @@ void EditManager::setTrackOutputToMaster(te::AudioTrack& track)
 void EditManager::setTrackOutputToTrack(te::AudioTrack& src, te::AudioTrack& dest)
 {
     if (!edit_) return;
+    if (wouldCreateCycle(&src, &dest)) {
+        qWarning() << "[setTrackOutputToTrack] rejected: would create routing cycle";
+        return;
+    }
     src.state.setProperty(juce::Identifier("outputDisconnected"), false,
                           &edit_->getUndoManager());
     src.getOutput().setOutputToTrack(&dest);
@@ -912,9 +990,29 @@ bool EditManager::exportMix(const ExportSettings& settings,
 {
     if (!edit_) return false;
     if (renderInProgress_) return false;
-    renderInProgress_ = true;
 
     auto& transport = edit_->getTransport();
+    if (transport.isRecording()) {
+        qWarning() << "[exportMix] cannot export while recording";
+        return false;
+    }
+
+    if (!settings.destFile.getParentDirectory().isDirectory()) {
+        qWarning() << "[exportMix] output directory does not exist";
+        return false;
+    }
+
+    bool allMuted = true;
+    for (auto* track : te::getAudioTracks(*edit_)) {
+        if (!track->isMuted(true)) { allMuted = false; break; }
+    }
+    if (allMuted) {
+        qWarning() << "[exportMix] all tracks are muted, export would be silent";
+        return false;
+    }
+
+    renderInProgress_ = true;
+
     if (transport.isPlaying())
         transport.stop(false, false);
 

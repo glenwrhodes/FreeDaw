@@ -26,6 +26,7 @@ protected:
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
 
 private:
     te::MidiNote* noteAtX(double x) const;

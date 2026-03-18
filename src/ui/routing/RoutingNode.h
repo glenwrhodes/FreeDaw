@@ -73,6 +73,9 @@ public:
     juce::String deviceName() const { return deviceName_; }
     void setDeviceName(const juce::String& d) { deviceName_ = d; }
 
+    bool isWarning() const { return warning_; }
+    void setWarning(bool w) { warning_ = w; update(); }
+
     static constexpr qreal NODE_WIDTH = 150.0;
     static constexpr qreal HEADER_HEIGHT = 26.0;
     static constexpr qreal EFFECT_ROW_HEIGHT = 18.0;
@@ -102,6 +105,8 @@ private:
     QStringList outputJackLabels_;
     te::AudioTrack* track_ = nullptr;
     juce::String deviceName_;
+    bool groupMoveGuard_ = false;
+    bool warning_ = false;
 };
 
 } // namespace freedaw

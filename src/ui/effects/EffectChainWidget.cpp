@@ -153,7 +153,7 @@ void EffectSlotWidget::buildControls()
     auto* paramsRow = new QHBoxLayout();
     paramsRow->setSpacing(4);
 
-    int maxKnobs = std::min(4, params.size());
+    int maxKnobs = std::min(8, params.size());
     for (int i = 0; i < maxKnobs; ++i) {
         auto* param = params[i];
         auto* knob = new RotaryKnob(this);
@@ -163,7 +163,7 @@ void EffectSlotWidget::buildControls()
         knob->setFixedSize(44, 52);
 
         connect(knob, &RotaryKnob::valueChanged, this, [param](double v) {
-            param->setParameter(float(v), juce::sendNotification);
+            param->setParameter(float(v), juce::sendNotificationAsync);
         });
 
         paramsRow->addWidget(knob);
@@ -318,8 +318,16 @@ void EffectChainWidget::addEffectToTrack(const QString& effectName)
 
     if (xmlType) {
         auto plugin = cache.createNewPlugin(juce::String(xmlType), {});
-        if (plugin)
-            track_->pluginList.insertPlugin(plugin, -1, nullptr);
+        if (plugin) {
+            int insertIndex = track_->pluginList.size();
+            for (int i = 0; i < track_->pluginList.size(); ++i) {
+                if (dynamic_cast<te::LevelMeterPlugin*>(track_->pluginList[i])) {
+                    insertIndex = i;
+                    break;
+                }
+            }
+            track_->pluginList.insertPlugin(plugin, insertIndex, nullptr);
+        }
     }
 
     rebuild();
@@ -349,9 +357,12 @@ void EffectChainWidget::addVstEffectToTrack(const juce::PluginDescription& desc)
 void EffectChainWidget::removeEffectFromTrack(te::Plugin* plugin)
 {
     if (!track_ || !plugin) return;
-    plugin->deleteFromParent();
-    rebuild();
-    emit editMgr_->editChanged();
+    plugin->setEnabled(false);
+    QTimer::singleShot(50, this, [this, plugin]() {
+        plugin->deleteFromParent();
+        rebuild();
+        if (editMgr_) emit editMgr_->editChanged();
+    });
 }
 
 } // namespace freedaw

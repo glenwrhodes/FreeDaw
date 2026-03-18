@@ -21,7 +21,9 @@ namespace freedaw {
 
 ChannelStrip::ChannelStrip(te::AudioTrack* track, EditManager* editMgr,
                            QWidget* parent)
-    : QWidget(parent), track_(track), editMgr_(editMgr)
+    : QWidget(parent), track_(track),
+      trackId_(track ? track->itemID.getRawID() : 0),
+      editMgr_(editMgr)
 {
     setAccessibleName("Channel Strip");
     setupUI();
@@ -211,8 +213,12 @@ void ChannelStrip::setupUI()
         if (!track_) return;
         for (auto* plugin : track_->pluginList.getPlugins()) {
             if (auto* volPan = dynamic_cast<te::VolumeAndPanPlugin*>(plugin)) {
-                double db = -60.0 + v * 66.0;
-                volPan->volParam->setParameter(te::decibelsToVolumeFaderPosition(float(db)), juce::sendNotification);
+                if (v <= 0.001) {
+                    volPan->volParam->setParameter(0.0f, juce::sendNotification);
+                } else {
+                    double db = -60.0 + v * 66.0;
+                    volPan->volParam->setParameter(te::decibelsToVolumeFaderPosition(float(db)), juce::sendNotification);
+                }
                 break;
             }
         }
@@ -284,8 +290,13 @@ void ChannelStrip::setupUI()
 
     if (track_ && editMgr_) {
         connect(editMgr_, &EditManager::tracksChanged, this, [this]() {
-            if (!track_ || !monoBtn_ || !editMgr_)
-                return;
+            if (!monoBtn_ || !editMgr_) return;
+            te::AudioTrack* t = nullptr;
+            for (auto* tr : editMgr_->getAudioTracks()) {
+                if (tr->itemID.getRawID() == trackId_) { t = tr; break; }
+            }
+            if (!t) return;
+            track_ = t;
             const bool mono = editMgr_->isTrackMono(track_);
             QSignalBlocker block(monoBtn_);
             monoBtn_->setChecked(mono);
@@ -337,6 +348,10 @@ void ChannelStrip::setupMasterUI()
         armBtn_->setVisible(false);
     if (monoBtn_)
         monoBtn_->setVisible(false);
+    if (muteBtn_)
+        muteBtn_->setVisible(false);
+    if (soloBtn_)
+        soloBtn_->setVisible(false);
 }
 
 void ChannelStrip::setSelected(bool selected)
@@ -593,18 +608,26 @@ void ChannelStrip::startRenameEdit()
     edit->setFocus();
     nameLabel_->hide();
 
-    auto* track = track_;
+    auto trackId = trackId_;
     auto* mgr = editMgr_;
+    auto* nameLbl = nameLabel_;
 
-    connect(edit, &QLineEdit::editingFinished, edit, [edit, track, mgr]() {
+    connect(edit, &QLineEdit::editingFinished, edit, [edit, trackId, mgr, nameLbl]() {
         QString newName = edit->text().trimmed();
         edit->hide();
         edit->deleteLater();
-        if (!newName.isEmpty() && track) {
-            QTimer::singleShot(0, mgr, [track, mgr, newName]() {
-                track->setName(juce::String(newName.toStdString()));
-                emit mgr->tracksChanged();
+        if (!newName.isEmpty() && mgr) {
+            QTimer::singleShot(0, mgr, [trackId, mgr, newName]() {
+                for (auto* t : mgr->getAudioTracks()) {
+                    if (t->itemID.getRawID() == trackId) {
+                        t->setName(juce::String(newName.toStdString()));
+                        emit mgr->tracksChanged();
+                        return;
+                    }
+                }
             });
+        } else if (nameLbl) {
+            nameLbl->show();
         }
     });
 }

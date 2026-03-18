@@ -15,13 +15,44 @@
 #include <QDir>
 #include <QMessageBox>
 #include <QApplication>
+#include <QLineEdit>
+#include <QTextEdit>
+#include <QPlainTextEdit>
+#include <QComboBox>
+#include <QShortcutEvent>
 #include <QtConcurrent/QtConcurrent>
 
 namespace freedaw {
 
+bool ShortcutFilter::eventFilter(QObject* /*obj*/, QEvent* event)
+{
+    if (event->type() != QEvent::Shortcut) return false;
+
+    auto* se = static_cast<QShortcutEvent*>(event);
+    auto seq = se->key();
+    if (seq.count() != 1) return false;
+
+    auto combo = seq[0];
+    auto mods = combo.keyboardModifiers();
+    if (mods != Qt::NoModifier && mods != Qt::ShiftModifier) return false;
+
+    auto* focus = QApplication::focusWidget();
+    if (qobject_cast<QLineEdit*>(focus) ||
+        qobject_cast<QTextEdit*>(focus) ||
+        qobject_cast<QPlainTextEdit*>(focus)) {
+        return true;
+    }
+    if (auto* cb = qobject_cast<QComboBox*>(focus))
+        if (cb->isEditable()) return true;
+    return false;
+}
+
 MainWindow::MainWindow(FreeDawApplication& app, QWidget* parent)
     : QMainWindow(parent), app_(app), editMgr_(app.editManager())
 {
+    auto* shortcutFilter = new ShortcutFilter(this);
+    QApplication::instance()->installEventFilter(shortcutFilter);
+
     setWindowTitle("FreeDaw");
     setAccessibleName("FreeDaw Main Window");
     resize(1280, 800);
@@ -233,7 +264,7 @@ void MainWindow::createMenus()
     });
     viewMenu->addSeparator();
     auto* quickPromptAction = viewMenu->addAction("AI &Quick Prompt",
-        QKeySequence("Ctrl+Space"), this, [this]() {
+        QKeySequence("Ctrl+Shift+Space"), this, [this]() {
             if (aiQuickPrompt_)
                 aiQuickPrompt_->showCentered();
         });
@@ -554,6 +585,15 @@ void MainWindow::createStatusBar()
 
 void MainWindow::onNewProject()
 {
+    if (editMgr_.edit() && editMgr_.edit()->getUndoManager().canUndo()) {
+        auto answer = QMessageBox::question(
+            this, "New Project",
+            "Save changes to the current project?",
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
+            QMessageBox::Save);
+        if (answer == QMessageBox::Cancel) return;
+        if (answer == QMessageBox::Save) onSaveProject();
+    }
     editMgr_.newEdit();
 }
 
@@ -571,7 +611,7 @@ void MainWindow::onOpenProject()
 
     settings.setValue("paths/lastFileDialogDir", QFileInfo(path).absolutePath());
 
-    juce::File file(path.toStdString());
+    juce::File file(juce::String(path.toUtf8().constData()));
     editMgr_.loadEdit(file);
 }
 
@@ -600,7 +640,7 @@ void MainWindow::onSaveProjectAs()
     settings.setValue("paths/lastFileDialogDir", QFileInfo(path).absolutePath());
 
     if (routingView_) routingView_->flushNodePositions();
-    juce::File file(path.toStdString());
+    juce::File file(juce::String(path.toUtf8().constData()));
     editMgr_.saveEditAs(file);
 }
 
@@ -657,9 +697,20 @@ void MainWindow::onAddTrack()
 void MainWindow::onRemoveTrack()
 {
     auto tracks = editMgr_.getAudioTracks();
-    if (tracks.size() > 1) {
-        editMgr_.removeTrack(tracks.getLast());
-    }
+    if (tracks.size() <= 1) return;
+
+    te::Track* target = nullptr;
+    if (timelineView_)
+        target = timelineView_->selectedTrack();
+    if (!target)
+        target = tracks.getLast();
+
+    auto answer = QMessageBox::question(
+        this, "Remove Track",
+        QString("Remove the selected track?"),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    if (answer == QMessageBox::Yes)
+        editMgr_.removeTrack(target);
 }
 
 void MainWindow::onSplitClipAtPlayhead()

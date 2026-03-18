@@ -63,7 +63,7 @@ FileBrowserPanel::FileBrowserPanel(QWidget* parent)
     treeView_->setModel(model_);
     treeView_->setDragEnabled(true);
     treeView_->setDragDropMode(QAbstractItemView::DragOnly);
-    treeView_->setSelectionMode(QAbstractItemView::SingleSelection);
+    treeView_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     treeView_->setHeaderHidden(false);
     treeView_->hideColumn(1);  // Size
     treeView_->hideColumn(2);  // Type

@@ -37,7 +37,7 @@ ExportDialog::ExportDialog(QWidget* parent)
     pathEdit_ = new QLineEdit(this);
     pathEdit_->setAccessibleName("Export File Path");
     pathEdit_->setPlaceholderText("Select output file...");
-    pathEdit_->setReadOnly(true);
+    pathEdit_->setReadOnly(false);
     pathRow->addWidget(pathEdit_, 1);
 
     browseBtn_ = new QPushButton("Browse...", this);
@@ -102,19 +102,37 @@ ExportDialog::ExportDialog(QWidget* parent)
                 "QPushButton:disabled { background: %3; color: %4; }")
             .arg(theme.accent.name(), theme.accentLight.name(),
                  theme.border.name(), theme.textDim.name()));
+    exportBtn_->setEnabled(false);
     connect(exportBtn_, &QPushButton::clicked, this, &QDialog::accept);
     buttonRow->addWidget(exportBtn_);
 
+    connect(pathEdit_, &QLineEdit::textChanged, this, [this](const QString& text) {
+        exportBtn_->setEnabled(!text.trimmed().isEmpty());
+    });
+
     mainLayout->addLayout(buttonRow);
+
+    QSettings qs;
+    int srIdx = sampleRateCombo_->findData(qs.value("export/sampleRate", 44100));
+    if (srIdx >= 0) sampleRateCombo_->setCurrentIndex(srIdx);
+    int bdIdx = bitDepthCombo_->findData(qs.value("export/bitDepth", 24));
+    if (bdIdx >= 0) bitDepthCombo_->setCurrentIndex(bdIdx);
+    normalizeCheck_->setChecked(qs.value("export/normalize", false).toBool());
 }
 
 ExportSettings ExportDialog::settings() const
 {
     ExportSettings s;
-    s.destFile = juce::File(pathEdit_->text().toStdString());
+    s.destFile = juce::File(juce::String(pathEdit_->text().toUtf8().constData()));
     s.sampleRate = sampleRateCombo_->currentData().toDouble();
     s.bitDepth = bitDepthCombo_->currentData().toInt();
     s.normalize = normalizeCheck_->isChecked();
+
+    QSettings qs;
+    qs.setValue("export/sampleRate", s.sampleRate);
+    qs.setValue("export/bitDepth", s.bitDepth);
+    qs.setValue("export/normalize", s.normalize);
+
     return s;
 }
 

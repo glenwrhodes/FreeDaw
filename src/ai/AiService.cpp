@@ -136,8 +136,22 @@ QString AiService::buildSystemPrompt() const
 
 void AiService::clearConversation()
 {
+    if (currentReply_) {
+        currentReply_->abort();
+        currentReply_->deleteLater();
+        currentReply_ = nullptr;
+    }
     conversationHistory_.clear();
     toolRoundCount_ = 0;
+    executedToolIds_.clear();
+    setBusy(false);
+}
+
+void AiService::pruneHistory()
+{
+    if (conversationHistory_.size() <= 50) return;
+    while (conversationHistory_.size() > 40)
+        conversationHistory_.removeFirst();
 }
 
 void AiService::sendMessage(const QString& userText)
@@ -215,6 +229,10 @@ void AiService::sendToApi()
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("x-api-key", apiKey().toUtf8());
     request.setRawHeader("anthropic-version", "2023-06-01");
+
+    request.setTransferTimeout(60000);
+
+    pruneHistory();
 
     QByteArray bodyData = QJsonDocument(body).toJson(QJsonDocument::Compact);
     currentReply_ = nam_->post(request, bodyData);
@@ -365,6 +383,7 @@ void AiService::processAssistantResponse()
 
 void AiService::executeToolCalls(const QVector<AiToolCall>& calls)
 {
+    executedToolIds_.clear();
     QVector<AiToolResult> results;
 
     for (auto& call : calls) {
@@ -375,6 +394,7 @@ void AiService::executeToolCalls(const QVector<AiToolCall>& calls)
 
         auto result = toolExecutor_->execute(call);
         results.append(result);
+        executedToolIds_.insert(call.id);
 
         emit toolCallFinished(call.name, call.id, result.content, result.isError);
     }
@@ -387,6 +407,7 @@ void AiService::executeConfirmedTool(const AiToolCall& call)
 {
     auto result = toolExecutor_->execute(call);
     emit toolCallFinished(call.name, call.id, result.content, result.isError);
+    executedToolIds_.insert(call.id);
 
     AiMessage assistantMsg = conversationHistory_.last();
     QVector<AiToolResult> allResults;
@@ -395,9 +416,15 @@ void AiService::executeConfirmedTool(const AiToolCall& call)
         if (block.type == "tool_use") {
             if (block.toolCall.id == call.id) {
                 allResults.append(result);
+            } else if (executedToolIds_.contains(block.toolCall.id)) {
+                continue;
+            } else if (confirmDestructive() && toolExecutor_->isDestructive(block.toolCall.name)) {
+                emit confirmDestructiveAction(block.toolCall.name, block.toolCall);
+                return;
             } else {
                 auto existingResult = toolExecutor_->execute(block.toolCall);
                 allResults.append(existingResult);
+                executedToolIds_.insert(block.toolCall.id);
                 emit toolCallFinished(block.toolCall.name, block.toolCall.id,
                                      existingResult.content, existingResult.isError);
             }

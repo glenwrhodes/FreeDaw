@@ -21,7 +21,31 @@ te::AudioTrack* AiToolExecutor::resolveTrack(const QJsonValue& trackRef) const
 
     if (trackRef.isDouble()) {
         int idx = trackRef.toInt();
-        return editMgr_->getAudioTrack(idx);
+        auto* track = editMgr_->getAudioTrack(idx);
+        if (!track)
+            qWarning() << "[resolveTrack] no track at index" << idx;
+        return track;
+    }
+
+    if (trackRef.isObject()) {
+        auto obj = trackRef.toObject();
+        int idx = obj["index"].toInt(-1);
+        QString name = obj["name"].toString();
+        auto* track = (idx >= 0) ? editMgr_->getAudioTrack(idx) : nullptr;
+        if (track && !name.isEmpty()) {
+            auto trackName = QString::fromStdString(track->getName().toStdString());
+            if (trackName.compare(name, Qt::CaseInsensitive) != 0)
+                qWarning() << "[resolveTrack] index/name mismatch: idx=" << idx
+                           << "expected=" << name << "actual=" << trackName;
+        }
+        if (track) return track;
+        if (!name.isEmpty()) {
+            for (auto* t : editMgr_->getAudioTracks())
+                if (QString::fromStdString(t->getName().toStdString())
+                        .compare(name, Qt::CaseInsensitive) == 0)
+                    return t;
+        }
+        return nullptr;
     }
 
     QString name = trackRef.toString();
@@ -227,17 +251,18 @@ static te::Plugin* ensureBuiltInEffect(EditManager* editMgr, te::AudioTrack* tra
     const char* xmlType = resolveEffectXmlType(effectName);
     if (!xmlType) return nullptr;
 
+    juce::String resolvedType(xmlType);
     for (auto* p : track->pluginList.getPlugins()) {
-        if ((effectName.compare("Reverb", Qt::CaseInsensitive) == 0 && dynamic_cast<te::ReverbPlugin*>(p)) ||
-            (effectName.compare("EQ", Qt::CaseInsensitive) == 0 && dynamic_cast<te::EqualiserPlugin*>(p)) ||
-            (effectName.compare("Compressor", Qt::CaseInsensitive) == 0 && dynamic_cast<te::CompressorPlugin*>(p)) ||
-            (effectName.compare("Delay", Qt::CaseInsensitive) == 0 && dynamic_cast<te::DelayPlugin*>(p)) ||
-            (effectName.compare("Chorus", Qt::CaseInsensitive) == 0 && dynamic_cast<te::ChorusPlugin*>(p)) ||
-            (effectName.compare("Phaser", Qt::CaseInsensitive) == 0 && dynamic_cast<te::PhaserPlugin*>(p)) ||
-            (effectName.compare("Low Pass Filter", Qt::CaseInsensitive) == 0 && dynamic_cast<te::LowPassPlugin*>(p)) ||
-            (effectName.compare("Pitch Shift", Qt::CaseInsensitive) == 0 && dynamic_cast<te::PitchShiftPlugin*>(p))) {
+        if (p->getPluginType() == resolvedType)
             return p;
-        }
+        if (dynamic_cast<te::ReverbPlugin*>(p) && resolvedType == te::ReverbPlugin::xmlTypeName) return p;
+        if (dynamic_cast<te::EqualiserPlugin*>(p) && resolvedType == te::EqualiserPlugin::xmlTypeName) return p;
+        if (dynamic_cast<te::CompressorPlugin*>(p) && resolvedType == te::CompressorPlugin::xmlTypeName) return p;
+        if (dynamic_cast<te::DelayPlugin*>(p) && resolvedType == te::DelayPlugin::xmlTypeName) return p;
+        if (dynamic_cast<te::ChorusPlugin*>(p) && resolvedType == te::ChorusPlugin::xmlTypeName) return p;
+        if (dynamic_cast<te::PhaserPlugin*>(p) && resolvedType == te::PhaserPlugin::xmlTypeName) return p;
+        if (dynamic_cast<te::LowPassPlugin*>(p) && resolvedType == te::LowPassPlugin::xmlTypeName) return p;
+        if (dynamic_cast<te::PitchShiftPlugin*>(p) && resolvedType == te::PitchShiftPlugin::xmlTypeName) return p;
     }
 
     auto plugin = editMgr->edit()->getPluginCache().createNewPlugin(juce::String(xmlType), {});
@@ -916,6 +941,15 @@ void AiToolExecutor::registerHandlers()
     };
 
     handlers_["record"] = [this](const QJsonObject&, const QString& id) -> AiToolResult {
+        bool anyArmed = false;
+        for (auto* track : editMgr_->getAudioTracks()) {
+            if (editMgr_->isTrackRecordEnabled(track)) {
+                anyArmed = true;
+                break;
+            }
+        }
+        if (!anyArmed)
+            return err(id, "No tracks are armed for recording. Arm a track first.");
         editMgr_->transport().record(false);
         return ok(id, "Recording started.");
     };
@@ -938,6 +972,8 @@ void AiToolExecutor::registerHandlers()
 
     handlers_["set_tempo"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
         double bpm = input["bpm"].toDouble();
+        if (bpm < 20.0 || bpm > 999.0)
+            return err(id, "BPM must be between 20 and 999.");
         editMgr_->setBpm(bpm);
         emit editMgr_->editChanged();
         return ok(id, QString("Tempo set to %1 BPM.").arg(bpm, 0, 'f', 1));
@@ -946,6 +982,10 @@ void AiToolExecutor::registerHandlers()
     handlers_["set_time_signature"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
         int num = input["numerator"].toInt();
         int den = input["denominator"].toInt();
+        if (num < 1 || num > 32)
+            return err(id, "Numerator must be between 1 and 32.");
+        if (den < 1 || den > 32 || (den & (den - 1)) != 0)
+            return err(id, "Denominator must be a power of 2 (1, 2, 4, 8, 16, 32).");
         editMgr_->setTimeSignature(num, den);
         emit editMgr_->editChanged();
         return ok(id, QString("Time signature set to %1/%2.").arg(num).arg(den));
@@ -984,7 +1024,9 @@ bool AiToolExecutor::isDestructive(const QString& toolName) const
 {
     static const QSet<QString> destructive = {
         "delete_track", "remove_effect_from_track",
-        "clear_track_output", "clear_track_input"
+        "clear_track_output", "clear_track_input",
+        "set_track_output",
+        "undo", "redo", "revert_last_mix_stage"
     };
     return destructive.contains(toolName);
 }

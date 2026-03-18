@@ -1,10 +1,13 @@
 #include "TimelineView.h"
 #include "utils/ThemeManager.h"
+#include <juce_audio_formats/juce_audio_formats.h>
 #include <QGraphicsSceneDragDropEvent>
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsSceneContextMenuEvent>
 #include <QMimeData>
 #include <QUrl>
+#include <QFileInfo>
+#include <QSet>
 #include <QScrollBar>
 #include <QWheelEvent>
 #include <QKeyEvent>
@@ -29,8 +32,20 @@ void TimelineScene::cancelBackgroundDrag()
 
 void TimelineScene::dragEnterEvent(QGraphicsSceneDragDropEvent* event)
 {
-    if (event->mimeData()->hasUrls())
-        event->acceptProposedAction();
+    if (!event->mimeData()->hasUrls()) return;
+
+    static const QSet<QString> kSupportedExts = {
+        ".wav", ".mp3", ".flac", ".ogg", ".aiff", ".aif",
+        ".mid", ".midi"
+    };
+    for (const auto& url : event->mimeData()->urls()) {
+        if (!url.isLocalFile()) continue;
+        QString ext = QFileInfo(url.toLocalFile()).suffix().toLower();
+        if (kSupportedExts.contains("." + ext)) {
+            event->acceptProposedAction();
+            return;
+        }
+    }
 }
 
 void TimelineScene::dragMoveEvent(QGraphicsSceneDragDropEvent* event)
@@ -43,11 +58,22 @@ void TimelineScene::dropEvent(QGraphicsSceneDragDropEvent* event)
 {
     if (!event->mimeData()->hasUrls()) return;
 
+    double xOffset = 0.0;
     for (const auto& url : event->mimeData()->urls()) {
         if (!url.isLocalFile()) continue;
         QString path = url.toLocalFile();
         QPointF pos = event->scenePos();
-        emit fileDropped(path, pos.x(), int(pos.y()));
+        emit fileDropped(path, pos.x() + xOffset, int(pos.y()));
+
+        juce::AudioFormatManager fmtMgr;
+        fmtMgr.registerBasicFormats();
+        juce::File f(path.toStdString());
+        if (auto reader = std::unique_ptr<juce::AudioFormatReader>(fmtMgr.createReaderFor(f))) {
+            double durationSecs = double(reader->lengthInSamples) / reader->sampleRate;
+            xOffset += durationSecs * 40.0;
+        } else {
+            xOffset += 200.0;
+        }
     }
     event->acceptProposedAction();
 }
@@ -231,14 +257,15 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
     connect(ruler_, &TimeRuler::positionClicked, this, [this](double beat) {
         if (!editMgr_ || !editMgr_->edit()) return;
         beat = snapper_.snapBeat(beat);
+        if (beat < 0) beat = 0;
         auto& ts = editMgr_->edit()->tempoSequence;
         auto time = ts.toTime(tracktion::BeatPosition::fromBeats(beat));
         editMgr_->transport().setPosition(time);
     });
 
-    // Ruler drag -> smooth scrub without snapping
     connect(ruler_, &TimeRuler::positionDragged, this, [this](double beat) {
         if (!editMgr_ || !editMgr_->edit()) return;
+        if (beat < 0) beat = 0;
         auto& ts = editMgr_->edit()->tempoSequence;
         auto time = ts.toTime(tracktion::BeatPosition::fromBeats(beat));
         editMgr_->transport().setPosition(time);
@@ -319,7 +346,13 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
                     }
 
                     menu.addAction("Remove Track", [this, track]() {
-                        editMgr_->removeTrack(track);
+                        auto answer = QMessageBox::question(
+                            this, "Remove Track",
+                            QString("Remove track \"%1\" and all its clips?")
+                                .arg(QString::fromStdString(track->getName().toStdString())),
+                            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+                        if (answer == QMessageBox::Yes)
+                            editMgr_->removeTrack(track);
                     });
                 }
 
@@ -681,10 +714,27 @@ void TimelineView::handleFileDrop(const QString& path, double xPos, int yPos)
     if (tracks.isEmpty()) return;
 
     auto ext = droppedFile.getFileExtension().toLowerCase();
-    if (ext == ".mid" || ext == ".midi") {
+    bool isMidiFile = (ext == ".mid" || ext == ".midi");
+    bool destIsMidiTrack = editMgr_->isMidiTrack(tracks[trackIdx]);
+
+    if (isMidiFile) {
         editMgr_->importMidiFileToTrack(*tracks[trackIdx], droppedFile, beat);
     } else {
-        editMgr_->addAudioClipToTrack(*tracks[trackIdx], droppedFile, beat);
+        if (destIsMidiTrack) {
+            int altIdx = -1;
+            for (int i = 0; i < tracks.size(); ++i) {
+                if (!editMgr_->isMidiTrack(tracks[i])) { altIdx = i; break; }
+            }
+            if (altIdx < 0) {
+                auto* newTrack = editMgr_->addAudioTrack();
+                if (!newTrack) return;
+                editMgr_->addAudioClipToTrack(*newTrack, droppedFile, beat);
+            } else {
+                editMgr_->addAudioClipToTrack(*tracks[altIdx], droppedFile, beat);
+            }
+        } else {
+            editMgr_->addAudioClipToTrack(*tracks[trackIdx], droppedFile, beat);
+        }
     }
     rebuildClips();
 }

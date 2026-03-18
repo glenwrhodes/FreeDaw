@@ -26,7 +26,7 @@ bool PianoKeyboard::isBlackKey(int note)
 QString PianoKeyboard::noteName(int note)
 {
     static const char* names[] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
-    int octave = (note / 12) - 2;
+    int octave = (note / 12) - 1;
     return QString("%1%2").arg(names[note % 12]).arg(octave);
 }
 

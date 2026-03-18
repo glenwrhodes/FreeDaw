@@ -54,7 +54,7 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
     positionLabel_->setAlignment(Qt::AlignCenter);
     positionLabel_->setStyleSheet(
         QString("QLabel { color: %1; background: %2; border: 1px solid %3; "
-                "border-radius: 3px; font-family: monospace; font-size: 13px; padding: 2px; }")
+                "border-radius: 3px; font-family: monospace; font-size: 10pt; padding: 2px; }")
             .arg(theme.accentLight.name(), theme.background.name(), theme.border.name()));
 
     beatLabel_ = new QLabel("1.1.000", this);
@@ -118,19 +118,25 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
         QString("QLabel { color: %1; background: transparent; border: none; }")
             .arg(theme.text.name()));
 
-    timeSigDenSpin_ = new QSpinBox(this);
-    timeSigDenSpin_->setAccessibleName("Time Signature Denominator");
-    timeSigDenSpin_->setRange(1, 16);
-    timeSigDenSpin_->setValue(editMgr_->getTimeSigDenominator());
-    timeSigDenSpin_->setFixedWidth(50);
-    timeSigDenSpin_->setFixedHeight(28);
-    connect(timeSigDenSpin_, qOverload<int>(&QSpinBox::valueChanged),
-            this, [this](int den) { editMgr_->setTimeSignature(timeSigNumSpin_->value(), den); });
+    timeSigDenCombo_ = new QComboBox(this);
+    timeSigDenCombo_->setAccessibleName("Time Signature Denominator");
+    for (int d : {1, 2, 4, 8, 16})
+        timeSigDenCombo_->addItem(QString::number(d), d);
+    int denIdx = timeSigDenCombo_->findData(editMgr_->getTimeSigDenominator());
+    if (denIdx >= 0) timeSigDenCombo_->setCurrentIndex(denIdx);
+    timeSigDenCombo_->setFixedWidth(50);
+    timeSigDenCombo_->setFixedHeight(28);
+    connect(timeSigDenCombo_, qOverload<int>(&QComboBox::currentIndexChanged),
+            this, [this](int idx) {
+                if (!editMgr_ || !editMgr_->edit()) return;
+                int den = timeSigDenCombo_->itemData(idx).toInt();
+                editMgr_->setTimeSignature(timeSigNumSpin_->value(), den);
+            });
 
     layout->addWidget(tsLabel);
     layout->addWidget(timeSigNumSpin_);
     layout->addWidget(slash);
-    layout->addWidget(timeSigDenSpin_);
+    layout->addWidget(timeSigDenCombo_);
 
     // Snap mode
     auto* snapLabel = new QLabel("Snap", this);
@@ -165,10 +171,15 @@ void TransportBar::onPlay()
 {
     if (!editMgr_ || !editMgr_->edit()) return;
     auto& t = editMgr_->transport();
-    if (t.isPlaying())
+    if (t.isPlaying()) {
         t.stop(false, false);
-    else
+        if (isRecording_) {
+            isRecording_ = false;
+            recordBtn_->setChecked(false);
+        }
+    } else {
         t.play(false);
+    }
     playBtn_->setChecked(t.isPlaying());
 }
 
@@ -208,12 +219,20 @@ void TransportBar::onLoop()
 
 void TransportBar::onBpmChanged(double bpm)
 {
+    if (!editMgr_ || !editMgr_->edit()) return;
+    auto& ts = editMgr_->edit()->tempoSequence;
+    auto& transport = editMgr_->transport();
+    double beatBefore = ts.toBeats(transport.getPosition()).inBeats();
     editMgr_->setBpm(bpm);
+    auto newTime = ts.toTime(tracktion::BeatPosition::fromBeats(beatBefore));
+    transport.setPosition(newTime);
 }
 
 void TransportBar::onTimeSigNumChanged(int num)
 {
-    editMgr_->setTimeSignature(num, timeSigDenSpin_->value());
+    if (!editMgr_ || !editMgr_->edit()) return;
+    int den = timeSigDenCombo_->currentData().toInt();
+    editMgr_->setTimeSignature(num, den);
 }
 
 void TransportBar::updatePosition()
@@ -221,7 +240,7 @@ void TransportBar::updatePosition()
     if (!editMgr_ || !editMgr_->edit()) return;
 
     auto pos = editMgr_->transport().getPosition();
-    double secs = pos.inSeconds();
+    double secs = std::max(0.0, pos.inSeconds());
 
     int mins = int(secs) / 60;
     double secsRem = secs - mins * 60;
@@ -230,8 +249,8 @@ void TransportBar::updatePosition()
             .arg(mins, 2, 10, QChar('0'))
             .arg(secsRem, 6, 'f', 3, QChar('0')));
 
-    auto& ts = editMgr_->edit()->tempoSequence;
-    double beat = ts.toBeats(pos).inBeats();
+    auto& ts2 = editMgr_->edit()->tempoSequence;
+    double beat = std::max(0.0, ts2.toBeats(pos).inBeats());
     int beatsPerBar = editMgr_->getTimeSigNumerator();
     int bar = int(beat / beatsPerBar) + 1;
     int beatInBar = int(std::fmod(beat, beatsPerBar)) + 1;
@@ -249,7 +268,7 @@ void TransportBar::applyButtonStyle(QPushButton* btn, const QColor& activeColor)
     auto& theme = ThemeManager::instance().current();
     btn->setStyleSheet(
         QString("QPushButton { background: %1; color: %2; border: 1px solid %3; "
-                "border-radius: 4px; font-weight: bold; font-size: 11px; }"
+                "border-radius: 4px; font-weight: bold; font-size: 8pt; }"
                 "QPushButton:hover { background: %4; }"
                 "QPushButton:checked { background: %5; color: white; }"
                 "QPushButton:pressed { background: %5; }")

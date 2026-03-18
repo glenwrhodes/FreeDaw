@@ -37,7 +37,6 @@ protected:
     bool eventFilter(QObject* obj, QEvent* event) override;
 
 signals:
-    void effectInsertRequested(te::AudioTrack* track, int slotIndex);
     void instrumentSelectRequested(te::AudioTrack* track);
 
 private:
@@ -56,6 +55,7 @@ private:
     void startRenameEdit();
 
     te::AudioTrack* track_ = nullptr;
+    uint64_t trackId_ = 0;
     EditManager* editMgr_;
     bool isMaster_ = false;
     bool selected_ = false;

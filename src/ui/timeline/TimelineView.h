@@ -72,6 +72,7 @@ public:
     void zoomVerticalIn();
     void zoomVerticalOut();
 
+    te::AudioTrack* selectedTrack() const { return selectedTrack_; }
     void rebuildClips();
 
 signals:

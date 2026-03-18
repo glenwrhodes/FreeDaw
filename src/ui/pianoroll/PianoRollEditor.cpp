@@ -203,8 +203,12 @@ void PianoRollEditor::syncVelocityScroll()
 
 void PianoRollEditor::onSnapModeChanged(int index)
 {
-    auto mode = static_cast<SnapMode>(index);
-    noteGrid_->snapper().setMode(mode);
+    static constexpr SnapMode mapping[] = {
+        SnapMode::Off, SnapMode::QuarterBeat, SnapMode::HalfBeat,
+        SnapMode::Beat, SnapMode::Bar
+    };
+    if (index >= 0 && index < 5)
+        noteGrid_->snapper().setMode(mapping[index]);
 }
 
 void PianoRollEditor::onDrawModeToggled(bool checked)

@@ -261,7 +261,8 @@ void NoteGrid::mouseReleaseEvent(QMouseEvent* event)
 void NoteGrid::wheelEvent(QWheelEvent* event)
 {
     if (editMode_ == EditMode::Draw && isDrawingNote_) {
-        const int velocityStep = std::max(1, event->angleDelta().y() / 120);
+        const int raw = event->angleDelta().y() / 120;
+        const int velocityStep = (raw >= 0) ? std::max(1, raw) : std::min(-1, raw);
         drawVelocity_ = std::clamp(drawVelocity_ + velocityStep * 4, 1, 127);
         defaultDrawVelocity_ = drawVelocity_;
         updateDrawPreviewAppearance();
@@ -311,11 +312,12 @@ void NoteGrid::quantizeNotes()
     double grid = snapper_.gridIntervalBeats();
     if (grid <= 0.0) grid = 0.25;
 
+    um->beginNewTransaction("Quantize Notes");
     for (auto* note : seq.getNotes()) {
         double startBeat = note->getStartBeat().inBeats();
         double snapped = std::round(startBeat / grid) * grid;
         double len = note->getLengthBeats().inBeats();
-        double snappedLen = std::max(grid, std::round(len / grid) * grid);
+        double snappedLen = std::max(std::min(len, grid), std::round(len / grid) * grid);
         note->setStartAndLength(
             tracktion::BeatPosition::fromBeats(snapped),
             tracktion::BeatDuration::fromBeats(snappedLen), um);

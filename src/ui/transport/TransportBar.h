@@ -45,7 +45,7 @@ private:
     QLabel*      beatLabel_;
     QDoubleSpinBox* bpmSpin_;
     QSpinBox*    timeSigNumSpin_;
-    QSpinBox*    timeSigDenSpin_;
+    QComboBox*   timeSigDenCombo_;
     QComboBox*   snapCombo_;
 
     QTimer positionTimer_;

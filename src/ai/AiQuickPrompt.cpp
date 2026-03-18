@@ -107,4 +107,11 @@ void AiQuickPrompt::focusOutEvent(QFocusEvent* /*event*/)
         hide();
 }
 
+void AiQuickPrompt::changeEvent(QEvent* event)
+{
+    if (event->type() == QEvent::ActivationChange && !isActiveWindow())
+        hide();
+    QWidget::changeEvent(event);
+}
+
 } // namespace freedaw

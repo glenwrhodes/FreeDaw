@@ -16,6 +16,7 @@ public slots:
 
 signals:
     void scanProgress(const QString& pluginName, int current, int total);
+    void pluginFound(const juce::PluginDescription& desc);
     void scanFinished();
 
 private:

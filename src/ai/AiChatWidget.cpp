@@ -31,6 +31,17 @@ AiChatWidget::AiChatWidget(EditManager* editMgr, AudioEngine* audioEngine,
     connect(aiService_, &AiService::confirmDestructiveAction, this, &AiChatWidget::onConfirmDestructive);
     connect(aiService_, &AiService::busyChanged, this, &AiChatWidget::onBusyChanged);
 
+    streamThrottle_ = new QTimer(this);
+    streamThrottle_->setInterval(50);
+    streamThrottle_->setSingleShot(false);
+    connect(streamThrottle_, &QTimer::timeout, this, [this]() {
+        if (streamDirty_ && streamingLabel_) {
+            streamingLabel_->setText(renderMarkdown(streamingText_));
+            scrollToBottom();
+            streamDirty_ = false;
+        }
+    });
+
     setupUi();
 }
 
@@ -208,6 +219,10 @@ bool AiChatWidget::eventFilter(QObject* obj, QEvent* event)
 void AiChatWidget::submitPrompt(const QString& text)
 {
     if (text.trimmed().isEmpty()) return;
+    if (aiService_->isBusy()) {
+        appendAssistantBubble("I'm still processing the previous request. Please wait.");
+        return;
+    }
     inputEdit_->clear();
     appendUserBubble(text);
     aiService_->sendMessage(text);
@@ -403,18 +418,21 @@ void AiChatWidget::updateStreamingBubble(const QString& token)
         isStreaming_ = true;
     }
 
-    streamingLabel_->setText(renderMarkdown(streamingText_));
-    scrollToBottom();
+    streamDirty_ = true;
+    if (!streamThrottle_->isActive())
+        streamThrottle_->start();
 }
 
 void AiChatWidget::finalizeStreamingBubble()
 {
+    streamThrottle_->stop();
     if (streamingLabel_ && !streamingText_.isEmpty()) {
         streamingLabel_->setText(renderMarkdown(streamingText_));
     }
     streamingLabel_ = nullptr;
     streamingText_.clear();
     isStreaming_ = false;
+    streamDirty_ = false;
 }
 
 void AiChatWidget::scrollToBottom()
@@ -600,32 +618,43 @@ void AiChatWidget::showSettingsDialog()
 
 QString AiChatWidget::renderMarkdown(const QString& text) const
 {
-    QString html = text.toHtmlEscaped();
+    static QRegularExpression codeBlockRe("```(?:\\w*)\n?(.*?)```",
+                                           QRegularExpression::DotMatchesEverythingOption);
+    static QRegularExpression inlineCodeRe("`([^`]+)`");
+    static QRegularExpression boldRe("\\*\\*(.+?)\\*\\*");
+    static QRegularExpression italicRe("\\*(.+?)\\*");
 
-    // Code blocks (``` ... ```)
-    static QRegularExpression codeBlock("```(?:\\w*)\n?(.*?)```",
-                                        QRegularExpression::DotMatchesEverythingOption);
-    html.replace(codeBlock,
-        "<pre style=\"background:#1a1a1a; padding:6px; border-radius:4px; "
-        "font-family:monospace; font-size:11px; white-space:pre-wrap;\">\\1</pre>");
+    struct Segment { bool isCode; QString content; };
+    QVector<Segment> segments;
+    int lastEnd = 0;
+    auto it = codeBlockRe.globalMatch(text);
+    while (it.hasNext()) {
+        auto match = it.next();
+        if (match.capturedStart() > lastEnd)
+            segments.append({false, text.mid(lastEnd, match.capturedStart() - lastEnd)});
+        segments.append({true, match.captured(1)});
+        lastEnd = match.capturedEnd();
+    }
+    if (lastEnd < text.size())
+        segments.append({false, text.mid(lastEnd)});
 
-    // Inline code
-    static QRegularExpression inlineCode("`([^`]+)`");
-    html.replace(inlineCode,
-        "<code style=\"background:#1a1a1a; padding:1px 4px; border-radius:3px; "
-        "font-family:monospace; font-size:11px;\">\\1</code>");
-
-    // Bold
-    static QRegularExpression bold("\\*\\*(.+?)\\*\\*");
-    html.replace(bold, "<b>\\1</b>");
-
-    // Italic
-    static QRegularExpression italic("\\*(.+?)\\*");
-    html.replace(italic, "<i>\\1</i>");
-
-    // Line breaks
-    html.replace("\n", "<br/>");
-
+    QString html;
+    for (auto& seg : segments) {
+        if (seg.isCode) {
+            html += "<pre style=\"background:#1a1a1a; padding:6px; border-radius:4px; "
+                    "font-family:monospace; font-size:11px; white-space:pre-wrap;\">"
+                  + seg.content.toHtmlEscaped() + "</pre>";
+        } else {
+            QString escaped = seg.content.toHtmlEscaped();
+            escaped.replace(inlineCodeRe,
+                "<code style=\"background:#1a1a1a; padding:1px 4px; border-radius:3px; "
+                "font-family:monospace; font-size:11px;\">\\1</code>");
+            escaped.replace(boldRe, "<b>\\1</b>");
+            escaped.replace(italicRe, "<i>\\1</i>");
+            escaped.replace("\n", "<br/>");
+            html += escaped;
+        }
+    }
     return html;
 }
 

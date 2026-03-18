@@ -1,5 +1,6 @@
 #include "PluginScanner.h"
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <QDebug>
 
 namespace freedaw {
 
@@ -10,7 +11,6 @@ PluginScanWorker::PluginScanWorker(te::Engine& engine)
 
 void PluginScanWorker::doScan()
 {
-    auto& kpl = engine_.getPluginManager().knownPluginList;
     juce::VST3PluginFormat vst3;
 
     auto defaultPaths = vst3.getDefaultLocationsToSearch();
@@ -19,10 +19,16 @@ void PluginScanWorker::doScan()
     int total = filesToScan.size();
     for (int i = 0; i < total; ++i) {
         juce::OwnedArray<juce::PluginDescription> descriptions;
-        vst3.findAllTypesForFile(descriptions, filesToScan[i]);
+        try {
+            vst3.findAllTypesForFile(descriptions, filesToScan[i]);
+        } catch (...) {
+            qWarning() << "[PluginScanner] plugin crashed during scan:"
+                        << filesToScan[i].toRawUTF8();
+            continue;
+        }
 
         for (auto* desc : descriptions) {
-            kpl.addType(*desc);
+            emit pluginFound(*desc);
             emit scanProgress(QString::fromStdString(desc->name.toStdString()),
                               i + 1, total);
         }
@@ -48,6 +54,11 @@ void PluginScanner::startScan()
     if (scanning_)
         return;
 
+    if (workerThread_.isRunning()) {
+        workerThread_.quit();
+        workerThread_.wait();
+    }
+
     scanning_ = true;
 
     auto* worker = new PluginScanWorker(audioEngine_.engine());
@@ -56,6 +67,10 @@ void PluginScanner::startScan()
     connect(&workerThread_, &QThread::finished, worker, &QObject::deleteLater);
     connect(worker, &PluginScanWorker::scanProgress,
             this, &PluginScanner::scanProgress);
+    connect(worker, &PluginScanWorker::pluginFound, this,
+            [this](const juce::PluginDescription& desc) {
+                getPluginList().addType(desc);
+            }, Qt::QueuedConnection);
     connect(worker, &PluginScanWorker::scanFinished, this, [this]() {
         scanning_ = false;
         saveCachedList();
@@ -83,8 +98,19 @@ void PluginScanner::loadCachedList()
     auto cacheFile = getCacheFile();
     if (!cacheFile.existsAsFile()) return;
 
-    if (auto xml = juce::XmlDocument::parse(cacheFile)) {
-        getPluginList().recreateFromXml(*xml);
+    auto xml = juce::XmlDocument::parse(cacheFile);
+    if (!xml) {
+        qWarning() << "[PluginScanner] corrupt plugin cache, deleting";
+        cacheFile.deleteFile();
+        return;
+    }
+    getPluginList().recreateFromXml(*xml);
+
+    auto& kpl = getPluginList();
+    for (int i = kpl.getNumTypes() - 1; i >= 0; --i) {
+        auto desc = kpl.getTypes()[i];
+        if (!juce::File(desc.fileOrIdentifier).existsAsFile())
+            kpl.removeType(desc);
     }
 }
 

@@ -250,6 +250,8 @@ void ClipItem::paint(QPainter* painter,
         QString name = QString::fromStdString(clip_->getName().toStdString());
         painter->drawText(r.adjusted(4, 2, -2, 0),
                           Qt::AlignLeft | Qt::AlignTop, name);
+    } else {
+        return;
     }
 }
 
@@ -317,6 +319,7 @@ void ClipItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
         menu.addAction("Delete", [this]() {
             if (!clip_ || !editMgr_) return;
             clip_->removeFromParent();
+            clip_ = nullptr;
             if (requestRefresh_) {
                 auto refresh = requestRefresh_;
                 QTimer::singleShot(0, [refresh]() { refresh(); });
@@ -448,8 +451,9 @@ void ClipItem::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
     if (snapper_)
         newBeat = snapper_->snapBeat(newBeat);
 
+    int liveTrackCount = editMgr_ ? editMgr_->trackCount() : trackCount_;
     int newTrack = dragStartTrack_ + int(std::round(delta.y() / th));
-    newTrack = std::clamp(newTrack, 0, std::max(0, trackCount_ - 1));
+    newTrack = std::clamp(newTrack, 0, std::max(0, liveTrackCount - 1));
 
     double x = newBeat * ppb;
     double y = newTrack * th;
@@ -575,14 +579,21 @@ void ClipItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
                     if (newTrack >= 0 && newTrack < tracks.size()) {
                         auto* dstTrack = tracks[newTrack];
                         if (dstTrack) {
-                            dstTrack->addClip(clip_);
-                            trackIndex_ = newTrack;
+                            bool dstIsMidi = editMgr_->isMidiTrack(dstTrack);
+                            if (isMidiClip_ != dstIsMidi) {
+                                setPos(dragStartBeat_ * (*pixelsPerBeatPtr_),
+                                       dragStartTrack_ * (*trackHeightPtr_));
+                            } else {
+                                dstTrack->addClip(clip_);
+                                trackIndex_ = newTrack;
+                            }
                         }
                     }
                 }
             }
 
-            editMgr_->edit()->restartPlayback();
+            if (editMgr_->edit())
+                editMgr_->edit()->restartPlayback();
         }
 
         if (duplicateGhostWaveItem_)

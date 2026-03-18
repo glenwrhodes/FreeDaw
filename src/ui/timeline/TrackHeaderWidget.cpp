@@ -334,6 +334,14 @@ void TrackHeaderWidget::refresh()
 {
     if (!track_) return;
     nameLabel_->setText(QString::fromStdString(track_->getName().toStdString()));
+
+    bool anyTrackSoloed = false;
+    if (editMgr_ && editMgr_->edit()) {
+        for (auto* t : te::getAudioTracks(*editMgr_->edit())) {
+            if (t->isSolo(false)) { anyTrackSoloed = true; break; }
+        }
+    }
+
     {
         QSignalBlocker block(muteBtn_);
         muteBtn_->setChecked(track_->isMuted(false));
@@ -341,6 +349,17 @@ void TrackHeaderWidget::refresh()
     {
         QSignalBlocker block(soloBtn_);
         soloBtn_->setChecked(track_->isSolo(false));
+    }
+
+    bool soloOverridesMute = track_->isSolo(false) && track_->isMuted(false);
+    muteBtn_->setEnabled(!soloOverridesMute);
+    if (soloOverridesMute)
+        muteBtn_->setToolTip("Mute overridden by Solo");
+    else
+        muteBtn_->setToolTip("Mute");
+
+    if (anyTrackSoloed && !track_->isSolo(false)) {
+        nameLabel_->setStyleSheet(nameLabel_->styleSheet() + " QLabel { opacity: 0.5; }");
     }
     if (editMgr_ && armBtn_) {
         QSignalBlocker block(armBtn_);
@@ -451,8 +470,9 @@ void TrackHeaderWidget::startRenameEdit()
 
     auto* track = track_;
     auto* mgr = editMgr_;
+    auto* nameLbl = nameLabel_;
 
-    connect(edit, &QLineEdit::editingFinished, edit, [edit, track, mgr]() {
+    connect(edit, &QLineEdit::editingFinished, edit, [edit, track, mgr, nameLbl]() {
         QString newName = edit->text().trimmed();
         edit->hide();
         edit->deleteLater();
@@ -461,6 +481,8 @@ void TrackHeaderWidget::startRenameEdit()
                 track->setName(juce::String(newName.toStdString()));
                 emit mgr->tracksChanged();
             });
+        } else if (nameLbl) {
+            nameLbl->show();
         }
     });
 }

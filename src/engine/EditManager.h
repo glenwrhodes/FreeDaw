@@ -78,6 +78,7 @@ public:
     bool isTrackRecordEnabled(te::AudioTrack* track) const;
 
     // Output routing
+    bool wouldCreateCycle(te::AudioTrack* src, te::AudioTrack* dest) const;
     void setTrackOutputToMaster(te::AudioTrack& track);
     void setTrackOutputToTrack(te::AudioTrack& src, te::AudioTrack& dest);
     void clearTrackOutput(te::AudioTrack& track);

@@ -93,18 +93,22 @@ RoutingNode::RoutingNode(NodeType type, const QString& name, const QColor& color
 QVariant RoutingNode::itemChange(GraphicsItemChange change, const QVariant& value)
 {
     if (change == ItemPositionChange && scene()) {
-        static bool groupMoveGuard = false;
-        if (!groupMoveGuard && isSelected()) {
-            groupMoveGuard = true;
-            QPointF delta = value.toPointF() - pos();
+        QPointF newPos = value.toPointF();
+        newPos.setX(std::max(0.0, newPos.x()));
+        newPos.setY(std::max(0.0, newPos.y()));
+
+        if (!groupMoveGuard_ && isSelected()) {
+            groupMoveGuard_ = true;
+            QPointF delta = newPos - pos();
             for (auto* item : scene()->selectedItems()) {
                 if (item != this) {
                     if (auto* node = dynamic_cast<RoutingNode*>(item))
                         node->moveBy(delta.x(), delta.y());
                 }
             }
-            groupMoveGuard = false;
+            groupMoveGuard_ = false;
         }
+        return newPos;
     }
     if (change == ItemPositionHasChanged)
         emit nodeMoved();
@@ -194,8 +198,9 @@ void RoutingNode::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWid
     // Body background
     QPainterPath bodyPath;
     bodyPath.addRoundedRect(bodyRect, 6, 6);
-    QColor borderColor = isSelected() ? color_.lighter(160) : color_.darker(140);
-    painter->setPen(QPen(borderColor, isSelected() ? 2.0 : 1.5));
+    QColor borderColor = warning_ ? QColor(220, 140, 30)
+                       : isSelected() ? color_.lighter(160) : color_.darker(140);
+    painter->setPen(QPen(borderColor, (isSelected() || warning_) ? 2.0 : 1.5));
     painter->setBrush(QBrush(theme.surface));
     painter->drawPath(bodyPath);
 

@@ -1,4 +1,5 @@
 #include "GridSnapper.h"
+#include <algorithm>
 #include <cmath>
 
 namespace freedaw {
@@ -20,7 +21,7 @@ double GridSnapper::snapBeat(double beat) const
     double interval = gridIntervalBeats();
     if (interval <= 0.0 || mode_ == SnapMode::Off)
         return beat;
-    return std::round(beat / interval) * interval;
+    return std::max(0.0, std::round(beat / interval) * interval);
 }
 
 } // namespace freedaw

@@ -20,6 +20,14 @@ namespace freedaw {
 
 class PianoRollEditor;
 
+class ShortcutFilter : public QObject {
+    Q_OBJECT
+public:
+    using QObject::QObject;
+protected:
+    bool eventFilter(QObject* obj, QEvent* event) override;
+};
+
 class MainWindow : public QMainWindow {
     Q_OBJECT
 

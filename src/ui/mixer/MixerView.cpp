@@ -85,8 +85,9 @@ MixerView::MixerView(EditManager* editMgr, QWidget* parent)
 void MixerView::rebuildStrips()
 {
     for (auto* s : strips_) {
+        s->disconnect();
         stripLayout_->removeWidget(s);
-        delete s;
+        s->deleteLater();
     }
     strips_.clear();
 
@@ -103,8 +104,6 @@ void MixerView::rebuildStrips()
 
     for (auto* track : tracks) {
         auto* strip = new ChannelStrip(track, editMgr_, stripContainer_);
-        connect(strip, &ChannelStrip::effectInsertRequested,
-                this, &MixerView::effectInsertRequested);
         connect(strip, &ChannelStrip::instrumentSelectRequested,
                 this, &MixerView::instrumentSelectRequested);
         strip->setSelected(track == selectedTrack_);

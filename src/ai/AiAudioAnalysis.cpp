@@ -7,6 +7,23 @@ namespace freedaw {
 AiAudioAnalysis::AiAudioAnalysis(EditManager* editMgr)
     : editMgr_(editMgr)
 {
+    if (editMgr_) {
+        QObject::connect(editMgr_, &EditManager::tracksChanged, [this]() {
+            if (!editMgr_) return;
+            auto tracks = editMgr_->getAudioTracks();
+            std::unordered_set<qulonglong> liveIds;
+            for (auto* t : tracks)
+                liveIds.insert(static_cast<qulonglong>(t->itemID.getRawID()));
+
+            for (auto it = meterClients_.begin(); it != meterClients_.end();) {
+                if (liveIds.count(it->first) == 0) {
+                    it = meterClients_.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        });
+    }
 }
 
 AiAudioAnalysis::~AiAudioAnalysis()

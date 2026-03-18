@@ -281,6 +281,9 @@ void RoutingView::buildNodes()
             node->setInputJackLabels({"IN"});
         node->setOutputJackLabels({"OUT"});
 
+        if (editMgr_->isTrackOutputDisconnected(track))
+            node->setWarning(true);
+
         scene_->addItem(node);
         connectNodeSignals(node);
         trackNodes_.push_back(node);
@@ -700,6 +703,12 @@ void RoutingView::finishCableDrag(const QPointF& scenePos)
 
     auto* srcNode = dragSourceJack_->parentNode();
     auto* dstNode = targetJack->parentNode();
+
+    if (srcNode == dstNode) {
+        cancelCableDrag();
+        return;
+    }
+
     bool isSidechainJack = targetJack->isInput() && targetJack->jackIndex() == 1;
 
     // Sidechain connection: any output -> SC jack (index 1)

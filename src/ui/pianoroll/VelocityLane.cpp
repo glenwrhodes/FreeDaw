@@ -66,7 +66,7 @@ void VelocityLane::paintEvent(QPaintEvent*)
     for (auto* note : seq.getNotes()) {
         double x = note->getStartBeat().inBeats() * pixelsPerBeat_ - scrollOffset_;
         double w = std::max(3.0, note->getLengthBeats().inBeats() * pixelsPerBeat_);
-        double barH = (note->getVelocity() / 127.0) * (h - 4);
+        double barH = std::max(2.0, (note->getVelocity() / 127.0) * (h - 4));
 
         if (x + w < 0 || x > width()) continue;
 
@@ -82,6 +82,7 @@ void VelocityLane::paintEvent(QPaintEvent*)
 
 void VelocityLane::mousePressEvent(QMouseEvent* event)
 {
+    if (height() <= 0) return;
     draggingNote_ = noteAtX(event->position().x());
     if (draggingNote_) {
         int vel = static_cast<int>(
@@ -96,7 +97,14 @@ void VelocityLane::mousePressEvent(QMouseEvent* event)
 
 void VelocityLane::mouseMoveEvent(QMouseEvent* event)
 {
-    if (!draggingNote_ || !(event->buttons() & Qt::LeftButton)) return;
+    if (height() <= 0) return;
+    if (!(event->buttons() & Qt::LeftButton)) return;
+
+    auto* noteUnderCursor = noteAtX(event->position().x());
+    if (noteUnderCursor)
+        draggingNote_ = noteUnderCursor;
+
+    if (!draggingNote_) return;
 
     int vel = static_cast<int>(
         127.0 * (1.0 - event->position().y() / height()));
@@ -105,6 +113,11 @@ void VelocityLane::mouseMoveEvent(QMouseEvent* event)
     draggingNote_->setVelocity(vel, um);
     update();
     emit velocityChanged();
+}
+
+void VelocityLane::mouseReleaseEvent(QMouseEvent* /*event*/)
+{
+    draggingNote_ = nullptr;
 }
 
 } // namespace freedaw

@@ -11,6 +11,7 @@
 #include <QLineEdit>
 #include <QCheckBox>
 #include <QKeyEvent>
+#include <QTimer>
 
 namespace freedaw {
 
@@ -74,6 +75,8 @@ private:
     QLabel* streamingLabel_ = nullptr;
     QString streamingText_;
     bool isStreaming_ = false;
+    QTimer* streamThrottle_ = nullptr;
+    bool streamDirty_ = false;
 
     bool showToolOutput_ = false;
     QPushButton* toolToggleBtn_ = nullptr;

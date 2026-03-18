@@ -50,12 +50,21 @@ void NoteItem::paint(QPainter* painter,
     QRectF r = rect();
 
     QColor color = isSelected() ? theme.pianoRollNoteSelected : theme.pianoRollNote;
-    double alpha = 0.6 + 0.4 * (note_->getVelocity() / 127.0);
+    int velocity = note_->getVelocity();
+    double alpha = 0.6 + 0.4 * (velocity / 127.0);
     color.setAlphaF(alpha);
 
     painter->fillRect(r, color);
-    painter->setPen(QPen(color.darker(130), 0.5));
-    painter->drawRect(r);
+
+    if (velocity == 0) {
+        QPen stripePen(QColor(200, 60, 60, 160), 1.0);
+        painter->setPen(stripePen);
+        painter->drawRect(r.adjusted(0.5, 0.5, -0.5, -0.5));
+        painter->drawLine(r.topLeft(), r.bottomRight());
+    } else {
+        painter->setPen(QPen(color.darker(130), 0.5));
+        painter->drawRect(r);
+    }
 }
 
 void NoteItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
