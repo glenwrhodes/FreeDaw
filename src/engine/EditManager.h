@@ -72,7 +72,9 @@ public:
     // Output routing
     void setTrackOutputToMaster(te::AudioTrack& track);
     void setTrackOutputToTrack(te::AudioTrack& src, te::AudioTrack& dest);
+    void clearTrackOutput(te::AudioTrack& track);
     te::AudioTrack* getTrackOutputDestination(te::AudioTrack* track) const;
+    bool isTrackOutputDisconnected(te::AudioTrack* track) const;
     QString getTrackOutputName(te::AudioTrack* track) const;
 
     // Bus tracks
@@ -81,9 +83,13 @@ public:
     juce::Array<te::AudioTrack*> getBusTracks() const;
     juce::Array<te::AudioTrack*> getNonBusAudioTracks() const;
 
-    // Input device renaming
+    // Input device renaming (persisted in edit state)
     void setInputDisplayName(const juce::String& deviceName, const QString& customName);
     QString getInputDisplayName(const juce::String& deviceName) const;
+
+    // Routing layout persistence
+    void saveRoutingLayout(const QMap<QString, QPointF>& positions);
+    QMap<QString, QPointF> loadRoutingLayout() const;
 
     void undo();
     void redo();
@@ -111,12 +117,15 @@ private:
     void createDefaultEdit();
     void ensureLevelMetersOnAllTracks();
     void enableAllWaveInputDevices();
+    void clearTrackInputInternal(te::AudioTrack& track);
+
+    void saveInputDisplayNames();
+    void loadInputDisplayNames();
 
     AudioEngine& audioEngine_;
     std::unique_ptr<te::Edit> edit_;
     juce::File currentFile_;
     std::unordered_set<uint64_t> midiTrackIds_;
-    std::unordered_set<uint64_t> busTrackIds_;
     std::map<std::string, QString> inputDisplayNames_;
 };
 

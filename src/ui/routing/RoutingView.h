@@ -19,12 +19,18 @@ class RoutingView : public QWidget {
 
 public:
     explicit RoutingView(EditManager* editMgr, QWidget* parent = nullptr);
+    ~RoutingView() override;
+
+signals:
+    void trackSelected(te::AudioTrack* track);
 
 public slots:
     void rebuild();
     void scheduleRebuild();
+    void flushNodePositions();
 
 private:
+    void onSceneSelectionChanged();
     void buildNodes();
     void buildCables();
     void layoutNodes();
@@ -37,6 +43,9 @@ private:
 
     QStringList getTrackEffectNames(te::AudioTrack* track) const;
     QStringList getMasterEffectNames() const;
+    bool trackHasSidechainPlugin(te::AudioTrack* track) const;
+    bool trackHasActiveSidechain(te::AudioTrack* track) const;
+    te::Plugin* getFirstSidechainPlugin(te::AudioTrack* track) const;
 
     QColor cableColorForIndex(int index) const;
     JackItem* findJackAt(const QPointF& scenePos, bool wantInput) const;

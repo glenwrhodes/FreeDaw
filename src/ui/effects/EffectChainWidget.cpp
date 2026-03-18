@@ -9,8 +9,9 @@ namespace freedaw {
 
 // ── EffectSlotWidget ────────────────────────────────────────────────────────
 
-EffectSlotWidget::EffectSlotWidget(te::Plugin* plugin, QWidget* parent)
-    : QWidget(parent), plugin_(plugin)
+EffectSlotWidget::EffectSlotWidget(te::Plugin* plugin, EditManager* editMgr,
+                                   QWidget* parent)
+    : QWidget(parent), plugin_(plugin), editMgr_(editMgr)
 {
     auto& theme = ThemeManager::instance().current();
 
@@ -87,6 +88,65 @@ EffectSlotWidget::EffectSlotWidget(te::Plugin* plugin, QWidget* parent)
 void EffectSlotWidget::buildControls()
 {
     if (!plugin_) return;
+
+    auto& theme = ThemeManager::instance().current();
+
+    if (plugin_->canSidechain()) {
+        auto* scRow = new QHBoxLayout();
+        scRow->setSpacing(4);
+
+        auto* scLabel = new QLabel("Sidechain:", this);
+        scLabel->setStyleSheet(
+            QString("font-size: 9px; color: %1;").arg(theme.textDim.name()));
+        scRow->addWidget(scLabel);
+
+        sidechainCombo_ = new QComboBox(this);
+        sidechainCombo_->setAccessibleName("Sidechain Source");
+        sidechainCombo_->setToolTip("Select which track feeds this plugin's sidechain input");
+        sidechainCombo_->setFixedHeight(20);
+        sidechainCombo_->setStyleSheet(
+            QString("QComboBox { background: %1; color: %2; border: 1px solid %3; "
+                    "border-radius: 2px; font-size: 9px; padding: 1px 3px; }"
+                    "QComboBox:hover { border: 1px solid %4; }"
+                    "QComboBox::drop-down { width: 12px; }"
+                    "QComboBox QAbstractItemView { background: %1; color: %2; "
+                    "selection-background-color: %5; font-size: 9px; }")
+                .arg(theme.background.name(), theme.text.name(),
+                     theme.border.name(), QColor(0, 188, 212).name(),
+                     theme.surfaceLight.name()));
+
+        auto sourceNames = plugin_->getSidechainSourceNames(true);
+        sidechainCombo_->blockSignals(true);
+        for (int i = 0; i < sourceNames.size(); ++i)
+            sidechainCombo_->addItem(
+                QString::fromStdString(sourceNames[i].toStdString()));
+
+        auto currentName = plugin_->getSidechainSourceName();
+        if (currentName.isNotEmpty()) {
+            QString suffix = QString::fromStdString(
+                ". " + currentName.toStdString());
+            for (int i = 0; i < sidechainCombo_->count(); ++i) {
+                if (sidechainCombo_->itemText(i).endsWith(suffix)) {
+                    sidechainCombo_->setCurrentIndex(i);
+                    break;
+                }
+            }
+        }
+        sidechainCombo_->blockSignals(false);
+
+        connect(sidechainCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, [this](int idx) {
+            if (!plugin_ || idx < 0) return;
+            juce::String name(sidechainCombo_->itemText(idx).toStdString());
+            plugin_->setSidechainSourceByName(name);
+            plugin_->guessSidechainRouting();
+            if (editMgr_)
+                emit editMgr_->editChanged();
+        });
+
+        scRow->addWidget(sidechainCombo_, 1);
+        layout_->addLayout(scRow);
+    }
 
     auto params = plugin_->getAutomatableParameters();
 
@@ -176,6 +236,14 @@ EffectChainWidget::EffectChainWidget(EditManager* editMgr, QWidget* parent)
 
     scrollArea_->setWidget(slotsContainer_);
     mainLayout_->addWidget(scrollArea_, 1);
+
+    rebuildTimer_.setSingleShot(true);
+    rebuildTimer_.setInterval(50);
+    connect(&rebuildTimer_, &QTimer::timeout, this, &EffectChainWidget::rebuild);
+
+    connect(editMgr_, &EditManager::editChanged, this, [this]() {
+        if (track_) scheduleRebuild();
+    });
 }
 
 void EffectChainWidget::setTrack(te::AudioTrack* track)
@@ -191,8 +259,15 @@ void EffectChainWidget::setTrack(te::AudioTrack* track)
     rebuild();
 }
 
+void EffectChainWidget::scheduleRebuild()
+{
+    if (!rebuildTimer_.isActive())
+        rebuildTimer_.start();
+}
+
 void EffectChainWidget::rebuild()
 {
+    rebuildTimer_.stop();
     QLayoutItem* item;
     while ((item = slotsLayout_->takeAt(0)) != nullptr) {
         if (item->widget())
@@ -216,7 +291,7 @@ void EffectChainWidget::rebuild()
                     this, &EffectChainWidget::removeEffectFromTrack);
             slotsLayout_->addWidget(delayWidget);
         } else {
-            auto* slot = new EffectSlotWidget(plugin, slotsContainer_);
+            auto* slot = new EffectSlotWidget(plugin, editMgr_, slotsContainer_);
             connect(slot, &EffectSlotWidget::removeRequested,
                     this, &EffectChainWidget::removeEffectFromTrack);
             slotsLayout_->addWidget(slot);

@@ -55,10 +55,12 @@ TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr
             .arg(theme.text.name(), theme.background.name()));
     topRow->addWidget(nameLabel_, 1);
 
-    auto* typeBadge = new QLabel(isMidi ? "MIDI" : "AUDIO", this);
+    bool isBus = editMgr_->isBusTrack(track_);
+    QString typeText = isMidi ? "MIDI" : (isBus ? "BUS" : "AUDIO");
+    auto* typeBadge = new QLabel(typeText, this);
     typeBadge->setAccessibleName("Track Type");
     typeBadge->setAlignment(Qt::AlignCenter);
-    QColor badgeBg = isMidi ? theme.midiClipBody : theme.accent;
+    QColor badgeBg = isMidi ? theme.midiClipBody : (isBus ? QColor(255, 152, 0) : theme.accent);
     typeBadge->setStyleSheet(
         QString("QLabel { color: #fff; font-size: 7px; font-weight: bold; "
                 "background: %1; border-radius: 2px; padding: 1px 3px; }")

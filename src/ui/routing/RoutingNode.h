@@ -59,6 +59,8 @@ public:
     void setEffectNames(const QStringList& names);
     void setInputJackCount(int count);
     void setOutputJackCount(int count);
+    void setInputJackLabels(const QStringList& labels);
+    void setOutputJackLabels(const QStringList& labels);
 
     JackItem* inputJack(int index) const;
     JackItem* outputJack(int index) const;
@@ -96,6 +98,8 @@ private:
     QStringList effectNames_;
     std::vector<JackItem*> inputJacks_;
     std::vector<JackItem*> outputJacks_;
+    QStringList inputJackLabels_;
+    QStringList outputJackLabels_;
     te::AudioTrack* track_ = nullptr;
     juce::String deviceName_;
 };

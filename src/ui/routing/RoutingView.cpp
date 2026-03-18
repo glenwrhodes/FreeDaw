@@ -90,12 +90,22 @@ RoutingView::RoutingView(EditManager* editMgr, QWidget* parent)
     rebuildTimer_.setInterval(50);
     connect(&rebuildTimer_, &QTimer::timeout, this, &RoutingView::rebuild);
 
+    connect(scene_, &QGraphicsScene::selectionChanged,
+            this, &RoutingView::onSceneSelectionChanged);
+
     connect(editMgr_, &EditManager::tracksChanged, this, &RoutingView::scheduleRebuild);
     connect(editMgr_, &EditManager::routingChanged, this, &RoutingView::scheduleRebuild);
     connect(editMgr_, &EditManager::editChanged, this, &RoutingView::scheduleRebuild);
     connect(editMgr_, &EditManager::aboutToChangeEdit, this, [this]() { clearAll(); });
 
     rebuild();
+}
+
+RoutingView::~RoutingView()
+{
+    rebuildTimer_.stop();
+    disconnect(scene_, nullptr, this, nullptr);
+    disconnect(editMgr_, nullptr, this, nullptr);
 }
 
 void RoutingView::clearAll()
@@ -110,6 +120,11 @@ void RoutingView::clearAll()
     masterNode_ = nullptr;
     outputNodes_.clear();
     scene_->clear();
+}
+
+void RoutingView::flushNodePositions()
+{
+    saveNodePositions();
 }
 
 void RoutingView::scheduleRebuild()
@@ -204,10 +219,15 @@ void RoutingView::saveNodePositions()
         if (!key.isEmpty())
             savedPositions_[key] = masterNode_->pos();
     }
+
+    editMgr_->saveRoutingLayout(savedPositions_);
 }
 
 void RoutingView::restoreNodePositions()
 {
+    if (savedPositions_.isEmpty())
+        savedPositions_ = editMgr_->loadRoutingLayout();
+
     if (savedPositions_.isEmpty()) return;
 
     auto restoreList = [this](const std::vector<RoutingNode*>& nodes) {
@@ -251,8 +271,16 @@ void RoutingView::buildNodes()
         auto* node = new RoutingNode(NodeType::Track, name, color);
         node->setTrack(track);
         node->setEffectNames(getTrackEffectNames(track));
-        node->setInputJackCount(1);
+
+        bool hasSC = trackHasSidechainPlugin(track);
+        node->setInputJackCount(hasSC ? 2 : 1);
         node->setOutputJackCount(1);
+        if (hasSC)
+            node->setInputJackLabels({"IN", "SC"});
+        else
+            node->setInputJackLabels({"IN"});
+        node->setOutputJackLabels({"OUT"});
+
         scene_->addItem(node);
         connectNodeSignals(node);
         trackNodes_.push_back(node);
@@ -264,8 +292,16 @@ void RoutingView::buildNodes()
         auto* node = new RoutingNode(NodeType::Bus, name, kBusColor);
         node->setTrack(bus);
         node->setEffectNames(getTrackEffectNames(bus));
-        node->setInputJackCount(1);
+
+        bool hasSC = trackHasSidechainPlugin(bus);
+        node->setInputJackCount(hasSC ? 2 : 1);
         node->setOutputJackCount(1);
+        if (hasSC)
+            node->setInputJackLabels({"IN", "SC"});
+        else
+            node->setInputJackLabels({"IN"});
+        node->setOutputJackLabels({"OUT"});
+
         scene_->addItem(node);
         connectNodeSignals(node);
         busNodes_.push_back(node);
@@ -360,7 +396,7 @@ void RoutingView::buildCables()
                     break;
                 }
             }
-        } else if (masterNode_) {
+        } else if (masterNode_ && !editMgr_->isTrackOutputDisconnected(tNode->track())) {
             auto* cable = new CableItem(
                 tNode->outputJack(0), masterNode_->inputJack(0),
                 cableColorForIndex(colorIdx++));
@@ -373,7 +409,7 @@ void RoutingView::buildCables()
     for (auto* bNode : busNodes_) {
         if (!bNode->track() || !masterNode_) continue;
         auto* dest = editMgr_->getTrackOutputDestination(bNode->track());
-        if (!dest) {
+        if (!dest && !editMgr_->isTrackOutputDisconnected(bNode->track())) {
             auto* cable = new CableItem(
                 bNode->outputJack(0), masterNode_->inputJack(0),
                 cableColorForIndex(colorIdx++));
@@ -381,6 +417,37 @@ void RoutingView::buildCables()
             cables_.push_back(cable);
         }
     }
+
+    // Sidechain cables (track/bus output -> another track/bus's SC jack)
+    auto drawSidechainCables = [&](const std::vector<RoutingNode*>& nodes) {
+        for (auto* node : nodes) {
+            if (!node->track()) continue;
+            for (auto* p : node->track()->pluginList.getPlugins()) {
+                if (!p->canSidechain()) continue;
+                auto scSourceID = p->getSidechainSourceID();
+                if (!scSourceID.isValid()) continue;
+
+                RoutingNode* sourceNode = nullptr;
+                for (auto* tn : trackNodes_)
+                    if (tn->track() && tn->track()->itemID == scSourceID)
+                        sourceNode = tn;
+                if (!sourceNode)
+                    for (auto* bn : busNodes_)
+                        if (bn->track() && bn->track()->itemID == scSourceID)
+                            sourceNode = bn;
+
+                if (sourceNode && node->inputJackCount() >= 2) {
+                    QColor scColor(0, 188, 212);
+                    auto* cable = new CableItem(
+                        sourceNode->outputJack(0), node->inputJack(1), scColor);
+                    scene_->addItem(cable);
+                    cables_.push_back(cable);
+                }
+            }
+        }
+    };
+    drawSidechainCables(trackNodes_);
+    drawSidechainCables(busNodes_);
 
     // Master -> Output device cable
     if (masterNode_ && !outputNodes_.empty()) {
@@ -414,6 +481,30 @@ QStringList RoutingView::getMasterEffectNames() const
         names.append(QString::fromStdString(p->getName().toStdString()));
     }
     return names;
+}
+
+bool RoutingView::trackHasSidechainPlugin(te::AudioTrack* track) const
+{
+    if (!track) return false;
+    for (auto* p : track->pluginList.getPlugins())
+        if (p->canSidechain()) return true;
+    return false;
+}
+
+bool RoutingView::trackHasActiveSidechain(te::AudioTrack* track) const
+{
+    if (!track) return false;
+    for (auto* p : track->pluginList.getPlugins())
+        if (p->canSidechain() && p->getSidechainSourceID().isValid()) return true;
+    return false;
+}
+
+te::Plugin* RoutingView::getFirstSidechainPlugin(te::AudioTrack* track) const
+{
+    if (!track) return nullptr;
+    for (auto* p : track->pluginList.getPlugins())
+        if (p->canSidechain()) return p;
+    return nullptr;
 }
 
 QColor RoutingView::cableColorForIndex(int index) const
@@ -609,15 +700,32 @@ void RoutingView::finishCableDrag(const QPointF& scenePos)
 
     auto* srcNode = dragSourceJack_->parentNode();
     auto* dstNode = targetJack->parentNode();
+    bool isSidechainJack = targetJack->isInput() && targetJack->jackIndex() == 1;
 
-    // Input Source -> Track
-    if (srcNode->nodeType() == NodeType::InputSource
-        && dstNode->nodeType() == NodeType::Track && dstNode->track()) {
+    // Sidechain connection: any output -> SC jack (index 1)
+    if (isSidechainJack && srcNode->track() && dstNode->track()) {
+        auto* scPlugin = getFirstSidechainPlugin(dstNode->track());
+        if (scPlugin) {
+            scPlugin->setSidechainSourceID(srcNode->track()->itemID);
+            scPlugin->guessSidechainRouting();
+            emit editMgr_->editChanged();
+        }
+    }
+    // Input Source -> Track or Bus (jack 0)
+    else if (srcNode->nodeType() == NodeType::InputSource
+        && (dstNode->nodeType() == NodeType::Track || dstNode->nodeType() == NodeType::Bus)
+        && dstNode->track()) {
         editMgr_->assignInputToTrack(*dstNode->track(), srcNode->deviceName());
     }
     // Track -> Bus
     else if (srcNode->nodeType() == NodeType::Track && srcNode->track()
              && dstNode->nodeType() == NodeType::Bus && dstNode->track()) {
+        editMgr_->setTrackOutputToTrack(*srcNode->track(), *dstNode->track());
+    }
+    // Bus -> Bus
+    else if (srcNode->nodeType() == NodeType::Bus && srcNode->track()
+             && dstNode->nodeType() == NodeType::Bus && dstNode->track()
+             && srcNode->track() != dstNode->track()) {
         editMgr_->setTrackOutputToTrack(*srcNode->track(), *dstNode->track());
     }
     // Track -> Master
@@ -650,11 +758,22 @@ void RoutingView::onCableRightClicked(CableItem* cable, const QPoint& screenPos)
     auto dstType = cable->destJack()->parentNode()->nodeType();
     te::AudioTrack* srcTrack = cable->sourceJack()->parentNode()->track();
     te::AudioTrack* dstTrack = cable->destJack()->parentNode()->track();
+    bool isSidechainCable = cable->destJack()->isInput() && cable->destJack()->jackIndex() == 1;
 
     QMenu menu;
     menu.setAccessibleName("Cable Context Menu");
 
-    if (srcType == NodeType::InputSource && dstType == NodeType::Track && dstTrack) {
+    if (isSidechainCable && dstTrack) {
+        menu.addAction("Remove Sidechain Connection", [this, dstTrack]() {
+            auto* scPlugin = getFirstSidechainPlugin(dstTrack);
+            if (scPlugin) {
+                scPlugin->setSidechainSourceID({});
+                emit editMgr_->editChanged();
+            }
+        });
+    }
+    else if (srcType == NodeType::InputSource
+             && (dstType == NodeType::Track || dstType == NodeType::Bus) && dstTrack) {
         menu.addAction("Remove Input Connection", [this, dstTrack]() {
             editMgr_->clearTrackInput(*dstTrack);
         });
@@ -664,13 +783,20 @@ void RoutingView::onCableRightClicked(CableItem* cable, const QPoint& screenPos)
             editMgr_->setTrackOutputToMaster(*srcTrack);
         });
     }
+    else if (srcType == NodeType::Bus && srcTrack && dstType == NodeType::Bus) {
+        menu.addAction("Route to Master Instead", [this, srcTrack]() {
+            editMgr_->setTrackOutputToMaster(*srcTrack);
+        });
+    }
     else if (srcType == NodeType::Track && srcTrack && dstType == NodeType::Master) {
-        auto* a = menu.addAction("Routed to Master (drag to reroute)");
-        a->setEnabled(false);
+        menu.addAction("Disconnect from Master", [this, srcTrack]() {
+            editMgr_->clearTrackOutput(*srcTrack);
+        });
     }
     else if (srcType == NodeType::Bus && srcTrack && dstType == NodeType::Master) {
-        auto* a = menu.addAction("Bus routed to Master (drag to reroute)");
-        a->setEnabled(false);
+        menu.addAction("Disconnect from Master", [this, srcTrack]() {
+            editMgr_->clearTrackOutput(*srcTrack);
+        });
     }
     else if (srcType == NodeType::Master && dstType == NodeType::OutputDevice) {
         auto* a = menu.addAction("Master Output (cannot remove)");
@@ -728,6 +854,23 @@ void RoutingView::deleteSelectedBuses()
     }
     for (auto* track : toDelete)
         editMgr_->removeTrack(track);
+}
+
+void RoutingView::onSceneSelectionChanged()
+{
+    te::AudioTrack* found = nullptr;
+    int trackBusCount = 0;
+    for (auto* item : scene_->selectedItems()) {
+        if (auto* node = dynamic_cast<RoutingNode*>(item)) {
+            if ((node->nodeType() == NodeType::Track ||
+                 node->nodeType() == NodeType::Bus) && node->track()) {
+                found = node->track();
+                if (++trackBusCount > 1) break;
+            }
+        }
+    }
+    if (trackBusCount == 1 && found)
+        emit trackSelected(found);
 }
 
 void RoutingView::zoomBy(double factor, const QPoint& viewAnchor)

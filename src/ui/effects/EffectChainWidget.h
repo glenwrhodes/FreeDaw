@@ -6,7 +6,9 @@
 #include <QVBoxLayout>
 #include <QScrollArea>
 #include <QPushButton>
+#include <QComboBox>
 #include <QLabel>
+#include <QTimer>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -16,7 +18,8 @@ class EffectSlotWidget : public QWidget {
     Q_OBJECT
 
 public:
-    EffectSlotWidget(te::Plugin* plugin, QWidget* parent = nullptr);
+    EffectSlotWidget(te::Plugin* plugin, EditManager* editMgr = nullptr,
+                     QWidget* parent = nullptr);
 
     te::Plugin* plugin() const { return plugin_; }
 
@@ -27,11 +30,13 @@ private:
     void buildControls();
 
     te::Plugin* plugin_;
+    EditManager* editMgr_ = nullptr;
     QVBoxLayout* layout_;
     QLabel* nameLabel_;
     QPushButton* bypassBtn_;
     QPushButton* editBtn_ = nullptr;
     QPushButton* removeBtn_;
+    QComboBox* sidechainCombo_ = nullptr;
 };
 
 class EffectChainWidget : public QWidget {
@@ -52,6 +57,8 @@ private:
     void addVstEffectToTrack(const juce::PluginDescription& desc);
     void removeEffectFromTrack(te::Plugin* plugin);
 
+    void scheduleRebuild();
+
     juce::KnownPluginList* pluginList_ = nullptr;
 
     EditManager* editMgr_;
@@ -63,6 +70,7 @@ private:
     QScrollArea* scrollArea_;
     QWidget* slotsContainer_;
     QVBoxLayout* slotsLayout_;
+    QTimer rebuildTimer_;
 };
 
 } // namespace freedaw

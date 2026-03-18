@@ -75,7 +75,7 @@ MixerView::MixerView(EditManager* editMgr, QWidget* parent)
     connect(editMgr_, &EditManager::tracksChanged,
             this, &MixerView::rebuildStrips);
     connect(editMgr_, &EditManager::routingChanged,
-            this, &MixerView::rebuildStrips);
+            this, &MixerView::rebuildStrips, Qt::QueuedConnection);
 
     rebuildStrips();
 }

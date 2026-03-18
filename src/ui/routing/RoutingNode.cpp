@@ -158,7 +158,12 @@ qreal RoutingNode::bodyHeight() const
 {
     qreal h = HEADER_HEIGHT;
     h += std::max(1, static_cast<int>(effectNames_.size())) * EFFECT_ROW_HEIGHT;
-    h += JACK_AREA_HEIGHT;
+    int maxJacks = std::max(static_cast<int>(inputJacks_.size()),
+                            static_cast<int>(outputJacks_.size()));
+    qreal jackH = JACK_AREA_HEIGHT;
+    if (maxJacks > 1)
+        jackH = JACK_AREA_HEIGHT + (maxJacks - 1) * (JACK_OUTER_DIAMETER + 4);
+    h += jackH;
     return h;
 }
 
@@ -266,18 +271,23 @@ void RoutingNode::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWid
     painter->setPen(QPen(theme.border, 0.5));
     painter->drawLine(QPointF(4, sepY), QPointF(NODE_WIDTH - 4, sepY));
 
-    // Jack labels
+    // Per-jack labels
     QFont jackFont;
     jackFont.setPixelSize(8);
     painter->setFont(jackFont);
     painter->setPen(theme.textDim);
-    qreal jackLabelY = sepY + JACK_AREA_HEIGHT / 2;
-    if (!inputJacks_.empty())
-        painter->drawText(QRectF(JACK_OUTER_DIAMETER + 4, jackLabelY - 8, 30, 16),
-                          Qt::AlignVCenter | Qt::AlignLeft, "IN");
-    if (!outputJacks_.empty())
-        painter->drawText(QRectF(NODE_WIDTH - JACK_OUTER_DIAMETER - 34, jackLabelY - 8, 30, 16),
-                          Qt::AlignVCenter | Qt::AlignRight, "OUT");
+    for (int i = 0; i < static_cast<int>(inputJacks_.size()); ++i) {
+        QPointF jp = inputJacks_[i]->pos();
+        QString label = (i < inputJackLabels_.size()) ? inputJackLabels_[i] : "IN";
+        painter->drawText(QRectF(jp.x() + JACK_OUTER_DIAMETER / 2 + 3, jp.y() - 8, 30, 16),
+                          Qt::AlignVCenter | Qt::AlignLeft, label);
+    }
+    for (int i = 0; i < static_cast<int>(outputJacks_.size()); ++i) {
+        QPointF jp = outputJacks_[i]->pos();
+        QString label = (i < outputJackLabels_.size()) ? outputJackLabels_[i] : "OUT";
+        painter->drawText(QRectF(jp.x() - JACK_OUTER_DIAMETER / 2 - 33, jp.y() - 8, 30, 16),
+                          Qt::AlignVCenter | Qt::AlignRight, label);
+    }
 }
 
 void RoutingNode::setEffectNames(const QStringList& names)
@@ -295,6 +305,7 @@ void RoutingNode::setInputJackCount(int count)
     for (int i = 0; i < count; ++i)
         inputJacks_.push_back(new JackItem(true, i, this));
     rebuildJacks();
+    prepareGeometryChange();
 }
 
 void RoutingNode::setOutputJackCount(int count)
@@ -304,6 +315,19 @@ void RoutingNode::setOutputJackCount(int count)
     for (int i = 0; i < count; ++i)
         outputJacks_.push_back(new JackItem(false, i, this));
     rebuildJacks();
+    prepareGeometryChange();
+}
+
+void RoutingNode::setInputJackLabels(const QStringList& labels)
+{
+    inputJackLabels_ = labels;
+    update();
+}
+
+void RoutingNode::setOutputJackLabels(const QStringList& labels)
+{
+    outputJackLabels_ = labels;
+    update();
 }
 
 JackItem* RoutingNode::inputJack(int index) const
@@ -323,18 +347,24 @@ JackItem* RoutingNode::outputJack(int index) const
 void RoutingNode::rebuildJacks()
 {
     qreal h = bodyHeight();
+    int maxJacks = std::max(static_cast<int>(inputJacks_.size()),
+                            static_cast<int>(outputJacks_.size()));
+    qreal jackAreaH = JACK_AREA_HEIGHT;
+    if (maxJacks > 1)
+        jackAreaH = JACK_AREA_HEIGHT + (maxJacks - 1) * (JACK_OUTER_DIAMETER + 4);
+    qreal jackAreaTop = h - jackAreaH;
 
     int inCount = static_cast<int>(inputJacks_.size());
     for (int i = 0; i < inCount; ++i) {
-        qreal spacing = JACK_AREA_HEIGHT / (inCount + 1);
-        qreal yOff = h - JACK_AREA_HEIGHT + spacing * (i + 1);
+        qreal spacing = jackAreaH / (inCount + 1);
+        qreal yOff = jackAreaTop + spacing * (i + 1);
         inputJacks_[i]->setPos(JACK_OUTER_DIAMETER / 2 + 2, yOff);
     }
 
     int outCount = static_cast<int>(outputJacks_.size());
     for (int i = 0; i < outCount; ++i) {
-        qreal spacing = JACK_AREA_HEIGHT / (outCount + 1);
-        qreal yOff = h - JACK_AREA_HEIGHT + spacing * (i + 1);
+        qreal spacing = jackAreaH / (outCount + 1);
+        qreal yOff = jackAreaTop + spacing * (i + 1);
         outputJacks_[i]->setPos(NODE_WIDTH - JACK_OUTER_DIAMETER / 2 - 2, yOff);
     }
 }

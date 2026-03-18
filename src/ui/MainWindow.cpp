@@ -431,6 +431,20 @@ void MainWindow::createDocks()
     routingDock_->setWidget(routingView_);
     addDockWidget(Qt::BottomDockWidgetArea, routingDock_);
 
+    connect(routingView_, &RoutingView::trackSelected,
+            this, [this](te::AudioTrack* track) {
+                if (timelineView_)
+                    timelineView_->setSelectedTrack(track);
+                if (effectChain_)
+                    effectChain_->setTrack(track);
+                if (mixerView_)
+                    mixerView_->setSelectedTrack(track);
+                if (effectsDock_) {
+                    effectsDock_->setVisible(true);
+                    effectsDock_->raise();
+                }
+            });
+
     tabifyDockWidget(mixerDock_, pianoRollDock_);
     tabifyDockWidget(pianoRollDock_, routingDock_);
     mixerDock_->raise();
@@ -512,6 +526,7 @@ void MainWindow::onSaveProject()
         onSaveProjectAs();
         return;
     }
+    if (routingView_) routingView_->flushNodePositions();
     editMgr_.saveEdit();
 }
 
@@ -529,6 +544,7 @@ void MainWindow::onSaveProjectAs()
 
     settings.setValue("paths/lastFileDialogDir", QFileInfo(path).absolutePath());
 
+    if (routingView_) routingView_->flushNodePositions();
     juce::File file(path.toStdString());
     editMgr_.saveEditAs(file);
 }

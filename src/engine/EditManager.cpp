@@ -1,6 +1,7 @@
 #include "EditManager.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <QDebug>
+#include <QPointF>
 
 namespace freedaw {
 
@@ -44,7 +45,7 @@ void EditManager::teardownCurrentEdit()
     transport.freePlaybackContext();
 
     midiTrackIds_.clear();
-    busTrackIds_.clear();
+    inputDisplayNames_.clear();
     qDebug() << "[teardown] complete";
 }
 
@@ -95,12 +96,21 @@ bool EditManager::loadEdit(const juce::File& file)
 
     currentFile_ = file;
 
+    qDebug() << "[loadEdit] loading input display names";
+    loadInputDisplayNames();
+
     qDebug() << "[loadEdit] enabling wave input devices";
     enableAllWaveInputDevices();
 
     qDebug() << "[loadEdit] allocating playback context";
     edit_->getTransport().ensureContextAllocated();
     qDebug() << "[loadEdit] playback context ready";
+
+    qDebug() << "[loadEdit] restoring disconnected outputs";
+    for (auto* track : te::getAudioTracks(*edit_)) {
+        if (track->state.getProperty(juce::Identifier("outputDisconnected"), false))
+            track->getOutput().setOutputToTrack(nullptr);
+    }
 
     qDebug() << "[loadEdit] emitting editChanged";
     emit editChanged();
@@ -162,6 +172,8 @@ void EditManager::removeTrack(te::Track* track)
         return;
     edit_->deleteTrack(track);
     emit tracksChanged();
+    emit routingChanged();
+    emit editChanged();
 }
 
 int EditManager::trackCount() const
@@ -571,11 +583,17 @@ QList<InputSource> EditManager::getAvailableInputSources() const
     return sources;
 }
 
+void EditManager::clearTrackInputInternal(te::AudioTrack& track)
+{
+    if (!edit_) return;
+    edit_->getEditInputDevices().clearAllInputs(track, &edit_->getUndoManager());
+}
+
 void EditManager::assignInputToTrack(te::AudioTrack& track, const juce::String& deviceName)
 {
     if (!edit_) return;
 
-    clearTrackInput(track);
+    clearTrackInputInternal(track);
     edit_->getTransport().ensureContextAllocated();
 
     for (auto* instance : edit_->getAllInputDevices()) {
@@ -589,13 +607,14 @@ void EditManager::assignInputToTrack(te::AudioTrack& track, const juce::String& 
     }
 
     emit editChanged();
+    emit routingChanged();
 }
 
 void EditManager::clearTrackInput(te::AudioTrack& track)
 {
-    if (!edit_) return;
-    edit_->getEditInputDevices().clearAllInputs(track, &edit_->getUndoManager());
+    clearTrackInputInternal(track);
     emit editChanged();
+    emit routingChanged();
 }
 
 QString EditManager::getTrackInputName(te::AudioTrack* track) const
@@ -645,21 +664,43 @@ bool EditManager::isTrackRecordEnabled(te::AudioTrack* track) const
 void EditManager::setTrackOutputToMaster(te::AudioTrack& track)
 {
     if (!edit_) return;
+    track.state.setProperty(juce::Identifier("outputDisconnected"), false,
+                            &edit_->getUndoManager());
     track.getOutput().setOutputToDefaultDevice(false);
     emit routingChanged();
+    emit editChanged();
 }
 
 void EditManager::setTrackOutputToTrack(te::AudioTrack& src, te::AudioTrack& dest)
 {
     if (!edit_) return;
+    src.state.setProperty(juce::Identifier("outputDisconnected"), false,
+                          &edit_->getUndoManager());
     src.getOutput().setOutputToTrack(&dest);
     emit routingChanged();
+    emit editChanged();
+}
+
+void EditManager::clearTrackOutput(te::AudioTrack& track)
+{
+    if (!edit_) return;
+    track.state.setProperty(juce::Identifier("outputDisconnected"), true,
+                            &edit_->getUndoManager());
+    track.getOutput().setOutputToTrack(nullptr);
+    emit routingChanged();
+    emit editChanged();
 }
 
 te::AudioTrack* EditManager::getTrackOutputDestination(te::AudioTrack* track) const
 {
     if (!track) return nullptr;
     return track->getOutput().getDestinationTrack();
+}
+
+bool EditManager::isTrackOutputDisconnected(te::AudioTrack* track) const
+{
+    if (!track) return true;
+    return track->state.getProperty(juce::Identifier("outputDisconnected"), false);
 }
 
 QString EditManager::getTrackOutputName(te::AudioTrack* track) const
@@ -675,7 +716,8 @@ te::AudioTrack* EditManager::addBusTrack()
 {
     auto* track = addAudioTrack();
     if (track) {
-        busTrackIds_.insert(track->itemID.getRawID());
+        track->state.setProperty(juce::Identifier("isBus"), true,
+                                 &edit_->getUndoManager());
         track->setName(juce::String("Bus " + juce::String(getBusTracks().size())));
         emit tracksChanged();
         emit routingChanged();
@@ -686,7 +728,7 @@ te::AudioTrack* EditManager::addBusTrack()
 bool EditManager::isBusTrack(te::AudioTrack* track) const
 {
     if (!track) return false;
-    return busTrackIds_.count(track->itemID.getRawID()) > 0;
+    return track->state.getProperty(juce::Identifier("isBus"), false);
 }
 
 juce::Array<te::AudioTrack*> EditManager::getBusTracks() const
@@ -713,6 +755,7 @@ void EditManager::setInputDisplayName(const juce::String& deviceName,
                                        const QString& customName)
 {
     inputDisplayNames_[deviceName.toStdString()] = customName;
+    saveInputDisplayNames();
     emit routingChanged();
 }
 
@@ -722,6 +765,97 @@ QString EditManager::getInputDisplayName(const juce::String& deviceName) const
     if (it != inputDisplayNames_.end() && !it->second.isEmpty())
         return it->second;
     return QString::fromStdString(deviceName.toStdString());
+}
+
+void EditManager::saveInputDisplayNames()
+{
+    if (!edit_) return;
+    static const juce::Identifier kInputNamesId("FREEDAW_INPUT_NAMES");
+    static const juce::Identifier kEntryId("INPUT");
+    static const juce::Identifier kDeviceId("device");
+    static const juce::Identifier kDisplayId("display");
+
+    auto existing = edit_->state.getChildWithName(kInputNamesId);
+    if (existing.isValid())
+        edit_->state.removeChild(existing, nullptr);
+
+    juce::ValueTree node(kInputNamesId);
+    for (auto& [dev, display] : inputDisplayNames_) {
+        if (display.isEmpty()) continue;
+        juce::ValueTree entry(kEntryId);
+        entry.setProperty(kDeviceId, juce::String(dev), nullptr);
+        entry.setProperty(kDisplayId, juce::String(display.toStdString()), nullptr);
+        node.appendChild(entry, nullptr);
+    }
+    edit_->state.appendChild(node, nullptr);
+}
+
+void EditManager::loadInputDisplayNames()
+{
+    inputDisplayNames_.clear();
+    if (!edit_) return;
+    static const juce::Identifier kInputNamesId("FREEDAW_INPUT_NAMES");
+    static const juce::Identifier kDeviceId("device");
+    static const juce::Identifier kDisplayId("display");
+
+    auto node = edit_->state.getChildWithName(kInputNamesId);
+    if (!node.isValid()) return;
+    for (int i = 0; i < node.getNumChildren(); ++i) {
+        auto entry = node.getChild(i);
+        auto dev = entry.getProperty(kDeviceId).toString().toStdString();
+        auto display = entry.getProperty(kDisplayId).toString().toStdString();
+        if (!dev.empty() && !display.empty())
+            inputDisplayNames_[dev] = QString::fromStdString(display);
+    }
+}
+
+// ── Routing layout persistence ───────────────────────────────────────────────
+
+void EditManager::saveRoutingLayout(const QMap<QString, QPointF>& positions)
+{
+    if (!edit_) return;
+    static const juce::Identifier kLayoutId("FREEDAW_ROUTING_LAYOUT");
+    static const juce::Identifier kNodeId("NODE");
+    static const juce::Identifier kKeyId("key");
+    static const juce::Identifier kXId("x");
+    static const juce::Identifier kYId("y");
+
+    auto existing = edit_->state.getChildWithName(kLayoutId);
+    if (existing.isValid())
+        edit_->state.removeChild(existing, nullptr);
+
+    juce::ValueTree node(kLayoutId);
+    for (auto it = positions.begin(); it != positions.end(); ++it) {
+        juce::ValueTree entry(kNodeId);
+        entry.setProperty(kKeyId, juce::String(it.key().toStdString()), nullptr);
+        entry.setProperty(kXId, it.value().x(), nullptr);
+        entry.setProperty(kYId, it.value().y(), nullptr);
+        node.appendChild(entry, nullptr);
+    }
+    edit_->state.appendChild(node, nullptr);
+}
+
+QMap<QString, QPointF> EditManager::loadRoutingLayout() const
+{
+    QMap<QString, QPointF> positions;
+    if (!edit_) return positions;
+    static const juce::Identifier kLayoutId("FREEDAW_ROUTING_LAYOUT");
+    static const juce::Identifier kKeyId("key");
+    static const juce::Identifier kXId("x");
+    static const juce::Identifier kYId("y");
+
+    auto node = edit_->state.getChildWithName(kLayoutId);
+    if (!node.isValid()) return positions;
+    for (int i = 0; i < node.getNumChildren(); ++i) {
+        auto entry = node.getChild(i);
+        QString key = QString::fromStdString(
+            entry.getProperty(kKeyId).toString().toStdString());
+        double x = entry.getProperty(kXId);
+        double y = entry.getProperty(kYId);
+        if (!key.isEmpty())
+            positions[key] = QPointF(x, y);
+    }
+    return positions;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
