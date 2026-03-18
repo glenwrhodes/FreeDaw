@@ -155,31 +155,117 @@ Add any of these to a track with one click from the Effects panel or mixer FX sl
 - Quick-jump locations: Desktop, Music, Documents, Home
 - Drag files directly from the browser onto timeline tracks
 
-### AI Assistant (right panel, tabbed)
+### AI Assistant — Your Studio Co-Engineer
 
-FreeDaw includes a built-in **AI-powered assistant** that can control the entire DAW through natural language. Powered by Anthropic's Claude, the assistant understands your project state and can execute complex multi-step operations on your behalf.
+FreeDaw ships with a built-in **AI assistant powered by Anthropic's Claude** that can control the entire DAW through natural language. This isn't a chatbot that tells you what buttons to click — it actually **executes operations directly** on your project, calling up to 30 different tools in an autonomous loop until your request is fulfilled.
 
-**Quick Prompt:** Press **Ctrl+Space** anywhere in the app to open an overlay text input. Type a command, hit Enter, and the AI panel opens with the conversation.
+Press **Ctrl+Space** from anywhere to open the quick prompt overlay, type what you need, and watch it happen.
 
-**What the AI can do:**
+#### Why it matters
 
-- **Track management** — *"Set up an orchestra template with Violins 1, Violins 2, Violas, Cellos, Basses, Flutes, Oboes, Clarinets, Bassoons, Horns, Trumpets, Trombones, Tuba, Timpani, and Percussion"* — creates and names all 15 tracks in seconds
-- **Bulk property changes** — *"Mute all tracks"*, *"Solo only the drum bus"*, *"Set every track to -12 dB"*, *"Pan the strings section left and brass right"*
-- **Renaming** — *"Rename all tracks by adding 'Take 2 - ' to the beginning of each name"*, *"Rename Track 3 to Lead Vocal"*
-- **Effects** — *"Add a reverb to every track"*, *"Make the reverb on the vocal track sound much longer and more ethereal"*, *"Bypass all compressors"*, *"Remove the delay from Track 5"*
-- **Routing** — *"Route all drum tracks to a new bus called Drums"*, *"Disconnect the output on Track 2"*
-- **Transport** — *"Set the tempo to 140 BPM"*, *"Change the time signature to 6/8"*, *"Start playback"*
-- **Project info** — *"What tracks do I have?"*, *"Show me the effects on the vocal track"*, *"What are the available input devices?"*
+Most DAW workflows involve dozens of repetitive clicks: creating tracks, naming them, setting up routing, dialing in effects. The AI assistant collapses these into a single sentence. It reads your current project state — every track name, every effect chain, every routing connection — and figures out the right sequence of operations to get you where you want to be.
 
-**30 tools** covering track creation/deletion, renaming, mute/solo/volume/pan/mono/arm, input/output routing, effect add/remove/parameter/bypass, transport controls, tempo, time signature, and project save/undo/redo.
+#### Session setup in seconds
 
-**Features:**
-- Streaming responses — tokens appear word-by-word as the AI thinks
-- Agentic tool-use loop — the AI calls tools, inspects results, and continues until the task is complete
-- Configurable destructive action confirmation — optionally prompts before deleting tracks or removing effects
-- Tool output toggle — show or hide technical tool call details (off by default for a clean experience)
-- Conversation history maintained per session
-- Bring your own API key (stored locally, never transmitted anywhere except Anthropic's API)
+Skip the tedious part of starting a new project. Describe what you need and the AI builds it:
+
+> *"I'm recording a jazz quartet. Set up tracks for upright bass, piano, drums, and tenor sax. Route them all to master. Add a light reverb to every track and set the tempo to 132 BPM in 4/4."*
+
+The AI creates four named tracks, adds reverb to each one, sets the tempo, and confirms what it did — all in one go. What would take 30+ clicks takes one sentence.
+
+> *"Set up a full orchestra template: Violins 1, Violins 2, Violas, Cellos, Basses, Flutes, Oboes, Clarinets, Bassoons, French Horns 1-2, Trumpets 1-2, Trombones 1-2, Tuba, Timpani, Harp, and Percussion. Create a Strings bus and a Brass bus. Route the string sections to the Strings bus and the brass to the Brass bus."*
+
+Twenty-plus tracks, two buses, and all routing — done before you could have right-clicked twice.
+
+#### Bulk editing without the tedium
+
+Make sweeping changes across your entire project with plain English:
+
+> *"Mute everything except the vocals and drums."*
+
+> *"Set all tracks to -6 dB and pan the guitars hard left and right."*
+
+> *"Rename every track by adding 'Session 3 - ' to the front of each name."*
+
+> *"Solo only Track 1 and Track 4."*
+
+The AI reads the current state, figures out which tracks need changing, and calls the right tools for each one.
+
+#### Sound design by description
+
+You don't need to know that the reverb's "room size" parameter is at index 0 and normalized to 0.0–1.0. Just describe what you want to hear:
+
+> *"Make the reverb on the vocal track sound much longer and more ethereal."*
+
+The AI inspects the current reverb parameters, understands that "longer" means increasing room size and decay, and "ethereal" means pushing wet mix higher while reducing damping — then sets the values accordingly.
+
+> *"The delay on the guitar feels too busy. Reduce the feedback and pull back the mix."*
+
+> *"Add a compressor to the drum bus. Set it up for gentle glue — low ratio, medium attack, fast release."*
+
+> *"Bypass all the effects on Track 3 so I can hear it dry."*
+
+#### Routing and signal flow
+
+Building complex routing by dragging cables is powerful but slow. The AI handles it conversationally:
+
+> *"Create a bus called 'Reverb Send' and route tracks 1, 2, and 5 to it."*
+
+> *"Move the bass and kick drum to a new 'Low End' bus."*
+
+> *"Disconnect the output on every track except the master bus."*
+
+> *"What are my available input devices? Assign the first one to Track 1."*
+
+#### Project housekeeping
+
+Keep your session organized without breaking flow:
+
+> *"Delete all the empty tracks."*
+
+> *"What effects are on each track? Give me a summary."*
+
+> *"Save the project."*
+
+> *"Undo that last change."*
+
+> *"What's the current tempo and time signature?"*
+
+#### Teaching and exploration
+
+The AI knows what tools it has and can explain your project to you:
+
+> *"I'm new to mixing. Can you explain what each of my tracks is doing right now?"*
+
+> *"What effects do I have available?"*
+
+> *"Walk me through a basic mixing approach for my 8-track rock session."*
+
+Because it can read your actual project state, its advice is grounded in what you really have — not generic suggestions.
+
+#### How it works under the hood
+
+The assistant uses **agentic tool use**: when you send a message, it decides which tools to call, executes them, reads the results, and continues calling more tools if needed — up to 20 rounds per request. It's not scripted or template-based; it reasons about your request and your project state dynamically.
+
+**30 tools** cover the full surface of the DAW:
+
+| Category | Tools |
+|----------|-------|
+| **Track management** | Create audio/MIDI/bus tracks, delete, rename |
+| **Track properties** | Mute, solo, volume, pan, mono, record arm |
+| **Routing** | Assign inputs, set outputs to master or buses, disconnect |
+| **Effects** | Add/remove built-in effects, set parameters, bypass |
+| **Transport** | Play, stop, record, seek, tempo, time signature |
+| **Project** | Save, undo, redo, get project info |
+
+**Key features:**
+- **Streaming responses** — tokens appear word-by-word as the AI thinks, so you see progress immediately
+- **True agentic behavior** — the AI calls tools, inspects results, and loops until the task is complete
+- **Destructive action safety** — optionally prompts for confirmation before deleting tracks or removing effects (on by default)
+- **Tool output toggle** — click "Tools: OFF/ON" to show or hide detailed tool call information (off by default for a clean experience)
+- **Dynamic project awareness** — the system prompt is rebuilt with your current project state at each conversation, so the AI always knows exactly what tracks, effects, and routing you have
+- **Conversation memory** — the AI remembers what you've discussed and done within a session
+- **Privacy-first** — bring your own Anthropic API key, stored locally in app settings, never sent anywhere except Anthropic's API
 
 ### Project Management
 
