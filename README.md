@@ -14,12 +14,20 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 Built with **Qt 6** for the UI and **Tracktion Engine** (JUCE) for the audio backend.
-Audio and MIDI tracks, a built-in piano roll, VST3 instrument support, 8 built-in effects, and more — all free and open source.
+Audio and MIDI tracks, a built-in piano roll, VST3 instrument support, bus routing, 8 built-in effects, and more — all free and open source.
 
 <br>
 
 <img src="resources/splash.png" alt="FreeDaw splash screen" width="600">
 
+</div>
+
+<br>
+
+<div align="center">
+<img src="resources/routing-view.png" alt="FreeDaw routing view showing input channels, audio tracks, a bus with effects, master output, and color-coded signal cables" width="800">
+<br>
+<em>Signal routing view — drag cables between inputs, tracks, buses, and outputs</em>
 </div>
 
 ---
@@ -88,7 +96,9 @@ Grab the latest release from the **[Releases page](https://github.com/glenwrhode
 
 ### Track Headers (left panel)
 
-- Per-track controls: name, Mute (M), Solo (S), Record Arm (R)
+- Per-track controls: name, Mute (M), Solo (S), Record Arm (R), Mono/Stereo toggle
+- Track type badge: **AUDIO**, **MIDI**, or **BUS**
+- Input source selector and output destination selector (Master or any bus)
 - Instrument button on MIDI tracks (opens VST editor)
 - Horizontal volume slider and pan knob per track
 - Real-time level meters (green/yellow/red) that react to playback audio
@@ -97,6 +107,7 @@ Grab the latest release from the **[Releases page](https://github.com/glenwrhode
 ### Mixer (bottom panel)
 
 - Channel strip per track with: vertical volume fader, pan knob, Mute/Solo/Record Arm, level meter
+- Bus channel strips alongside regular tracks
 - Master channel strip on the right
 - Instrument selector on MIDI track channel strips
 - Two FX insert slots per track (quick-add Reverb, EQ, Compressor)
@@ -117,6 +128,20 @@ Add any of these to a track with one click from the Effects panel or mixer FX sl
 | Low Pass Filter | Cutoff frequency |
 | Pitch Shift | Semitone shift |
 
+### Routing View (bottom panel, tabbed)
+
+- Visual node-based signal routing with drag-and-drop cable connections
+- Five column layout: **Input Channels → Tracks → Buses → Master → Output Channels**
+- Color-coded cables show signal flow at a glance
+- **Bus tracks** — create buses to submix groups of tracks, with independent effects processing
+- Route any track's output to Master or to a bus
+- Sidechain input support on bus tracks
+- Rename input devices with custom labels
+- Auto-layout button or freely drag nodes to arrange the view
+- Right-click cables to disconnect; right-click empty space to add buses
+- Node positions persist across sessions
+- Zoom and pan navigation
+
 ### Effects Panel (right panel, tabbed)
 
 - Select a track to see and edit its effect chain
@@ -136,7 +161,7 @@ Add any of these to a track with one click from the Effects panel or mixer FX sl
 - File > Open Project -- load a `.tracktionedit` file
 - File > Save / Save As -- save your arrangement
 - Edit > Add Audio Track / Add MIDI Track / Remove Selected Track
-- View > Toggle Mixer, Toggle Browser, Toggle Effects
+- View > Toggle Mixer, Toggle Routing, Toggle Browser, Toggle Effects
 
 ---
 
@@ -264,6 +289,9 @@ Each track has controls in two places:
 - **M** -- Mute the track
 - **S** -- Solo the track (only this track plays)
 - **R** -- Arm for recording
+- **Mono/Stereo** toggle -- switch between mono and stereo processing
+- **Input selector** -- choose an audio input device
+- **Output selector** -- route to Master or any bus track
 - **Volume slider** -- horizontal, adjusts track volume
 - **Pan knob** -- drag up/down to pan left/right
 - **Level meter** -- shows real-time audio level (green = good, yellow = hot, red = clipping)
@@ -274,6 +302,16 @@ Each track has controls in two places:
 - **Pan knob** -- rotary control
 - **FX 1 / FX 2** dropdowns -- quick-add Reverb, EQ, or Compressor
 - **Master strip** on the far right -- controls overall output level
+
+### Routing
+
+1. Switch to the **Routing** tab (tabbed alongside the Mixer and Piano Roll at the bottom).
+2. The view shows your signal chain as draggable nodes: input channels on the left, tracks in the middle, buses and master on the right, and output channels on the far right.
+3. **Create a bus** by clicking the "+ Add Bus" button in the toolbar, or right-click empty space and select "Add Bus".
+4. **Connect tracks to a bus** by dragging a cable from a track's OUT jack to a bus's IN jack, or use the output selector dropdown on the track header.
+5. **Add effects to a bus** using the Effects panel — select the bus track first, then add effects.
+6. **Rearrange nodes** by dragging them freely. Click "Auto Layout" to reset positions.
+7. **Remove a cable** by right-clicking it and selecting "Disconnect".
 
 ### Working with MIDI
 
@@ -353,6 +391,7 @@ AudioMixer/
     freedaw.iss                           Inno Setup installer script
   resources/
     splash.png                            Splash screen artwork
+    routing-view.png                      Routing view screenshot
   libs/
     JUCE/                                 JUCE framework (git submodule)
     tracktion_engine/                     Tracktion Engine (git submodule)
@@ -396,6 +435,10 @@ AudioMixer/
         EffectSelectorDialog.h/cpp        Effect picker dialog
         PluginEditorWindow.h/cpp          Native VST plugin editor window
         VstSelectorDialog.h/cpp           Searchable VST instrument selector
+      routing/
+        RoutingView.h/cpp                 Node-based signal routing view
+        RoutingNode.h/cpp                 Draggable routing node (input/track/bus/master/output)
+        CableItem.h/cpp                   Color-coded cable connecting jacks
       browser/
         FileBrowserPanel.h/cpp            File system browser with drag support
     utils/
