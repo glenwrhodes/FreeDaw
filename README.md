@@ -14,7 +14,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 Built with **Qt 6** for the UI and **Tracktion Engine** (JUCE) for the audio backend.
-Audio and MIDI tracks, a built-in piano roll, VST3 instrument support, bus routing, 8 built-in effects, and more — all free and open source.
+Audio and MIDI tracks, a built-in piano roll, VST3 instrument support, bus routing, 8 built-in effects, an **AI assistant powered by Claude** — all free and open source.
 
 <br>
 
@@ -155,13 +155,39 @@ Add any of these to a track with one click from the Effects panel or mixer FX sl
 - Quick-jump locations: Desktop, Music, Documents, Home
 - Drag files directly from the browser onto timeline tracks
 
+### AI Assistant (right panel, tabbed)
+
+FreeDaw includes a built-in **AI-powered assistant** that can control the entire DAW through natural language. Powered by Anthropic's Claude, the assistant understands your project state and can execute complex multi-step operations on your behalf.
+
+**Quick Prompt:** Press **Ctrl+Space** anywhere in the app to open an overlay text input. Type a command, hit Enter, and the AI panel opens with the conversation.
+
+**What the AI can do:**
+
+- **Track management** — *"Set up an orchestra template with Violins 1, Violins 2, Violas, Cellos, Basses, Flutes, Oboes, Clarinets, Bassoons, Horns, Trumpets, Trombones, Tuba, Timpani, and Percussion"* — creates and names all 15 tracks in seconds
+- **Bulk property changes** — *"Mute all tracks"*, *"Solo only the drum bus"*, *"Set every track to -12 dB"*, *"Pan the strings section left and brass right"*
+- **Renaming** — *"Rename all tracks by adding 'Take 2 - ' to the beginning of each name"*, *"Rename Track 3 to Lead Vocal"*
+- **Effects** — *"Add a reverb to every track"*, *"Make the reverb on the vocal track sound much longer and more ethereal"*, *"Bypass all compressors"*, *"Remove the delay from Track 5"*
+- **Routing** — *"Route all drum tracks to a new bus called Drums"*, *"Disconnect the output on Track 2"*
+- **Transport** — *"Set the tempo to 140 BPM"*, *"Change the time signature to 6/8"*, *"Start playback"*
+- **Project info** — *"What tracks do I have?"*, *"Show me the effects on the vocal track"*, *"What are the available input devices?"*
+
+**30 tools** covering track creation/deletion, renaming, mute/solo/volume/pan/mono/arm, input/output routing, effect add/remove/parameter/bypass, transport controls, tempo, time signature, and project save/undo/redo.
+
+**Features:**
+- Streaming responses — tokens appear word-by-word as the AI thinks
+- Agentic tool-use loop — the AI calls tools, inspects results, and continues until the task is complete
+- Configurable destructive action confirmation — optionally prompts before deleting tracks or removing effects
+- Tool output toggle — show or hide technical tool call details (off by default for a clean experience)
+- Conversation history maintained per session
+- Bring your own API key (stored locally, never transmitted anywhere except Anthropic's API)
+
 ### Project Management
 
 - File > New Project -- start fresh with 4 empty audio tracks
 - File > Open Project -- load a `.tracktionedit` file
 - File > Save / Save As -- save your arrangement
 - Edit > Add Audio Track / Add MIDI Track / Remove Selected Track
-- View > Toggle Mixer, Toggle Routing, Toggle Browser, Toggle Effects
+- View > Toggle Mixer, Toggle Routing, Toggle Browser, Toggle Effects, Toggle AI Assistant
 
 ---
 
@@ -339,6 +365,22 @@ Each track has controls in two places:
 4. The effect appears with parameter knobs. Adjust to taste.
 5. Click **Byp** to bypass an effect, or **X** to remove it.
 
+### Using the AI Assistant
+
+1. **Set your API key.** Click the **AI** tab in the right panel, then click **Settings**. Enter your Anthropic API key (`sk-ant-...`) and click OK. The key is stored locally and only sent to Anthropic's API.
+
+2. **Quick prompt (Ctrl+Space).** Press Ctrl+Space from anywhere in the app. A floating text input appears — type your request and press Enter. The AI panel opens and the assistant begins working.
+
+3. **Chat panel.** Click the **AI** tab on the right panel to open the full chat interface. Type in the input box at the bottom and press Enter (or click Send). Shift+Enter adds a new line.
+
+4. **Watch it work.** The AI streams its response in real time. If tools are needed (creating tracks, changing settings, adding effects), it calls them automatically and continues until the task is done.
+
+5. **Tool output toggle.** Click the **Tools: OFF** button in the header to see detailed tool call information — useful for understanding exactly what the AI did. Toggle it back off for a cleaner view.
+
+6. **Destructive action safety.** By default, the AI will ask for confirmation before deleting tracks or removing effects. You can toggle this in Settings.
+
+7. **Clear conversation.** Click **Clear** to start a fresh conversation. The AI will re-read your current project state at the start of the next message.
+
 ### Saving and loading
 
 - **File > Save As** (Ctrl+Shift+S) -- save your project as a `.tracktionedit` file.
@@ -365,6 +407,7 @@ Each track has controls in two places:
 | Ctrl+Q | Quit |
 | Ctrl+= | Zoom in (timeline) |
 | Ctrl+- | Zoom out (timeline) |
+| Ctrl+Space | Open AI quick prompt |
 
 **Piano Roll**
 
@@ -441,6 +484,13 @@ AudioMixer/
         CableItem.h/cpp                   Color-coded cable connecting jacks
       browser/
         FileBrowserPanel.h/cpp            File system browser with drag support
+    ai/
+      AiTypes.h                           Shared types: messages, tool calls, roles
+      AiToolDefs.h/cpp                    30 tool JSON schemas for Anthropic API
+      AiToolExecutor.h/cpp                Dispatches tool calls to engine APIs
+      AiService.h/cpp                     Anthropic API client with SSE streaming
+      AiChatWidget.h/cpp                  Chat panel UI with streaming & markdown
+      AiQuickPrompt.h/cpp                 Ctrl+Space overlay prompt
     utils/
       WaveformCache.h/cpp                 Audio file waveform thumbnail cache
       ThemeManager.h/cpp                  Dark theme color management
