@@ -111,6 +111,7 @@ public:
     juce::File currentFile() const { return currentFile_; }
 
     // Export / Freeze / Bounce
+    bool isRenderInProgress() const { return renderInProgress_; }
     bool exportMix(const ExportSettings& settings,
                    std::function<void(float)> progressCallback);
     bool isTrackFrozen(te::AudioTrack* track) const;
@@ -139,15 +140,20 @@ private:
     void saveInputDisplayNames();
     void loadInputDisplayNames();
 
+    void unfreezeAllTracks();
+    void cleanupFreezeState(te::AudioTrack& track);
+    static juce::String sanitizeForFilename(const juce::String& name);
+
     AudioEngine& audioEngine_;
     std::unique_ptr<te::Edit> edit_;
     juce::File currentFile_;
     std::unordered_set<uint64_t> midiTrackIds_;
     std::map<std::string, QString> inputDisplayNames_;
+    bool renderInProgress_ = false;
     struct FreezeState {
         juce::File freezeFile;
         std::vector<te::EditItemID> mutedClipIds;
-        std::vector<int> disabledPluginIndices;
+        std::vector<te::EditItemID> disabledPluginIds;
     };
     std::map<uint64_t, FreezeState> frozenTracks_;
 };

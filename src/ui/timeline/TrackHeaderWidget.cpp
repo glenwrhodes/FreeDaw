@@ -7,6 +7,7 @@
 #include <QMouseEvent>
 #include <QMenu>
 #include <QSignalBlocker>
+#include <QApplication>
 #include <cmath>
 
 namespace {
@@ -209,11 +210,14 @@ TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr
     applyToggleStyle(freezeBtn_, QColor(0, 150, 200));
     connect(freezeBtn_, &QPushButton::clicked, this, [this]() {
         if (!track_ || !editMgr_) return;
+        if (editMgr_->isRenderInProgress()) return;
+        QApplication::setOverrideCursor(Qt::WaitCursor);
         bool frozen = editMgr_->isTrackFrozen(track_);
         if (frozen)
             editMgr_->unfreezeTrack(*track_);
         else
             editMgr_->freezeTrack(*track_);
+        QApplication::restoreOverrideCursor();
     });
 
     btnRow->addWidget(muteBtn_);
