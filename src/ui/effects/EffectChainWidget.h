@@ -7,6 +7,7 @@
 #include <QScrollArea>
 #include <QPushButton>
 #include <QLabel>
+#include <juce_audio_processors/juce_audio_processors.h>
 #include <tracktion_engine/tracktion_engine.h>
 
 namespace freedaw {
@@ -29,6 +30,7 @@ private:
     QVBoxLayout* layout_;
     QLabel* nameLabel_;
     QPushButton* bypassBtn_;
+    QPushButton* editBtn_ = nullptr;
     QPushButton* removeBtn_;
 };
 
@@ -37,6 +39,7 @@ class EffectChainWidget : public QWidget {
 
 public:
     explicit EffectChainWidget(EditManager* editMgr, QWidget* parent = nullptr);
+    void setPluginList(juce::KnownPluginList* list) { pluginList_ = list; }
 
     void setTrack(te::AudioTrack* track);
     te::AudioTrack* currentTrack() const { return track_; }
@@ -46,7 +49,10 @@ public slots:
 
 private:
     void addEffectToTrack(const QString& effectName);
+    void addVstEffectToTrack(const juce::PluginDescription& desc);
     void removeEffectFromTrack(te::Plugin* plugin);
+
+    juce::KnownPluginList* pluginList_ = nullptr;
 
     EditManager* editMgr_;
     te::AudioTrack* track_ = nullptr;

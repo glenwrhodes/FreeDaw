@@ -50,6 +50,9 @@ set(FREEDAW_SOURCES
     src/ui/pianoroll/NoteGrid.h           src/ui/pianoroll/NoteGrid.cpp
     src/ui/pianoroll/NoteItem.h           src/ui/pianoroll/NoteItem.cpp
     src/ui/pianoroll/VelocityLane.h       src/ui/pianoroll/VelocityLane.cpp
+    src/ui/routing/RoutingView.h          src/ui/routing/RoutingView.cpp
+    src/ui/routing/RoutingNode.h          src/ui/routing/RoutingNode.cpp
+    src/ui/routing/CableItem.h            src/ui/routing/CableItem.cpp
     src/ui/browser/FileBrowserPanel.h    src/ui/browser/FileBrowserPanel.cpp
     src/ui/SplashScreen.h           src/ui/SplashScreen.cpp
     src/utils/WaveformCache.h       src/utils/WaveformCache.cpp

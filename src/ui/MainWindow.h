@@ -6,6 +6,7 @@
 #include "ui/transport/TransportBar.h"
 #include "ui/effects/EffectChainWidget.h"
 #include "ui/browser/FileBrowserPanel.h"
+#include "ui/routing/RoutingView.h"
 #include <QMainWindow>
 #include <QDockWidget>
 #include <QMenuBar>
@@ -53,11 +54,13 @@ private:
     EffectChainWidget* effectChain_   = nullptr;
     FileBrowserPanel*  fileBrowser_   = nullptr;
     PianoRollEditor*   pianoRoll_     = nullptr;
+    RoutingView*       routingView_   = nullptr;
 
     QDockWidget* mixerDock_           = nullptr;
     QDockWidget* effectsDock_         = nullptr;
     QDockWidget* browserDock_         = nullptr;
     QDockWidget* pianoRollDock_       = nullptr;
+    QDockWidget* routingDock_         = nullptr;
 
     QToolBar* transportToolBar_       = nullptr;
     QToolBar* mainToolBar_            = nullptr;

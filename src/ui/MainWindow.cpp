@@ -195,6 +195,10 @@ void MainWindow::createMenus()
     viewMenu->addAction("Toggle &Effects", this, [this]() {
         effectsDock_->setVisible(!effectsDock_->isVisible());
     });
+    viewMenu->addAction("Toggle &Routing", this, [this]() {
+        routingDock_->setVisible(!routingDock_->isVisible());
+        if (routingDock_->isVisible()) routingDock_->raise();
+    });
 
     // Transport menu
     auto* transportMenu = menuBar->addMenu("&Transport");
@@ -353,6 +357,12 @@ void MainWindow::createToolBar()
         effectsToggle->setToolTip("Toggle Effects");
         mainToolBar_->addAction(effectsToggle);
     }
+    if (routingDock_) {
+        auto* routingToggle = routingDock_->toggleViewAction();
+        routingToggle->setIcon(miIcon(icons::mi::Settings));
+        routingToggle->setToolTip("Toggle Routing");
+        mainToolBar_->addAction(routingToggle);
+    }
 }
 
 void MainWindow::createDocks()
@@ -414,7 +424,15 @@ void MainWindow::createDocks()
                     pianoRoll_->setClip(clip);
             });
 
+    // Routing view dock (bottom, tabbed with mixer and piano roll)
+    routingDock_ = new QDockWidget("Routing", this);
+    routingDock_->setAccessibleName("Routing Dock");
+    routingView_ = new RoutingView(&editMgr_, routingDock_);
+    routingDock_->setWidget(routingView_);
+    addDockWidget(Qt::BottomDockWidgetArea, routingDock_);
+
     tabifyDockWidget(mixerDock_, pianoRollDock_);
+    tabifyDockWidget(pianoRollDock_, routingDock_);
     mixerDock_->raise();
 
     connect(&editMgr_, &EditManager::midiClipDoubleClicked,
@@ -431,6 +449,7 @@ void MainWindow::createDocks()
     effectsDock_ = new QDockWidget("Effects", this);
     effectsDock_->setAccessibleName("Effects Dock");
     effectChain_ = new EffectChainWidget(&editMgr_, effectsDock_);
+    effectChain_->setPluginList(&app_.pluginScanner().getPluginList());
     effectsDock_->setWidget(effectChain_);
     addDockWidget(Qt::RightDockWidgetArea, effectsDock_);
 

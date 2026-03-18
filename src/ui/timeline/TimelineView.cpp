@@ -332,6 +332,8 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
             this, &TimelineView::onTracksChanged);
     connect(editMgr_, &EditManager::editChanged,
             this, &TimelineView::onEditChanged);
+    connect(editMgr_, &EditManager::routingChanged,
+            this, &TimelineView::rebuildTrackHeaders);
 
     onTracksChanged();
 }

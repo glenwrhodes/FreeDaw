@@ -1,6 +1,7 @@
 #include "EffectChainWidget.h"
 #include "DelayEffectWidget.h"
 #include "EffectSelectorDialog.h"
+#include "PluginEditorWindow.h"
 #include "utils/ThemeManager.h"
 #include <QHBoxLayout>
 
@@ -46,6 +47,23 @@ EffectSlotWidget::EffectSlotWidget(te::Plugin* plugin, QWidget* parent)
         if (plugin_) plugin_->setEnabled(!bypassed);
     });
     headerRow->addWidget(bypassBtn_);
+
+    if (auto* ext = dynamic_cast<te::ExternalPlugin*>(plugin_)) {
+        editBtn_ = new QPushButton("UI", this);
+        editBtn_->setAccessibleName("Open Plugin Editor");
+        editBtn_->setFixedSize(28, 20);
+        editBtn_->setToolTip("Open VST Editor");
+        editBtn_->setStyleSheet(
+            QString("QPushButton { font-size: 9px; background: %1; color: %2; "
+                    "border: 1px solid %3; border-radius: 2px; }"
+                    "QPushButton:hover { background: %4; }")
+                .arg(theme.surface.name(), theme.accent.name(),
+                     theme.border.name(), theme.surfaceLight.name()));
+        connect(editBtn_, &QPushButton::clicked, this, [ext]() {
+            PluginEditorWindow::showForPlugin(*ext);
+        });
+        headerRow->addWidget(editBtn_);
+    }
 
     removeBtn_ = new QPushButton("X", this);
     removeBtn_->setAccessibleName("Remove Effect");
@@ -129,9 +147,12 @@ EffectChainWidget::EffectChainWidget(EditManager* editMgr, QWidget* parent)
                  theme.border.name(), theme.surfaceLight.name()));
     connect(addBtn_, &QPushButton::clicked, this, [this]() {
         if (!track_) return;
-        EffectSelectorDialog dlg(this);
+        EffectSelectorDialog dlg(pluginList_, this);
         if (dlg.exec() == QDialog::Accepted && !dlg.selectedEffect().isEmpty()) {
-            addEffectToTrack(dlg.selectedEffect());
+            if (dlg.isVstEffect())
+                addVstEffectToTrack(dlg.selectedVstPlugin());
+            else
+                addEffectToTrack(dlg.selectedEffect());
         }
     });
     mainLayout_->addWidget(addBtn_);
@@ -227,6 +248,27 @@ void EffectChainWidget::addEffectToTrack(const QString& effectName)
     }
 
     rebuild();
+    emit editMgr_->editChanged();
+}
+
+void EffectChainWidget::addVstEffectToTrack(const juce::PluginDescription& desc)
+{
+    if (!track_ || !editMgr_ || !editMgr_->edit()) return;
+
+    auto pluginState = te::ExternalPlugin::create(editMgr_->edit()->engine, desc);
+    if (auto plugin = editMgr_->edit()->getPluginCache().createNewPlugin(pluginState)) {
+        int insertIndex = track_->pluginList.size();
+        for (int i = 0; i < track_->pluginList.size(); ++i) {
+            if (dynamic_cast<te::LevelMeterPlugin*>(track_->pluginList[i])) {
+                insertIndex = i;
+                break;
+            }
+        }
+        track_->pluginList.insertPlugin(plugin, insertIndex, nullptr);
+    }
+
+    rebuild();
+    emit editMgr_->editChanged();
 }
 
 void EffectChainWidget::removeEffectFromTrack(te::Plugin* plugin)
@@ -234,6 +276,7 @@ void EffectChainWidget::removeEffectFromTrack(te::Plugin* plugin)
     if (!track_ || !plugin) return;
     plugin->deleteFromParent();
     rebuild();
+    emit editMgr_->editChanged();
 }
 
 } // namespace freedaw

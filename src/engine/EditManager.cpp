@@ -44,6 +44,7 @@ void EditManager::teardownCurrentEdit()
     transport.freePlaybackContext();
 
     midiTrackIds_.clear();
+    busTrackIds_.clear();
     qDebug() << "[teardown] complete";
 }
 
@@ -563,7 +564,7 @@ QList<InputSource> EditManager::getAvailableInputSources() const
         if (auto* dev = dm.getWaveInDevice(i)) {
             InputSource src;
             src.deviceName = dev->getName();
-            src.displayName = QString::fromStdString(dev->getName().toStdString());
+            src.displayName = getInputDisplayName(dev->getName());
             sources.append(src);
         }
     }
@@ -638,6 +639,92 @@ bool EditManager::isTrackRecordEnabled(te::AudioTrack* track) const
     }
     return false;
 }
+
+// ── Output routing ───────────────────────────────────────────────────────────
+
+void EditManager::setTrackOutputToMaster(te::AudioTrack& track)
+{
+    if (!edit_) return;
+    track.getOutput().setOutputToDefaultDevice(false);
+    emit routingChanged();
+}
+
+void EditManager::setTrackOutputToTrack(te::AudioTrack& src, te::AudioTrack& dest)
+{
+    if (!edit_) return;
+    src.getOutput().setOutputToTrack(&dest);
+    emit routingChanged();
+}
+
+te::AudioTrack* EditManager::getTrackOutputDestination(te::AudioTrack* track) const
+{
+    if (!track) return nullptr;
+    return track->getOutput().getDestinationTrack();
+}
+
+QString EditManager::getTrackOutputName(te::AudioTrack* track) const
+{
+    if (!track) return {};
+    return QString::fromStdString(
+        track->getOutput().getDescriptiveOutputName().toStdString());
+}
+
+// ── Bus tracks ───────────────────────────────────────────────────────────────
+
+te::AudioTrack* EditManager::addBusTrack()
+{
+    auto* track = addAudioTrack();
+    if (track) {
+        busTrackIds_.insert(track->itemID.getRawID());
+        track->setName(juce::String("Bus " + juce::String(getBusTracks().size())));
+        emit tracksChanged();
+        emit routingChanged();
+    }
+    return track;
+}
+
+bool EditManager::isBusTrack(te::AudioTrack* track) const
+{
+    if (!track) return false;
+    return busTrackIds_.count(track->itemID.getRawID()) > 0;
+}
+
+juce::Array<te::AudioTrack*> EditManager::getBusTracks() const
+{
+    juce::Array<te::AudioTrack*> result;
+    for (auto* track : getAudioTracks())
+        if (isBusTrack(track))
+            result.add(track);
+    return result;
+}
+
+juce::Array<te::AudioTrack*> EditManager::getNonBusAudioTracks() const
+{
+    juce::Array<te::AudioTrack*> result;
+    for (auto* track : getAudioTracks())
+        if (!isBusTrack(track))
+            result.add(track);
+    return result;
+}
+
+// ── Input device renaming ────────────────────────────────────────────────────
+
+void EditManager::setInputDisplayName(const juce::String& deviceName,
+                                       const QString& customName)
+{
+    inputDisplayNames_[deviceName.toStdString()] = customName;
+    emit routingChanged();
+}
+
+QString EditManager::getInputDisplayName(const juce::String& deviceName) const
+{
+    auto it = inputDisplayNames_.find(deviceName.toStdString());
+    if (it != inputDisplayNames_.end() && !it->second.isEmpty())
+        return it->second;
+    return QString::fromStdString(deviceName.toStdString());
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 void EditManager::ensureLevelMetersOnAllTracks()
 {

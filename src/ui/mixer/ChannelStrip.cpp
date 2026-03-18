@@ -99,6 +99,25 @@ void ChannelStrip::setupUI()
             this, &ChannelStrip::onInputComboChanged);
     layout->addWidget(inputCombo_);
 
+    outputCombo_ = new QComboBox(this);
+    outputCombo_->setAccessibleName("Output Destination");
+    outputCombo_->setToolTip("Select output destination");
+    outputCombo_->setFixedHeight(20);
+    outputCombo_->setStyleSheet(
+        QString("QComboBox { background: %1; color: %2; border: 1px solid %3; "
+                "border-radius: 2px; font-size: 8px; padding: 1px 2px; }"
+                "QComboBox:hover { border: 1px solid %4; }"
+                "QComboBox::drop-down { width: 12px; }"
+                "QComboBox QAbstractItemView { background: %1; color: %2; "
+                "selection-background-color: %5; font-size: 8px; }")
+            .arg(theme.background.name(), theme.text.name(),
+                 theme.border.name(), QColor(255, 152, 0).name(),
+                 theme.surfaceLight.name()));
+    populateOutputCombo();
+    connect(outputCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &ChannelStrip::onOutputComboChanged);
+    layout->addWidget(outputCombo_);
+
     nameLabel_ = new QLabel(this);
     nameLabel_->setAccessibleName("Track Name");
     if (track_)
@@ -290,6 +309,8 @@ void ChannelStrip::setupMasterUI()
 
     if (inputCombo_)
         inputCombo_->setVisible(false);
+    if (outputCombo_)
+        outputCombo_->setVisible(false);
     if (armBtn_)
         armBtn_->setVisible(false);
     if (monoBtn_)
@@ -322,6 +343,8 @@ void ChannelStrip::refresh()
     }
     if (editMgr_ && inputCombo_)
         populateInputCombo();
+    if (editMgr_ && outputCombo_)
+        populateOutputCombo();
 }
 
 void ChannelStrip::updateMeter()
@@ -422,6 +445,50 @@ void ChannelStrip::onInputComboChanged(int index)
     } else {
         editMgr_->assignInputToTrack(*track_,
             juce::String(deviceName.toStdString()));
+    }
+}
+
+void ChannelStrip::populateOutputCombo()
+{
+    if (!outputCombo_ || !editMgr_) return;
+
+    QSignalBlocker block(outputCombo_);
+    outputCombo_->clear();
+    outputCombo_->addItem("Master", QString("__master__"));
+
+    auto buses = editMgr_->getBusTracks();
+    for (auto* bus : buses) {
+        QString name = QString::fromStdString(bus->getName().toStdString());
+        QString id = QString::number(bus->itemID.getRawID());
+        outputCombo_->addItem(name, id);
+    }
+
+    if (!track_ || !editMgr_) return;
+    auto* dest = editMgr_->getTrackOutputDestination(track_);
+    if (!dest) {
+        outputCombo_->setCurrentIndex(0);
+    } else {
+        QString destId = QString::number(dest->itemID.getRawID());
+        int idx = outputCombo_->findData(destId);
+        outputCombo_->setCurrentIndex(idx >= 0 ? idx : 0);
+    }
+}
+
+void ChannelStrip::onOutputComboChanged(int index)
+{
+    if (!track_ || !editMgr_ || index < 0) return;
+
+    QString destData = outputCombo_->itemData(index).toString();
+    if (destData == "__master__") {
+        editMgr_->setTrackOutputToMaster(*track_);
+    } else {
+        uint64_t rawId = destData.toULongLong();
+        for (auto* bus : editMgr_->getBusTracks()) {
+            if (bus->itemID.getRawID() == rawId) {
+                editMgr_->setTrackOutputToTrack(*track_, *bus);
+                break;
+            }
+        }
     }
 }
 

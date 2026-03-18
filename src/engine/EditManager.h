@@ -6,6 +6,8 @@
 #include <QString>
 #include <QList>
 #include <unordered_set>
+#include <map>
+#include <string>
 #include <memory>
 
 namespace freedaw {
@@ -67,6 +69,22 @@ public:
     void setTrackRecordEnabled(te::AudioTrack& track, bool enabled);
     bool isTrackRecordEnabled(te::AudioTrack* track) const;
 
+    // Output routing
+    void setTrackOutputToMaster(te::AudioTrack& track);
+    void setTrackOutputToTrack(te::AudioTrack& src, te::AudioTrack& dest);
+    te::AudioTrack* getTrackOutputDestination(te::AudioTrack* track) const;
+    QString getTrackOutputName(te::AudioTrack* track) const;
+
+    // Bus tracks
+    te::AudioTrack* addBusTrack();
+    bool isBusTrack(te::AudioTrack* track) const;
+    juce::Array<te::AudioTrack*> getBusTracks() const;
+    juce::Array<te::AudioTrack*> getNonBusAudioTracks() const;
+
+    // Input device renaming
+    void setInputDisplayName(const juce::String& deviceName, const QString& customName);
+    QString getInputDisplayName(const juce::String& deviceName) const;
+
     void undo();
     void redo();
 
@@ -83,6 +101,7 @@ signals:
     void editChanged();
     void tracksChanged();
     void transportStateChanged();
+    void routingChanged();
     void midiClipDoubleClicked(te::MidiClip* clip);
     void midiClipSelected(te::MidiClip* clip);
     void midiClipModified(te::MidiClip* clip);
@@ -97,6 +116,8 @@ private:
     std::unique_ptr<te::Edit> edit_;
     juce::File currentFile_;
     std::unordered_set<uint64_t> midiTrackIds_;
+    std::unordered_set<uint64_t> busTrackIds_;
+    std::map<std::string, QString> inputDisplayNames_;
 };
 
 } // namespace freedaw

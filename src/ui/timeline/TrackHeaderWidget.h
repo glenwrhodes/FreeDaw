@@ -45,6 +45,8 @@ private:
     void updateMonoButtonVisual(bool mono);
     void populateInputCombo();
     void onInputComboChanged(int index);
+    void populateOutputCombo();
+    void onOutputComboChanged(int index);
     void onArmToggled(bool armed);
 
     te::AudioTrack* track_;
@@ -52,6 +54,7 @@ private:
     bool selected_ = false;
 
     QComboBox* inputCombo_ = nullptr;
+    QComboBox* outputCombo_ = nullptr;
     QLabel* nameLabel_;
     QPushButton* instrumentBtn_ = nullptr;
     QPushButton* muteBtn_;
