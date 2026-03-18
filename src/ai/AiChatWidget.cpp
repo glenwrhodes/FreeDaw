@@ -446,10 +446,19 @@ void AiChatWidget::onResponseComplete(const AiMessage& message)
 
 void AiChatWidget::onToolCallStarted(const QString& toolName, const QString& /*toolId*/)
 {
+    QString stageLabel;
+    if (toolName.startsWith("analyze_")) stageLabel = "Analyzing";
+    else if (toolName.contains("preset") || toolName.contains("reverb") || toolName.contains("dynamic"))
+        stageLabel = "Processing";
+    else if (toolName.contains("route") || toolName.contains("bus"))
+        stageLabel = "Routing";
+    else if (toolName.contains("master"))
+        stageLabel = "Mastering";
+
     if (showToolOutput_)
         statusLabel_->setText(QString("Calling %1...").arg(toolName));
     else
-        statusLabel_->setText("Working...");
+        statusLabel_->setText(stageLabel.isEmpty() ? "Working..." : QString("%1...").arg(stageLabel));
     finalizeStreamingBubble();
 }
 
@@ -565,6 +574,11 @@ void AiChatWidget::showSettingsDialog()
     confirmCheck->setChecked(aiService_->confirmDestructive());
     layout->addRow("", confirmCheck);
 
+    auto* previewMixPlanCheck = new QCheckBox("Preview mix/master plan before applying changes", dialog);
+    previewMixPlanCheck->setAccessibleName("Preview mix master plan");
+    previewMixPlanCheck->setChecked(aiService_->previewMixPlanMode());
+    layout->addRow("", previewMixPlanCheck);
+
     auto* btnBox = new QDialogButtonBox(
         QDialogButtonBox::Ok | QDialogButtonBox::Cancel, dialog);
     layout->addRow(btnBox);
@@ -573,6 +587,7 @@ void AiChatWidget::showSettingsDialog()
         aiService_->setApiKey(apiKeyEdit->text().trimmed());
         aiService_->setModel(modelEdit->text().trimmed());
         aiService_->setConfirmDestructive(confirmCheck->isChecked());
+        aiService_->setPreviewMixPlanMode(previewMixPlanCheck->isChecked());
         dialog->accept();
     });
     connect(btnBox, &QDialogButtonBox::rejected, dialog, &QDialog::reject);

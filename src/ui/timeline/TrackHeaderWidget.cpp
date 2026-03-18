@@ -48,11 +48,13 @@ TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr
     nameLabel_ = new QLabel(
         QString::fromStdString(track_->getName().toStdString()), this);
     nameLabel_->setAccessibleName("Track Name");
+    nameLabel_->setToolTip("Double-click to rename");
     nameLabel_->setAlignment(Qt::AlignCenter);
     nameLabel_->setStyleSheet(
         QString("QLabel { color: %1; font-size: 10px; font-weight: bold; "
                 "background: %2; border-radius: 2px; padding: 2px; }")
             .arg(theme.text.name(), theme.background.name()));
+    nameLabel_->installEventFilter(this);
     topRow->addWidget(nameLabel_, 1);
 
     bool isBus = editMgr_->isBusTrack(track_);
@@ -390,6 +392,48 @@ void TrackHeaderWidget::mousePressEvent(QMouseEvent* event)
 {
     emit trackSelected(track_);
     QWidget::mousePressEvent(event);
+}
+
+bool TrackHeaderWidget::eventFilter(QObject* obj, QEvent* event)
+{
+    if (obj == nameLabel_ && event->type() == QEvent::MouseButtonDblClick && track_) {
+        startRenameEdit();
+        return true;
+    }
+    return QWidget::eventFilter(obj, event);
+}
+
+void TrackHeaderWidget::startRenameEdit()
+{
+    if (!track_ || !editMgr_) return;
+
+    auto* edit = new QLineEdit(this);
+    edit->setAccessibleName("Rename Track");
+    edit->setText(QString::fromStdString(track_->getName().toStdString()));
+    edit->selectAll();
+    edit->setGeometry(nameLabel_->geometry());
+    edit->setAlignment(Qt::AlignCenter);
+    edit->setStyleSheet(
+        "QLineEdit { background: #222; color: #eee; border: 1px solid #888; "
+        "font-size: 10px; font-weight: bold; padding: 1px 2px; border-radius: 2px; }");
+    edit->show();
+    edit->setFocus();
+    nameLabel_->hide();
+
+    auto* track = track_;
+    auto* mgr = editMgr_;
+
+    connect(edit, &QLineEdit::editingFinished, edit, [edit, track, mgr]() {
+        QString newName = edit->text().trimmed();
+        edit->hide();
+        edit->deleteLater();
+        if (!newName.isEmpty() && track) {
+            QTimer::singleShot(0, mgr, [track, mgr, newName]() {
+                track->setName(juce::String(newName.toStdString()));
+                emit mgr->tracksChanged();
+            });
+        }
+    });
 }
 
 void TrackHeaderWidget::updateMeter()

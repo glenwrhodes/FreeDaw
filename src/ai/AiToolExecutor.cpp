@@ -1,13 +1,14 @@
 #include "AiToolExecutor.h"
 #include <tracktion_engine/tracktion_engine.h>
 #include <cmath>
+#include <algorithm>
 
 namespace freedaw {
 
 AiToolExecutor::AiToolExecutor(EditManager* editMgr, AudioEngine* audioEngine,
                                PluginScanner* pluginScanner, QObject* parent)
     : QObject(parent), editMgr_(editMgr), audioEngine_(audioEngine),
-      pluginScanner_(pluginScanner)
+      pluginScanner_(pluginScanner), audioAnalysis_(editMgr)
 {
     registerHandlers();
 }
@@ -208,6 +209,47 @@ static const char* resolveEffectXmlType(const QString& name)
         || lower == "low pass")                    return te::LowPassPlugin::xmlTypeName;
     if (lower == "pitch shift" || lower == "pitchshift") return te::PitchShiftPlugin::xmlTypeName;
     return nullptr;
+}
+
+static te::VolumeAndPanPlugin* findVolumePanPlugin(te::AudioTrack* track)
+{
+    if (!track) return nullptr;
+    for (auto* p : track->pluginList.getPlugins()) {
+        if (auto* vp = dynamic_cast<te::VolumeAndPanPlugin*>(p))
+            return vp;
+    }
+    return nullptr;
+}
+
+static te::Plugin* ensureBuiltInEffect(EditManager* editMgr, te::AudioTrack* track, const QString& effectName)
+{
+    if (!editMgr || !editMgr->edit() || !track) return nullptr;
+    const char* xmlType = resolveEffectXmlType(effectName);
+    if (!xmlType) return nullptr;
+
+    for (auto* p : track->pluginList.getPlugins()) {
+        if ((effectName.compare("Reverb", Qt::CaseInsensitive) == 0 && dynamic_cast<te::ReverbPlugin*>(p)) ||
+            (effectName.compare("EQ", Qt::CaseInsensitive) == 0 && dynamic_cast<te::EqualiserPlugin*>(p)) ||
+            (effectName.compare("Compressor", Qt::CaseInsensitive) == 0 && dynamic_cast<te::CompressorPlugin*>(p)) ||
+            (effectName.compare("Delay", Qt::CaseInsensitive) == 0 && dynamic_cast<te::DelayPlugin*>(p)) ||
+            (effectName.compare("Chorus", Qt::CaseInsensitive) == 0 && dynamic_cast<te::ChorusPlugin*>(p)) ||
+            (effectName.compare("Phaser", Qt::CaseInsensitive) == 0 && dynamic_cast<te::PhaserPlugin*>(p)) ||
+            (effectName.compare("Low Pass Filter", Qt::CaseInsensitive) == 0 && dynamic_cast<te::LowPassPlugin*>(p)) ||
+            (effectName.compare("Pitch Shift", Qt::CaseInsensitive) == 0 && dynamic_cast<te::PitchShiftPlugin*>(p))) {
+            return p;
+        }
+    }
+
+    auto plugin = editMgr->edit()->getPluginCache().createNewPlugin(juce::String(xmlType), {});
+    if (!plugin) return nullptr;
+    auto* raw = plugin.get();
+    track->pluginList.insertPlugin(plugin, -1, nullptr);
+    return raw;
+}
+
+static QString inferTrackRole(const QString& trackName)
+{
+    return AiAudioAnalysis::inferRoleFromName(trackName);
 }
 
 // ── Handler registration ────────────────────────────────────────────────────
@@ -555,6 +597,310 @@ void AiToolExecutor::registerHandlers()
         return ok(id, QString("'%1' %2.")
                       .arg(QString::fromStdString(plugin->getName().toStdString()),
                            bypassed ? "bypassed" : "enabled"));
+    };
+
+    // ── Analysis / Mix Intelligence ────────────────────────────────────────
+
+    handlers_["analyze_track_levels"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* track = resolveTrack(input["track"]);
+        if (!track) return err(id, "Track not found.");
+        const double windowSeconds = input.contains("window_seconds")
+            ? input["window_seconds"].toDouble()
+            : 2.0;
+        return ok(id, audioAnalysis_.analyzeTrackLevels(track, windowSeconds));
+    };
+
+    handlers_["analyze_master_levels"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        const double windowSeconds = input.contains("window_seconds")
+            ? input["window_seconds"].toDouble()
+            : 4.0;
+        return ok(id, audioAnalysis_.analyzeMasterLevels(windowSeconds));
+    };
+
+    handlers_["analyze_frequency_balance"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        const auto target = input["target"];
+        if (target.isString() && target.toString().compare("master", Qt::CaseInsensitive) == 0)
+            return ok(id, audioAnalysis_.analyzeMasterFrequencyBalance());
+        auto* track = resolveTrack(target);
+        if (!track) return err(id, "Track not found.");
+        return ok(id, audioAnalysis_.analyzeFrequencyBalance(track));
+    };
+
+    handlers_["analyze_stereo_image"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        const auto target = input["target"];
+        if (target.isString() && target.toString().compare("master", Qt::CaseInsensitive) == 0)
+            return ok(id, audioAnalysis_.analyzeMasterStereoImage());
+        auto* track = resolveTrack(target);
+        if (!track) return err(id, "Track not found.");
+        return ok(id, audioAnalysis_.analyzeStereoImage(track));
+    };
+
+    handlers_["analyze_transients"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* track = resolveTrack(input["track"]);
+        if (!track) return err(id, "Track not found.");
+        return ok(id, audioAnalysis_.analyzeTransients(track));
+    };
+
+    handlers_["analyze_masking"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* a = resolveTrack(input["track_a"]);
+        auto* b = resolveTrack(input["track_b"]);
+        if (!a || !b) return err(id, "Both tracks are required.");
+        return ok(id, audioAnalysis_.analyzeMasking(a, b));
+    };
+
+    // ── Semantic Mix / Master Actions ───────────────────────────────────────
+
+    handlers_["apply_mix_preset"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* track = resolveTrack(input["track"]);
+        if (!track) return err(id, "Track not found.");
+        const QString preset = input["preset_name"].toString().toLower().trimmed();
+
+        if (preset == "vocal_clarity") {
+            ensureBuiltInEffect(editMgr_, track, "EQ");
+            auto* comp = ensureBuiltInEffect(editMgr_, track, "Compressor");
+            if (comp) {
+                auto params = comp->getAutomatableParameters();
+                if (params.size() > 0) params[0]->setParameter(0.40f, juce::sendNotification);
+                if (params.size() > 1) params[1]->setParameter(0.55f, juce::sendNotification);
+            }
+            if (auto* vp = findVolumePanPlugin(track))
+                vp->volParam->setParameter(te::decibelsToVolumeFaderPosition(-8.0f), juce::sendNotification);
+        } else if (preset == "drum_punch") {
+            auto* comp = ensureBuiltInEffect(editMgr_, track, "Compressor");
+            if (comp) {
+                auto params = comp->getAutomatableParameters();
+                if (params.size() > 0) params[0]->setParameter(0.58f, juce::sendNotification);
+                if (params.size() > 1) params[1]->setParameter(0.62f, juce::sendNotification);
+            }
+        } else if (preset == "bass_control") {
+            auto* comp = ensureBuiltInEffect(editMgr_, track, "Compressor");
+            if (comp) {
+                auto params = comp->getAutomatableParameters();
+                if (params.size() > 0) params[0]->setParameter(0.52f, juce::sendNotification);
+            }
+            if (auto* vp = findVolumePanPlugin(track))
+                vp->pan.setValue(0.0f, nullptr);
+        } else {
+            return err(id, QString("Unknown preset '%1'.").arg(preset));
+        }
+
+        emit editMgr_->editChanged();
+        return ok(id, QString("Applied mix preset '%1' to '%2'.")
+                      .arg(preset, QString::fromStdString(track->getName().toStdString())));
+    };
+
+    handlers_["set_track_target_peak"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* track = resolveTrack(input["track"]);
+        if (!track) return err(id, "Track not found.");
+        const double targetDb = input["dbfs"].toDouble(-10.0);
+        auto analysis = audioAnalysis_.analyzeTrackLevels(track, 1.5);
+        const double currentPeak = analysis["peak_dbfs"].toDouble(-120.0);
+        if (currentPeak <= -100.0)
+            return err(id, "Track appears silent right now; play audio first for peak targeting.");
+
+        const double delta = targetDb - currentPeak;
+        auto* vp = findVolumePanPlugin(track);
+        if (!vp) return err(id, "Volume plugin not found.");
+
+        const double currentVolDb = te::volumeFaderPositionToDB(vp->volParam->getCurrentValue());
+        const double nextDb = std::clamp(currentVolDb + delta, -60.0, 6.0);
+        vp->volParam->setParameter(te::decibelsToVolumeFaderPosition(static_cast<float>(nextDb)),
+                                   juce::sendNotification);
+        emit editMgr_->editChanged();
+        return ok(id, QString("Adjusted '%1' toward target peak %2 dBFS (current %3 dBFS, new volume %4 dB).")
+                      .arg(QString::fromStdString(track->getName().toStdString()))
+                      .arg(targetDb, 0, 'f', 1).arg(currentPeak, 0, 'f', 1).arg(nextDb, 0, 'f', 1));
+    };
+
+    handlers_["set_track_dynamic_goal"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* track = resolveTrack(input["track"]);
+        if (!track) return err(id, "Track not found.");
+        const QString goal = input["goal"].toString().toLower().trimmed();
+        auto* comp = ensureBuiltInEffect(editMgr_, track, "Compressor");
+        if (!comp) return err(id, "Could not create/find compressor.");
+        auto params = comp->getAutomatableParameters();
+
+        if (goal == "tighter") {
+            if (params.size() > 0) params[0]->setParameter(0.60f, juce::sendNotification);
+            if (params.size() > 1) params[1]->setParameter(0.65f, juce::sendNotification);
+        } else if (goal == "more_open") {
+            if (params.size() > 0) params[0]->setParameter(0.35f, juce::sendNotification);
+            if (params.size() > 1) params[1]->setParameter(0.40f, juce::sendNotification);
+        } else if (goal == "more_sustain") {
+            if (params.size() > 0) params[0]->setParameter(0.50f, juce::sendNotification);
+            if (params.size() > 2) params[2]->setParameter(0.70f, juce::sendNotification);
+        } else {
+            return err(id, QString("Unknown dynamic goal '%1'.").arg(goal));
+        }
+
+        emit editMgr_->editChanged();
+        return ok(id, QString("Applied dynamic goal '%1' to '%2'.")
+                      .arg(goal, QString::fromStdString(track->getName().toStdString())));
+    };
+
+    handlers_["set_reverb_character"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* track = resolveTrack(input["track"]);
+        if (!track) return err(id, "Track not found.");
+        const QString style = input["style"].toString().toLower().trimmed();
+        const double amount = std::clamp(input.contains("amount") ? input["amount"].toDouble() : 0.5, 0.0, 1.0);
+        auto* reverb = ensureBuiltInEffect(editMgr_, track, "Reverb");
+        if (!reverb) return err(id, "Could not create/find reverb.");
+        auto params = reverb->getAutomatableParameters();
+
+        if (style == "ethereal") {
+            if (params.size() > 0) params[0]->setParameter(static_cast<float>(0.75 + amount * 0.2), juce::sendNotification);
+            if (params.size() > 2) params[2]->setParameter(static_cast<float>(0.55 + amount * 0.35), juce::sendNotification);
+        } else if (style == "roomy") {
+            if (params.size() > 0) params[0]->setParameter(static_cast<float>(0.55 + amount * 0.25), juce::sendNotification);
+            if (params.size() > 2) params[2]->setParameter(static_cast<float>(0.40 + amount * 0.25), juce::sendNotification);
+        } else if (style == "tight") {
+            if (params.size() > 0) params[0]->setParameter(static_cast<float>(0.20 + amount * 0.20), juce::sendNotification);
+            if (params.size() > 2) params[2]->setParameter(static_cast<float>(0.15 + amount * 0.20), juce::sendNotification);
+        } else {
+            return err(id, QString("Unknown reverb style '%1'.").arg(style));
+        }
+
+        emit editMgr_->editChanged();
+        return ok(id, QString("Set reverb on '%1' to style '%2' (amount %3).")
+                      .arg(QString::fromStdString(track->getName().toStdString()), style)
+                      .arg(amount, 0, 'f', 2));
+    };
+
+    handlers_["set_bus_glue"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* bus = resolveTrack(input["bus"]);
+        if (!bus) return err(id, "Bus track not found.");
+        if (!editMgr_->isBusTrack(bus))
+            return err(id, "Target track is not a bus.");
+        const double intensity = std::clamp(input.contains("intensity") ? input["intensity"].toDouble() : 0.5, 0.0, 1.0);
+        auto* comp = ensureBuiltInEffect(editMgr_, bus, "Compressor");
+        if (!comp) return err(id, "Could not create/find compressor.");
+        auto params = comp->getAutomatableParameters();
+        if (params.size() > 0) params[0]->setParameter(static_cast<float>(0.40 + intensity * 0.30), juce::sendNotification);
+        if (params.size() > 1) params[1]->setParameter(static_cast<float>(0.35 + intensity * 0.25), juce::sendNotification);
+        emit editMgr_->editChanged();
+        return ok(id, QString("Applied bus glue on '%1' with intensity %2.")
+                      .arg(QString::fromStdString(bus->getName().toStdString()))
+                      .arg(intensity, 0, 'f', 2));
+    };
+
+    handlers_["set_master_target"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        if (!editMgr_ || !editMgr_->edit()) return err(id, "No project loaded.");
+        const QString profile = input["profile"].toString().toLower().trimmed();
+        if (profile == "streaming_balanced") {
+            editMgr_->edit()->setMasterVolumeSliderPos(0.72f);
+        } else if (profile == "loud_pop") {
+            editMgr_->edit()->setMasterVolumeSliderPos(0.82f);
+        } else if (profile == "dynamic_film") {
+            editMgr_->edit()->setMasterVolumeSliderPos(0.65f);
+        } else {
+            return err(id, QString("Unknown master profile '%1'.").arg(profile));
+        }
+        emit editMgr_->editChanged();
+        return ok(id, QString("Set master target profile to '%1'.").arg(profile));
+    };
+
+    // ── Session Structure Helpers ────────────────────────────────────────────
+
+    handlers_["group_tracks_by_inferred_role"] = [this](const QJsonObject&, const QString& id) -> AiToolResult {
+        QJsonObject out;
+        QJsonArray drums, bass, vocals, music, fx;
+        auto tracks = editMgr_->getAudioTracks();
+        for (auto* t : tracks) {
+            const QString name = QString::fromStdString(t->getName().toStdString());
+            const QString role = inferTrackRole(name);
+            if (role == "drums") drums.append(name);
+            else if (role == "bass") bass.append(name);
+            else if (role == "vocals") vocals.append(name);
+            else if (role == "fx") fx.append(name);
+            else music.append(name);
+        }
+        out["drums"] = drums;
+        out["bass"] = bass;
+        out["vocals"] = vocals;
+        out["music"] = music;
+        out["fx"] = fx;
+        return ok(id, out);
+    };
+
+    handlers_["create_mix_buses_from_roles"] = [this](const QJsonObject&, const QString& id) -> AiToolResult {
+        QStringList targetBuses = {"Drums Bus", "Music Bus", "Vocals Bus", "FX Bus"};
+        QJsonArray created;
+        auto buses = editMgr_->getBusTracks();
+
+        auto busExists = [&buses](const QString& busName) {
+            for (auto* b : buses) {
+                if (QString::fromStdString(b->getName().toStdString()).compare(busName, Qt::CaseInsensitive) == 0)
+                    return true;
+            }
+            return false;
+        };
+
+        for (const auto& name : targetBuses) {
+            if (!busExists(name)) {
+                auto* bus = editMgr_->addBusTrack();
+                if (bus) {
+                    bus->setName(juce::String(name.toStdString()));
+                    created.append(name);
+                }
+            }
+        }
+        emit editMgr_->tracksChanged();
+        return ok(id, created);
+    };
+
+    handlers_["auto_route_by_name_patterns"] = [this](const QJsonObject&, const QString& id) -> AiToolResult {
+        auto tracks = editMgr_->getNonBusAudioTracks();
+        auto buses = editMgr_->getBusTracks();
+        QMap<QString, te::AudioTrack*> busByRole;
+        for (auto* b : buses) {
+            const QString n = QString::fromStdString(b->getName().toStdString()).toLower();
+            if (n.contains("drum")) busByRole["drums"] = b;
+            else if (n.contains("vocal")) busByRole["vocals"] = b;
+            else if (n.contains("fx")) busByRole["fx"] = b;
+            else if (n.contains("music")) busByRole["music"] = b;
+        }
+
+        QJsonArray routed;
+        for (auto* t : tracks) {
+            const QString role = inferTrackRole(QString::fromStdString(t->getName().toStdString()));
+            if (busByRole.contains(role)) {
+                editMgr_->setTrackOutputToTrack(*t, *busByRole[role]);
+                QJsonObject row;
+                row["track"] = QString::fromStdString(t->getName().toStdString());
+                row["bus"] = QString::fromStdString(busByRole[role]->getName().toStdString());
+                routed.append(row);
+            }
+        }
+        emit editMgr_->routingChanged();
+        return ok(id, routed);
+    };
+
+    // ── Mix Plan / Checkpoint Helpers ────────────────────────────────────────
+
+    handlers_["preview_mix_plan"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        const QString req = input["request"].toString().trimmed();
+        QJsonObject out;
+        out["request"] = req;
+        out["stages"] = QJsonArray{
+            "1) Gain staging and peak targets",
+            "2) Balance and pan pass",
+            "3) Corrective EQ and masking checks",
+            "4) Compression/dynamics shaping",
+            "5) Space effects (reverb/delay)",
+            "6) Bus glue + master target",
+            "7) Verify against analysis metrics"
+        };
+        out["note"] = "Preview only - no project changes applied.";
+        return ok(id, out);
+    };
+
+    handlers_["commit_last_mix_stage"] = [this](const QJsonObject&, const QString& id) -> AiToolResult {
+        return ok(id, "Last mix stage marked as committed.");
+    };
+
+    handlers_["revert_last_mix_stage"] = [this](const QJsonObject&, const QString& id) -> AiToolResult {
+        editMgr_->undo();
+        return ok(id, "Reverted last mix stage via undo.");
     };
 
     // ── Transport ───────────────────────────────────────────────────────────

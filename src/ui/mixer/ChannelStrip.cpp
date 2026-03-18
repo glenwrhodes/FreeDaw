@@ -4,6 +4,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QSignalBlocker>
+#include <QMouseEvent>
 #include <cmath>
 
 namespace {
@@ -120,6 +121,7 @@ void ChannelStrip::setupUI()
 
     nameLabel_ = new QLabel(this);
     nameLabel_->setAccessibleName("Track Name");
+    nameLabel_->setToolTip("Double-click to rename");
     if (track_)
         nameLabel_->setText(QString::fromStdString(track_->getName().toStdString()));
     nameLabel_->setAlignment(Qt::AlignCenter);
@@ -128,6 +130,7 @@ void ChannelStrip::setupUI()
         QString("QLabel { color: %1; font-size: 10px; font-weight: bold; "
                 "background: %2; border-radius: 2px; padding: 2px; }")
             .arg(theme.text.name(), nameBg.name()));
+    nameLabel_->installEventFilter(this);
     layout->addWidget(nameLabel_);
 
     if (isMidi) {
@@ -543,6 +546,48 @@ void ChannelStrip::onArmToggled(bool armed)
     }
 
     editMgr_->setTrackRecordEnabled(*track_, armed);
+}
+
+bool ChannelStrip::eventFilter(QObject* obj, QEvent* event)
+{
+    if (obj == nameLabel_ && event->type() == QEvent::MouseButtonDblClick && track_) {
+        startRenameEdit();
+        return true;
+    }
+    return QWidget::eventFilter(obj, event);
+}
+
+void ChannelStrip::startRenameEdit()
+{
+    if (!track_ || !editMgr_) return;
+
+    auto* edit = new QLineEdit(this);
+    edit->setAccessibleName("Rename Track");
+    edit->setText(QString::fromStdString(track_->getName().toStdString()));
+    edit->selectAll();
+    edit->setGeometry(nameLabel_->geometry());
+    edit->setAlignment(Qt::AlignCenter);
+    edit->setStyleSheet(
+        "QLineEdit { background: #222; color: #eee; border: 1px solid #888; "
+        "font-size: 10px; font-weight: bold; padding: 1px 2px; border-radius: 2px; }");
+    edit->show();
+    edit->setFocus();
+    nameLabel_->hide();
+
+    auto* track = track_;
+    auto* mgr = editMgr_;
+
+    connect(edit, &QLineEdit::editingFinished, edit, [edit, track, mgr]() {
+        QString newName = edit->text().trimmed();
+        edit->hide();
+        edit->deleteLater();
+        if (!newName.isEmpty() && track) {
+            QTimer::singleShot(0, mgr, [track, mgr, newName]() {
+                track->setName(juce::String(newName.toStdString()));
+                emit mgr->tracksChanged();
+            });
+        }
+    });
 }
 
 void ChannelStrip::updateSelectionStyle()

@@ -33,6 +33,8 @@ public:
 
     bool confirmDestructive() const;
     void setConfirmDestructive(bool confirm);
+    bool previewMixPlanMode() const;
+    void setPreviewMixPlanMode(bool enabled);
 
     bool isBusy() const { return busy_; }
 

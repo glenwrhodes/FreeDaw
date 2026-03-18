@@ -9,6 +9,7 @@
 #include <QPushButton>
 #include <QComboBox>
 #include <QLabel>
+#include <QLineEdit>
 #include <QTimer>
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -32,6 +33,9 @@ public:
     void setSelected(bool selected);
     bool isSelected() const { return selected_; }
 
+protected:
+    bool eventFilter(QObject* obj, QEvent* event) override;
+
 signals:
     void effectInsertRequested(te::AudioTrack* track, int slotIndex);
     void instrumentSelectRequested(te::AudioTrack* track);
@@ -49,6 +53,7 @@ private:
     void populateOutputCombo();
     void onOutputComboChanged(int index);
     void onArmToggled(bool armed);
+    void startRenameEdit();
 
     te::AudioTrack* track_ = nullptr;
     EditManager* editMgr_;

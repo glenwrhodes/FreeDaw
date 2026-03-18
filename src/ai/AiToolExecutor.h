@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AiTypes.h"
+#include "AiAudioAnalysis.h"
 #include "engine/AudioEngine.h"
 #include "engine/EditManager.h"
 #include "engine/PluginScanner.h"
@@ -40,6 +41,7 @@ private:
     EditManager* editMgr_;
     AudioEngine* audioEngine_;
     PluginScanner* pluginScanner_;
+    AiAudioAnalysis audioAnalysis_;
 };
 
 } // namespace freedaw

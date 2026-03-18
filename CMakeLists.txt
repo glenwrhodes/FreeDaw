@@ -59,6 +59,7 @@ set(FREEDAW_SOURCES
     src/utils/ThemeManager.h        src/utils/ThemeManager.cpp
     src/utils/IconFont.h
     src/ai/AiTypes.h
+    src/ai/AiAudioAnalysis.h      src/ai/AiAudioAnalysis.cpp
     src/ai/AiToolDefs.h            src/ai/AiToolDefs.cpp
     src/ai/AiToolExecutor.h        src/ai/AiToolExecutor.cpp
     src/ai/AiService.h             src/ai/AiService.cpp

@@ -5,6 +5,7 @@
 #include "ui/controls/RotaryKnob.h"
 #include <QWidget>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QComboBox>
 #include <QSlider>
@@ -38,6 +39,7 @@ signals:
 
 protected:
     void mousePressEvent(QMouseEvent* event) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
     void updateMeter();
@@ -49,6 +51,7 @@ private:
     void populateOutputCombo();
     void onOutputComboChanged(int index);
     void onArmToggled(bool armed);
+    void startRenameEdit();
 
     te::AudioTrack* track_;
     EditManager* editMgr_;

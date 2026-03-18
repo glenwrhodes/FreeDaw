@@ -335,6 +335,162 @@ QJsonArray AiToolDefs::allTools()
         "Get the current transport state: playing/stopped/recording, position in seconds, and loop status.",
         {}));
 
+    // ── Analysis / Mix Intelligence ─────────────────────────────────────────
+
+    {
+        QJsonObject props;
+        props["track"] = trackProp();
+        props["window_seconds"] = propNumber("Analysis window length in seconds (recommended: 1-10).", 0.1, 120.0);
+        tools.append(makeTool("analyze_track_levels",
+            "Analyze a track's current levels and return peak, true peak estimate, RMS estimate, and crest factor.",
+            props, {"track"}));
+    }
+
+    {
+        QJsonObject props;
+        props["window_seconds"] = propNumber("Analysis window length in seconds (recommended: 1-30).", 0.1, 300.0);
+        tools.append(makeTool("analyze_master_levels",
+            "Analyze master/output level estimates and return integrated LUFS estimate, short-term LUFS estimate, peak, true peak estimate, and dynamic range estimate.",
+            props));
+    }
+
+    {
+        QJsonObject props;
+        QJsonObject targetRef;
+        targetRef["description"] = "Track name/index, or the literal string 'master'.";
+        QJsonArray oneOf;
+        QJsonObject strType; strType["type"] = "string";
+        QJsonObject intType; intType["type"] = "integer";
+        oneOf.append(strType);
+        oneOf.append(intType);
+        targetRef["oneOf"] = oneOf;
+        props["target"] = targetRef;
+        tools.append(makeTool("analyze_frequency_balance",
+            "Estimate low/mid/high spectral energy balance and tilt for a track or master.",
+            props, {"target"}));
+    }
+
+    {
+        QJsonObject props;
+        QJsonObject targetRef;
+        targetRef["description"] = "Track name/index, or the literal string 'master'.";
+        QJsonArray oneOf;
+        QJsonObject strType; strType["type"] = "string";
+        QJsonObject intType; intType["type"] = "integer";
+        oneOf.append(strType);
+        oneOf.append(intType);
+        targetRef["oneOf"] = oneOf;
+        props["target"] = targetRef;
+        tools.append(makeTool("analyze_stereo_image",
+            "Estimate stereo width and mono compatibility for a track or master.",
+            props, {"target"}));
+    }
+
+    {
+        QJsonObject props;
+        props["track"] = trackProp();
+        tools.append(makeTool("analyze_transients",
+            "Estimate transient density and attack sharpness for a track.",
+            props, {"track"}));
+    }
+
+    {
+        QJsonObject props;
+        props["track_a"] = trackProp();
+        props["track_b"] = trackProp();
+        tools.append(makeTool("analyze_masking",
+            "Estimate frequency masking/overlap risk between two tracks.",
+            props, {"track_a", "track_b"}));
+    }
+
+    // ── Semantic Mix / Master Actions ───────────────────────────────────────
+
+    {
+        QJsonObject props;
+        props["track"] = trackProp();
+        props["preset_name"] = prop("string", "Preset intent name, e.g. vocal_clarity, drum_punch, bass_control, smooth_pad.");
+        tools.append(makeTool("apply_mix_preset",
+            "Apply a semantic mix preset to a track by adjusting effects and level/dynamics-related settings.",
+            props, {"track", "preset_name"}));
+    }
+
+    {
+        QJsonObject props;
+        props["track"] = trackProp();
+        props["dbfs"] = propNumber("Desired peak target in dBFS (negative value).", -40.0, 0.0);
+        tools.append(makeTool("set_track_target_peak",
+            "Adjust a track's volume toward a target peak in dBFS.",
+            props, {"track", "dbfs"}));
+    }
+
+    {
+        QJsonObject props;
+        props["track"] = trackProp();
+        props["goal"] = prop("string", "Dynamic goal, e.g. tighter, more_open, more_sustain.");
+        tools.append(makeTool("set_track_dynamic_goal",
+            "Apply dynamic-shaping behavior for a track by tuning compressor-style settings.",
+            props, {"track", "goal"}));
+    }
+
+    {
+        QJsonObject props;
+        props["track"] = trackProp();
+        props["style"] = prop("string", "Reverb character style, e.g. ethereal, roomy, tight.");
+        props["amount"] = propNumber("Wetness/intensity amount from 0.0 to 1.0.", 0.0, 1.0);
+        tools.append(makeTool("set_reverb_character",
+            "Set reverb behavior on a track using style and amount semantics.",
+            props, {"track", "style"}));
+    }
+
+    {
+        QJsonObject props;
+        props["bus"] = trackProp();
+        props["intensity"] = propNumber("Glue intensity from 0.0 to 1.0.", 0.0, 1.0);
+        tools.append(makeTool("set_bus_glue",
+            "Apply gentle bus compression-style glue to a bus track.",
+            props, {"bus"}));
+    }
+
+    {
+        QJsonObject props;
+        props["profile"] = prop("string", "Master profile, e.g. streaming_balanced, loud_pop, dynamic_film.");
+        tools.append(makeTool("set_master_target",
+            "Apply master output target behavior/profile guidance.",
+            props, {"profile"}));
+    }
+
+    // ── Session Structure Helpers ────────────────────────────────────────────
+
+    tools.append(makeTool("create_mix_buses_from_roles",
+        "Create common mix buses from inferred track roles (drums, music, vocals, fx) and return created buses.",
+        {}));
+
+    tools.append(makeTool("auto_route_by_name_patterns",
+        "Route tracks to buses using inferred naming patterns (e.g., kick/snare/toms to drums bus).",
+        {}));
+
+    tools.append(makeTool("group_tracks_by_inferred_role",
+        "Return track grouping suggestions by inferred role (drums, bass, vocals, music, fx, etc.).",
+        {}));
+
+    // ── Mix Plan / Checkpoint Helpers ────────────────────────────────────────
+
+    {
+        QJsonObject props;
+        props["request"] = prop("string", "Original user mix/master request.");
+        tools.append(makeTool("preview_mix_plan",
+            "Generate and return a staged mix/master action plan without changing project state.",
+            props, {"request"}));
+    }
+
+    tools.append(makeTool("commit_last_mix_stage",
+        "Mark the most recent mix stage as committed/checkpointed for workflow tracking.",
+        {}));
+
+    tools.append(makeTool("revert_last_mix_stage",
+        "Revert one mix stage by undoing recent changes.",
+        {}));
+
     {
         QJsonObject props;
         props["bpm"] = propNumber("Tempo in beats per minute.", 20.0, 999.0);

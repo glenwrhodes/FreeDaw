@@ -56,6 +56,18 @@ void AiService::setConfirmDestructive(bool confirm)
     s.setValue("ai/confirmDestructive", confirm);
 }
 
+bool AiService::previewMixPlanMode() const
+{
+    QSettings s;
+    return s.value("ai/previewMixPlanMode", false).toBool();
+}
+
+void AiService::setPreviewMixPlanMode(bool enabled)
+{
+    QSettings s;
+    s.setValue("ai/previewMixPlanMode", enabled);
+}
+
 void AiService::setBusy(bool b)
 {
     if (busy_ != b) {
@@ -108,7 +120,14 @@ QString AiService::buildSystemPrompt() const
               "- Do NOT write MIDI notes - that capability is not yet available.\n"
               "- When users ask about effects parameters, use get_track_effects to see "
               "current values before modifying them.\n"
-              "- Parameter values are normalized 0.0 to 1.0.\n";
+              "- Parameter values are normalized 0.0 to 1.0.\n"
+              "- For mix/master requests, use staged workflow: analyze -> apply -> verify.\n"
+              "- Before major processing, call analysis tools first.\n"
+              "- Stop when targets are met or no meaningful improvement remains.\n";
+
+    if (previewMixPlanMode()) {
+        prompt += "- Preview mode is ON: call preview_mix_plan before mutating tools and wait for user confirmation intent.\n";
+    }
 
     return prompt;
 }
