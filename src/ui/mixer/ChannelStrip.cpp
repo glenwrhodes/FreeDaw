@@ -293,6 +293,25 @@ void ChannelStrip::setupUI()
         });
     }
 
+    frozenLabel_ = new QLabel("FROZEN", this);
+    frozenLabel_->setAccessibleName("Track Frozen Indicator");
+    frozenLabel_->setAlignment(Qt::AlignCenter);
+    frozenLabel_->setStyleSheet(
+        QString("QLabel { color: #fff; font-size: 8px; font-weight: bold; "
+                "background: %1; border-radius: 2px; padding: 1px 4px; }")
+            .arg(QColor(0, 150, 200).name()));
+    frozenLabel_->setFixedHeight(16);
+    bool isFrozen = track_ && editMgr_ && editMgr_->isTrackFrozen(track_);
+    frozenLabel_->setVisible(isFrozen);
+    layout->addWidget(frozenLabel_);
+
+    if (track_ && editMgr_) {
+        connect(editMgr_, &EditManager::trackFreezeStateChanged, this, [this](te::AudioTrack* t) {
+            if (t != track_ || !frozenLabel_ || !editMgr_) return;
+            frozenLabel_->setVisible(editMgr_->isTrackFrozen(track_));
+        });
+    }
+
     updateSelectionStyle();
 }
 

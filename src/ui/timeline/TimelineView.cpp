@@ -10,6 +10,7 @@
 #include <QKeyEvent>
 #include <QCoreApplication>
 #include <QMenu>
+#include <QMessageBox>
 #include <QDebug>
 #include <QLineF>
 #include <cmath>
@@ -297,6 +298,24 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
                                 emit editMgr_->midiClipDoubleClicked(clip);
                         });
                     }
+                    menu.addAction("Bounce Track to Audio", [this, track]() {
+                        QMessageBox confirmDlg(this);
+                        confirmDlg.setWindowTitle("Bounce Track");
+                        confirmDlg.setText(
+                            "This will render the track with all effects applied "
+                            "and replace its contents with the rendered audio.\n\n"
+                            "Existing clips and effects will be removed.");
+                        confirmDlg.setInformativeText("Continue?");
+                        confirmDlg.setStandardButtons(
+                            QMessageBox::Yes | QMessageBox::No);
+                        confirmDlg.setDefaultButton(QMessageBox::No);
+                        confirmDlg.setIcon(QMessageBox::Question);
+                        if (confirmDlg.exec() == QMessageBox::Yes) {
+                            bool ok = editMgr_->bounceTrackToAudio(*track);
+                            if (ok) rebuildClips();
+                        }
+                    });
+
                     menu.addAction("Remove Track", [this, track]() {
                         editMgr_->removeTrack(track);
                     });

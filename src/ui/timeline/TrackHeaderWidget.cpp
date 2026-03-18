@@ -201,10 +201,26 @@ TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr
         updateMonoButtonVisual(mono);
     });
 
+    freezeBtn_ = new QPushButton(this);
+    freezeBtn_->setAccessibleName("Freeze Track");
+    freezeBtn_->setCheckable(false);
+    freezeBtn_->setFixedSize(26, 20);
+    freezeBtn_->setText("F");
+    applyToggleStyle(freezeBtn_, QColor(0, 150, 200));
+    connect(freezeBtn_, &QPushButton::clicked, this, [this]() {
+        if (!track_ || !editMgr_) return;
+        bool frozen = editMgr_->isTrackFrozen(track_);
+        if (frozen)
+            editMgr_->unfreezeTrack(*track_);
+        else
+            editMgr_->freezeTrack(*track_);
+    });
+
     btnRow->addWidget(muteBtn_);
     btnRow->addWidget(soloBtn_);
     btnRow->addWidget(armBtn_);
     btnRow->addWidget(monoBtn_);
+    btnRow->addWidget(freezeBtn_);
     btnRow->addStretch();
     mainLayout->addLayout(btnRow);
 
@@ -215,6 +231,10 @@ TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr
     }
     updateMonoButtonVisual(mono);
 
+    if (editMgr_ && track_) {
+        updateFreezeButtonVisual(editMgr_->isTrackFrozen(track_));
+    }
+
     connect(editMgr_, &EditManager::tracksChanged, this, [this]() {
         if (!track_ || !monoBtn_ || !editMgr_)
             return;
@@ -222,6 +242,11 @@ TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr
         QSignalBlocker block(monoBtn_);
         monoBtn_->setChecked(isMono);
         updateMonoButtonVisual(isMono);
+    });
+
+    connect(editMgr_, &EditManager::trackFreezeStateChanged, this, [this](te::AudioTrack* t) {
+        if (t != track_ || !freezeBtn_ || !editMgr_) return;
+        updateFreezeButtonVisual(editMgr_->isTrackFrozen(track_));
     });
 
     auto* controlRow = new QHBoxLayout();
@@ -464,6 +489,54 @@ void TrackHeaderWidget::updateMonoButtonVisual(bool mono)
 
     monoBtn_->setText(QString(mono ? icons::fa::Mono : icons::fa::Stereo));
     monoBtn_->setToolTip(mono ? "Track is mono" : "Track is stereo");
+}
+
+void TrackHeaderWidget::updateFreezeButtonVisual(bool frozen)
+{
+    if (!freezeBtn_) return;
+
+    auto& theme = ThemeManager::instance().current();
+    QColor freezeColor(0, 150, 200);
+
+    if (frozen) {
+        freezeBtn_->setToolTip("Unfreeze Track (click to restore live processing)");
+        freezeBtn_->setStyleSheet(
+            QString("QPushButton { background: %1; color: #fff; font-size: 9px; "
+                    "font-weight: bold; border: 1px solid %1; border-radius: 3px; }"
+                    "QPushButton:hover { background: %2; }")
+                .arg(freezeColor.name(), freezeColor.lighter(130).name()));
+
+        QColor frozenBg = theme.surface;
+        frozenBg = frozenBg.darker(110);
+        QPalette pal = palette();
+        pal.setColor(QPalette::Window, frozenBg);
+        setPalette(pal);
+
+        if (nameLabel_) {
+            nameLabel_->setStyleSheet(
+                QString("QLabel { color: %1; font-size: 10px; font-weight: bold; "
+                        "background: %2; border: 1px solid %3; "
+                        "border-radius: 2px; padding: 2px; }")
+                    .arg(freezeColor.name(), theme.background.name(),
+                         freezeColor.name()));
+        }
+    } else {
+        freezeBtn_->setToolTip("Freeze Track (render effects to audio)");
+        applyToggleStyle(freezeBtn_, freezeColor);
+
+        QPalette pal = palette();
+        pal.setColor(QPalette::Window, theme.surface);
+        setPalette(pal);
+
+        bool isMidi = editMgr_ && editMgr_->isMidiTrack(track_);
+        if (nameLabel_) {
+            QColor nameBg = isMidi ? theme.midiClipBody : theme.background;
+            nameLabel_->setStyleSheet(
+                QString("QLabel { color: %1; font-size: 10px; font-weight: bold; "
+                        "background: %2; border-radius: 2px; padding: 2px; }")
+                    .arg(theme.text.name(), nameBg.name()));
+        }
+    }
 }
 
 void TrackHeaderWidget::populateInputCombo()

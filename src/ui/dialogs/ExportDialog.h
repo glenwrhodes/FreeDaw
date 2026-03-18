@@ -1,0 +1,39 @@
+#pragma once
+
+#include "engine/EditManager.h"
+#include <QDialog>
+#include <QLineEdit>
+#include <QComboBox>
+#include <QCheckBox>
+#include <QPushButton>
+#include <QProgressBar>
+#include <QLabel>
+
+namespace freedaw {
+
+class ExportDialog : public QDialog {
+    Q_OBJECT
+
+public:
+    explicit ExportDialog(QWidget* parent = nullptr);
+
+    ExportSettings settings() const;
+
+    void setExporting(bool exporting);
+    void setProgress(float progress);
+
+private:
+    void onBrowse();
+
+    QLineEdit* pathEdit_ = nullptr;
+    QPushButton* browseBtn_ = nullptr;
+    QComboBox* sampleRateCombo_ = nullptr;
+    QComboBox* bitDepthCombo_ = nullptr;
+    QCheckBox* normalizeCheck_ = nullptr;
+    QPushButton* exportBtn_ = nullptr;
+    QPushButton* cancelBtn_ = nullptr;
+    QProgressBar* progressBar_ = nullptr;
+    QLabel* statusLabel_ = nullptr;
+};
+
+} // namespace freedaw

@@ -7,7 +7,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ── Qt6 ──────────────────────────────────────────────────────────────────────
 set(CMAKE_PREFIX_PATH "c:/qt/6.10.2/msvc2022_64" CACHE STRING "Qt prefix path")
-find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network Concurrent)
 qt_standard_project_setup()
 
 # ── JUCE ─────────────────────────────────────────────────────────────────────
@@ -40,6 +40,7 @@ set(FREEDAW_SOURCES
     src/ui/controls/VolumeFader.h   src/ui/controls/VolumeFader.cpp
     src/ui/controls/LevelMeter.h    src/ui/controls/LevelMeter.cpp
     src/ui/controls/WaveformWidget.h src/ui/controls/WaveformWidget.cpp
+    src/ui/dialogs/ExportDialog.h        src/ui/dialogs/ExportDialog.cpp
     src/ui/effects/EffectChainWidget.h   src/ui/effects/EffectChainWidget.cpp
     src/ui/effects/DelayEffectWidget.h   src/ui/effects/DelayEffectWidget.cpp
     src/ui/effects/EffectSelectorDialog.h src/ui/effects/EffectSelectorDialog.cpp
@@ -97,6 +98,7 @@ target_compile_definitions(FreeDaw PRIVATE
 target_link_libraries(FreeDaw PRIVATE
     Qt6::Widgets
     Qt6::Network
+    Qt6::Concurrent
     tracktion::tracktion_core
     tracktion::tracktion_engine
     tracktion::tracktion_graph

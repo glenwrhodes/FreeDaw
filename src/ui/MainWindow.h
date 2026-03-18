@@ -38,6 +38,7 @@ private:
     void onOpenProject();
     void onSaveProject();
     void onSaveProjectAs();
+    void onExportAudio();
     void onAddTrack();
     void onAddMidiTrack();
     void onRemoveTrack();

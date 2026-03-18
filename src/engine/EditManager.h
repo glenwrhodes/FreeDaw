@@ -9,12 +9,20 @@
 #include <map>
 #include <string>
 #include <memory>
+#include <functional>
 
 namespace freedaw {
 
 struct InputSource {
     juce::String deviceName;
     QString displayName;
+};
+
+struct ExportSettings {
+    juce::File destFile;
+    double sampleRate = 44100.0;
+    int bitDepth = 24;
+    bool normalize = false;
 };
 
 class EditManager : public QObject {
@@ -102,7 +110,16 @@ public:
 
     juce::File currentFile() const { return currentFile_; }
 
+    // Export / Freeze / Bounce
+    bool exportMix(const ExportSettings& settings,
+                   std::function<void(float)> progressCallback);
+    bool isTrackFrozen(te::AudioTrack* track) const;
+    void freezeTrack(te::AudioTrack& track);
+    void unfreezeTrack(te::AudioTrack& track);
+    bool bounceTrackToAudio(te::AudioTrack& track);
+
 signals:
+    void trackFreezeStateChanged(te::AudioTrack* track);
     void aboutToChangeEdit();
     void editChanged();
     void tracksChanged();
@@ -127,6 +144,7 @@ private:
     juce::File currentFile_;
     std::unordered_set<uint64_t> midiTrackIds_;
     std::map<std::string, QString> inputDisplayNames_;
+    std::map<uint64_t, juce::File> frozenTracks_;
 };
 
 } // namespace freedaw

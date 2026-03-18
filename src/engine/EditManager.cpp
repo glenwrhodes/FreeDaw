@@ -1,5 +1,6 @@
 #include "EditManager.h"
 #include <juce_audio_formats/juce_audio_formats.h>
+#include <tracktion_engine/tracktion_engine.h>
 #include <QDebug>
 #include <QPointF>
 
@@ -46,6 +47,7 @@ void EditManager::teardownCurrentEdit()
 
     midiTrackIds_.clear();
     inputDisplayNames_.clear();
+    frozenTracks_.clear();
     qDebug() << "[teardown] complete";
 }
 
@@ -856,6 +858,271 @@ QMap<QString, QPointF> EditManager::loadRoutingLayout() const
             positions[key] = QPointF(x, y);
     }
     return positions;
+}
+
+// ── Export / Freeze / Bounce ──────────────────────────────────────────────────
+
+bool EditManager::exportMix(const ExportSettings& settings,
+                            std::function<void(float)> progressCallback)
+{
+    if (!edit_) return false;
+
+    auto& transport = edit_->getTransport();
+    if (transport.isPlaying())
+        transport.stop(false, false);
+
+    auto tracks = te::getAudioTracks(*edit_);
+    if (tracks.isEmpty()) return false;
+
+    juce::BigInteger tracksToDo;
+    for (auto* track : tracks) {
+        int idx = track->getIndexInEditTrackList();
+        if (idx >= 0)
+            tracksToDo.setBit(idx);
+    }
+
+    auto editLength = edit_->getLength();
+    if (editLength.inSeconds() <= 0.0) return false;
+
+    te::Renderer::Parameters params(*edit_);
+    params.destFile = settings.destFile;
+    params.sampleRateForAudio = settings.sampleRate;
+    params.bitDepth = settings.bitDepth;
+    params.shouldNormalise = settings.normalize;
+    params.tracksToDo = tracksToDo;
+    params.time = { tracktion::TimePosition(), tracktion::TimePosition::fromSeconds(editLength.inSeconds()) };
+    params.usePlugins = true;
+    params.useMasterPlugins = true;
+    params.canRenderInMono = false;
+
+    juce::WavAudioFormat wavFormat;
+    params.audioFormat = &wavFormat;
+
+    std::atomic<float> progress{0.0f};
+    auto task = std::make_unique<te::Renderer::RenderTask>(
+        "Exporting mix", params, &progress, nullptr);
+
+    while (true) {
+        auto status = task->runJob();
+        float p = progress.load();
+        if (progressCallback)
+            progressCallback(p);
+        if (status == juce::ThreadPoolJob::jobHasFinished)
+            break;
+    }
+
+    if (!task->errorMessage.isEmpty()) {
+        qWarning() << "[exportMix] render error:"
+                    << QString::fromStdString(task->errorMessage.toStdString());
+        return false;
+    }
+
+    return settings.destFile.existsAsFile();
+}
+
+bool EditManager::isTrackFrozen(te::AudioTrack* track) const
+{
+    if (!track) return false;
+    return frozenTracks_.count(track->itemID.getRawID()) > 0;
+}
+
+void EditManager::freezeTrack(te::AudioTrack& track)
+{
+    if (!edit_) {
+        qWarning() << "[freezeTrack] no edit";
+        return;
+    }
+    if (frozenTracks_.count(track.itemID.getRawID()) > 0) {
+        qDebug() << "[freezeTrack] already frozen";
+        return;
+    }
+
+    auto& transport = edit_->getTransport();
+    if (transport.isPlaying())
+        transport.stop(false, false);
+
+    int trackIdx = track.getIndexInEditTrackList();
+    qDebug() << "[freezeTrack] track index:" << trackIdx
+             << "name:" << QString::fromStdString(track.getName().toStdString());
+
+    auto editLength = edit_->getLength();
+    qDebug() << "[freezeTrack] edit length:" << editLength.inSeconds() << "sec";
+    if (editLength.inSeconds() <= 0.0) {
+        qWarning() << "[freezeTrack] edit length is 0, nothing to freeze";
+        return;
+    }
+
+    auto projectDir = currentFile_.getParentDirectory();
+    if (projectDir == juce::File())
+        projectDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
+
+    auto freezeFile = projectDir.getChildFile(
+        track.getName() + "_freeze_" +
+        juce::String(juce::Time::currentTimeMillis()) + ".wav");
+
+    qDebug() << "[freezeTrack] freeze file:"
+             << QString::fromStdString(freezeFile.getFullPathName().toStdString());
+
+    juce::BigInteger trackNum;
+    trackNum.setBit(trackIdx);
+
+    auto& dm = audioEngine_.engine().getDeviceManager();
+
+    te::Renderer::Parameters params(*edit_);
+    params.tracksToDo = trackNum;
+    params.destFile = freezeFile;
+    params.bitDepth = 24;
+    params.blockSizeForAudio = dm.getBlockSize();
+    params.sampleRateForAudio = dm.getSampleRate();
+    params.time = { tracktion::TimePosition(),
+                    tracktion::TimePosition::fromSeconds(editLength.inSeconds()) };
+    params.canRenderInMono = false;
+    params.usePlugins = true;
+    params.useMasterPlugins = false;
+    params.checkNodesForAudio = false;
+
+    juce::WavAudioFormat wavFormat;
+    params.audioFormat = &wavFormat;
+
+    qDebug() << "[freezeTrack] starting render: sr=" << params.sampleRateForAudio
+             << "bs=" << params.blockSizeForAudio
+             << "bits set=" << params.tracksToDo.countNumberOfSetBits();
+
+    std::atomic<float> progress{0.0f};
+    auto task = std::make_unique<te::Renderer::RenderTask>(
+        "Freezing track: " + track.getName(), params, &progress, nullptr);
+
+    if (!task->errorMessage.isEmpty()) {
+        qWarning() << "[freezeTrack] RenderTask init error:"
+                    << QString::fromStdString(task->errorMessage.toStdString());
+        return;
+    }
+
+    qDebug() << "[freezeTrack] RenderTask created, running...";
+
+    int iterations = 0;
+    while (true) {
+        auto status = task->runJob();
+        iterations++;
+        if (status == juce::ThreadPoolJob::jobHasFinished)
+            break;
+    }
+
+    qDebug() << "[freezeTrack] render done, iterations:" << iterations
+             << "progress:" << progress.load()
+             << "error:" << QString::fromStdString(task->errorMessage.toStdString());
+
+    qDebug() << "[freezeTrack] file exists:" << freezeFile.existsAsFile()
+             << "size:" << freezeFile.getSize();
+
+    if (!task->errorMessage.isEmpty()) {
+        qWarning() << "[freezeTrack] render error:"
+                    << QString::fromStdString(task->errorMessage.toStdString());
+        freezeFile.deleteFile();
+        return;
+    }
+
+    if (!freezeFile.existsAsFile()) {
+        qWarning() << "[freezeTrack] render produced no file";
+        return;
+    }
+
+    frozenTracks_[track.itemID.getRawID()] = freezeFile;
+    qDebug() << "[freezeTrack] SUCCESS - track marked frozen, file size:"
+             << freezeFile.getSize();
+
+    emit trackFreezeStateChanged(&track);
+    emit editChanged();
+}
+
+void EditManager::unfreezeTrack(te::AudioTrack& track)
+{
+    if (!edit_) return;
+
+    auto it = frozenTracks_.find(track.itemID.getRawID());
+    if (it == frozenTracks_.end()) return;
+
+    auto freezeFile = it->second;
+    frozenTracks_.erase(it);
+
+    if (freezeFile.existsAsFile())
+        freezeFile.deleteFile();
+
+    qDebug() << "[unfreezeTrack] track unfrozen:"
+             << QString::fromStdString(track.getName().toStdString());
+
+    emit trackFreezeStateChanged(&track);
+    emit editChanged();
+}
+
+bool EditManager::bounceTrackToAudio(te::AudioTrack& track)
+{
+    if (!edit_) return false;
+
+    auto& transport = edit_->getTransport();
+    if (transport.isPlaying())
+        transport.stop(false, false);
+
+    auto editLength = edit_->getLength();
+    if (editLength.inSeconds() <= 0.0) return false;
+
+    juce::BigInteger trackBit;
+    int idx = track.getIndexInEditTrackList();
+    if (idx < 0) return false;
+    trackBit.setBit(idx);
+
+    auto projectDir = currentFile_.getParentDirectory();
+    if (projectDir == juce::File())
+        projectDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
+
+    auto bounceFile = projectDir.getChildFile(
+        track.getName() + "_bounce_" +
+        juce::String(juce::Time::currentTimeMillis()) + ".wav");
+
+    te::Renderer::Parameters params(*edit_);
+    params.destFile = bounceFile;
+    params.sampleRateForAudio = 44100.0;
+    params.bitDepth = 24;
+    params.tracksToDo = trackBit;
+    params.time = { tracktion::TimePosition(), tracktion::TimePosition::fromSeconds(editLength.inSeconds()) };
+    params.usePlugins = true;
+    params.useMasterPlugins = false;
+    params.canRenderInMono = false;
+
+    juce::WavAudioFormat wavFormat;
+    params.audioFormat = &wavFormat;
+
+    std::atomic<float> progress{0.0f};
+    auto task = std::make_unique<te::Renderer::RenderTask>(
+        "Bouncing track", params, &progress, nullptr);
+
+    while (true) {
+        auto status = task->runJob();
+        if (status == juce::ThreadPoolJob::jobHasFinished)
+            break;
+    }
+
+    if (!bounceFile.existsAsFile()) return false;
+
+    auto& um = edit_->getUndoManager();
+    um.beginNewTransaction("Bounce Track to Audio");
+
+    auto clips = track.getClips();
+    for (int i = clips.size() - 1; i >= 0; --i)
+        clips[i]->removeFromParent();
+
+    for (int i = track.pluginList.size() - 1; i >= 0; --i) {
+        auto* plugin = track.pluginList[i];
+        if (dynamic_cast<te::VolumeAndPanPlugin*>(plugin)) continue;
+        if (dynamic_cast<te::LevelMeterPlugin*>(plugin)) continue;
+        plugin->deleteFromParent();
+    }
+
+    addAudioClipToTrack(track, bounceFile, 0.0);
+
+    emit tracksChanged();
+    emit editChanged();
+    return true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

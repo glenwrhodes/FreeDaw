@@ -46,6 +46,7 @@ private:
     void updateSelectionStyle();
     void applyToggleStyle(QPushButton* btn, const QColor& activeColor);
     void updateMonoButtonVisual(bool mono);
+    void updateFreezeButtonVisual(bool frozen);
     void populateInputCombo();
     void onInputComboChanged(int index);
     void populateOutputCombo();
@@ -65,6 +66,7 @@ private:
     QPushButton* soloBtn_;
     QPushButton* armBtn_;
     QPushButton* monoBtn_ = nullptr;
+    QPushButton* freezeBtn_ = nullptr;
     QSlider* volumeSlider_;
     RotaryKnob* panKnob_;
     LevelMeter* meter_;

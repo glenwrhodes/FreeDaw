@@ -71,6 +71,7 @@ private:
     QPushButton* soloBtn_ = nullptr;
     QPushButton* armBtn_ = nullptr;
     QPushButton* monoBtn_ = nullptr;
+    QLabel* frozenLabel_ = nullptr;
 
     QTimer meterTimer_;
     te::LevelMeasurer::Client meterClient_;

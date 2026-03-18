@@ -2,6 +2,7 @@
 #include "ui/effects/VstSelectorDialog.h"
 #include "ui/effects/PluginEditorWindow.h"
 #include "ui/pianoroll/PianoRollEditor.h"
+#include "ui/dialogs/ExportDialog.h"
 #include "utils/ThemeManager.h"
 #include "utils/IconFont.h"
 #include <QFileDialog>
@@ -13,6 +14,8 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QMessageBox>
+#include <QApplication>
+#include <QtConcurrent/QtConcurrent>
 
 namespace freedaw {
 
@@ -161,6 +164,10 @@ void MainWindow::createMenus()
 
     fileMenu->addAction("Save &As...", QKeySequence("Ctrl+Shift+S"), this,
         &MainWindow::onSaveProjectAs);
+
+    fileMenu->addSeparator();
+    fileMenu->addAction("&Export Audio...", QKeySequence("Ctrl+Shift+E"), this,
+        &MainWindow::onExportAudio);
 
     fileMenu->addSeparator();
     fileMenu->addAction("&Quit", QKeySequence::Quit, this, &QMainWindow::close);
@@ -595,6 +602,51 @@ void MainWindow::onSaveProjectAs()
     if (routingView_) routingView_->flushNodePositions();
     juce::File file(path.toStdString());
     editMgr_.saveEditAs(file);
+}
+
+void MainWindow::onExportAudio()
+{
+    ExportDialog dlg(this);
+    if (dlg.exec() != QDialog::Accepted) return;
+
+    auto settings = dlg.settings();
+    if (settings.destFile == juce::File()) {
+        QMessageBox::warning(this, "Export Audio",
+                             "Please select an output file.");
+        return;
+    }
+
+    ExportDialog progressDlg(this);
+    progressDlg.setWindowTitle("Exporting...");
+    progressDlg.setExporting(true);
+    progressDlg.setModal(true);
+    progressDlg.show();
+
+    bool success = false;
+    auto future = QtConcurrent::run([this, settings, &progressDlg, &success]() {
+        success = editMgr_.exportMix(settings, [&progressDlg](float p) {
+            QMetaObject::invokeMethod(&progressDlg, [&progressDlg, p]() {
+                progressDlg.setProgress(p);
+            }, Qt::QueuedConnection);
+        });
+    });
+
+    while (!future.isFinished()) {
+        QApplication::processEvents(QEventLoop::AllEvents, 50);
+    }
+
+    progressDlg.hide();
+
+    if (success) {
+        auto fileName = QString::fromStdString(
+            settings.destFile.getFileName().toStdString());
+        QMessageBox::information(this, "Export Complete",
+            QString("Mix exported successfully to:\n%1").arg(fileName));
+        statusBar()->showMessage("Export complete", 5000);
+    } else {
+        QMessageBox::critical(this, "Export Failed",
+            "Failed to export the mix. Check the output path and try again.");
+    }
 }
 
 void MainWindow::onAddTrack()
