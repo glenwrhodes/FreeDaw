@@ -2,6 +2,7 @@
 #include "ui/effects/VstSelectorDialog.h"
 #include "ui/effects/PluginEditorWindow.h"
 #include "ui/pianoroll/PianoRollEditor.h"
+#include "ui/audioclip/AudioClipEditor.h"
 #include "ui/dialogs/ExportDialog.h"
 #include "ui/SplashScreen.h"
 #include "utils/ThemeManager.h"
@@ -21,6 +22,7 @@
 #include <QPlainTextEdit>
 #include <QComboBox>
 #include <QShortcutEvent>
+#include <QTimer>
 #include <QtConcurrent/QtConcurrent>
 
 namespace freedaw {
@@ -92,6 +94,8 @@ MainWindow::MainWindow(FreeDawApplication& app, QWidget* parent)
             this, [this]() {
                 if (pianoRoll_)
                     pianoRoll_->setClip(nullptr);
+                if (audioClipEditor_)
+                    audioClipEditor_->setClip(nullptr, nullptr);
             });
 
     setCorner(Qt::TopRightCorner, Qt::RightDockWidgetArea);
@@ -101,6 +105,8 @@ MainWindow::MainWindow(FreeDawApplication& app, QWidget* parent)
     createMenus();
     createToolBar();
     createStatusBar();
+
+    resizeDocks({mixerDock_}, {350}, Qt::Vertical);
 
     aiQuickPrompt_ = new AiQuickPrompt(this);
     connect(aiQuickPrompt_, &AiQuickPrompt::promptSubmitted,
@@ -251,6 +257,10 @@ void MainWindow::createMenus()
     });
     viewMenu->addAction("Toggle &Effects", this, [this]() {
         effectsDock_->setVisible(!effectsDock_->isVisible());
+    });
+    viewMenu->addAction("Toggle Audio &Clip Editor", this, [this]() {
+        audioClipDock_->setVisible(!audioClipDock_->isVisible());
+        if (audioClipDock_->isVisible()) audioClipDock_->raise();
     });
     viewMenu->addAction("Toggle &Routing", this, [this]() {
         routingDock_->setVisible(!routingDock_->isVisible());
@@ -438,6 +448,12 @@ void MainWindow::createToolBar()
         effectsToggle->setToolTip("Toggle Effects");
         mainToolBar_->addAction(effectsToggle);
     }
+    if (audioClipDock_) {
+        auto* audioClipToggle = audioClipDock_->toggleViewAction();
+        audioClipToggle->setIcon(faIcon(icons::fa::Waveform));
+        audioClipToggle->setToolTip("Toggle Audio Clip Editor");
+        mainToolBar_->addAction(audioClipToggle);
+    }
     if (routingDock_) {
         auto* routingToggle = routingDock_->toggleViewAction();
         routingToggle->setIcon(miIcon(icons::mi::Settings));
@@ -511,6 +527,42 @@ void MainWindow::createDocks()
                     pianoRoll_->setClip(clip);
             });
 
+    // Audio Clip Editor dock (bottom, tabbed with mixer and piano roll)
+    audioClipDock_ = new QDockWidget("Audio Clip", this);
+    audioClipDock_->setAccessibleName("Audio Clip Editor Dock");
+    audioClipEditor_ = new AudioClipEditor(audioClipDock_);
+    audioClipDock_->setWidget(audioClipEditor_);
+    addDockWidget(Qt::BottomDockWidgetArea, audioClipDock_);
+
+    connect(audioClipEditor_, &AudioClipEditor::clipModified,
+            timelineView_, &TimelineView::rebuildClips);
+
+    connect(&editMgr_, &EditManager::aboutToChangeEdit, this, [this]() {
+        if (audioClipEditor_)
+            audioClipEditor_->setClip(nullptr, nullptr);
+    });
+
+    connect(&editMgr_, &EditManager::editChanged, this, [this]() {
+        if (audioClipEditor_ && audioClipEditor_->clip()) {
+            if (editMgr_.isClipValid(audioClipEditor_->clip()))
+                audioClipEditor_->refresh();
+            else
+                audioClipEditor_->setClip(nullptr, nullptr);
+        }
+    });
+
+    connect(&editMgr_, &EditManager::audioClipModified,
+            this, [this](te::WaveAudioClip* clip) {
+                if (audioClipEditor_ && audioClipEditor_->clip() == clip)
+                    audioClipEditor_->refresh();
+            });
+
+    connect(&editMgr_, &EditManager::audioClipSelected,
+            this, [this](te::WaveAudioClip* clip) {
+                if (audioClipDock_ && audioClipDock_->isVisible() && audioClipEditor_ && clip)
+                    audioClipEditor_->setClip(clip, &editMgr_);
+            });
+
     // Routing view dock (bottom, tabbed with mixer and piano roll)
     routingDock_ = new QDockWidget("Routing", this);
     routingDock_->setAccessibleName("Routing Dock");
@@ -533,11 +585,15 @@ void MainWindow::createDocks()
             });
 
     tabifyDockWidget(mixerDock_, pianoRollDock_);
-    tabifyDockWidget(pianoRollDock_, routingDock_);
+    tabifyDockWidget(pianoRollDock_, audioClipDock_);
+    tabifyDockWidget(audioClipDock_, routingDock_);
     mixerDock_->raise();
 
     connect(&editMgr_, &EditManager::midiClipDoubleClicked,
             this, &MainWindow::onMidiClipDoubleClicked);
+
+    connect(&editMgr_, &EditManager::audioClipDoubleClicked,
+            this, &MainWindow::onAudioClipDoubleClicked);
 
     // File browser dock (right, collapsible)
     browserDock_ = new QDockWidget("Browser", this);
@@ -775,6 +831,16 @@ void MainWindow::onMidiClipDoubleClicked(te::MidiClip* clip)
 
     if (pianoRoll_)
         pianoRoll_->setClip(clip);
+}
+
+void MainWindow::onAudioClipDoubleClicked(te::WaveAudioClip* clip)
+{
+    if (!clip) return;
+    audioClipDock_->setVisible(true);
+    audioClipDock_->raise();
+
+    if (audioClipEditor_)
+        audioClipEditor_->setClip(clip, &editMgr_);
 }
 
 } // namespace freedaw

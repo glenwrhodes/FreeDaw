@@ -65,8 +65,14 @@ RoutingView::RoutingView(EditManager* editMgr, QWidget* parent)
     connect(autoLayoutBtn, &QPushButton::clicked, this, [this]() {
         layoutNodes();
         for (auto* c : cables_) c->updatePath();
+        updateSceneRect();
     });
     toolbar_->addWidget(autoLayoutBtn);
+
+    auto* zoomFitBtn = new QPushButton("Zoom to Fit", toolbar_);
+    zoomFitBtn->setAccessibleName("Zoom to Fit");
+    connect(zoomFitBtn, &QPushButton::clicked, this, &RoutingView::zoomToFit);
+    toolbar_->addWidget(zoomFitBtn);
 
     layout->addWidget(toolbar_);
 
@@ -142,16 +148,7 @@ void RoutingView::rebuild()
     layoutNodes();
     restoreNodePositions();
     buildCables();
-
-    qreal maxX = COL_OUTPUTS + RoutingNode::NODE_WIDTH + 50;
-    qreal maxY = 50;
-    auto allNodes = {&inputNodes_, &trackNodes_, &busNodes_, &outputNodes_};
-    for (auto* list : allNodes)
-        for (auto* n : *list)
-            maxY = std::max(maxY, n->pos().y() + n->boundingRect().height() + 30);
-    if (masterNode_)
-        maxY = std::max(maxY, masterNode_->pos().y() + masterNode_->boundingRect().height() + 30);
-    scene_->setSceneRect(0, 0, maxX, maxY);
+    updateSceneRect();
 }
 
 void RoutingView::updateAllCablePaths()
@@ -163,6 +160,7 @@ void RoutingView::updateAllCablePaths()
 void RoutingView::connectNodeSignals(RoutingNode* node)
 {
     connect(node, &RoutingNode::nodeMoved, this, &RoutingView::updateAllCablePaths);
+    connect(node, &RoutingNode::nodeMoved, this, &RoutingView::updateSceneRect);
     connect(node, &RoutingNode::renameRequested, this, [this, node](const QString& newName) {
         switch (node->nodeType()) {
             case NodeType::Track:
@@ -834,6 +832,11 @@ void RoutingView::onEmptySpaceRightClicked(const QPoint& screenPos)
     menu.addAction("Auto Layout", [this]() {
         layoutNodes();
         updateAllCablePaths();
+        updateSceneRect();
+    });
+
+    menu.addAction("Zoom to Fit", [this]() {
+        zoomToFit();
     });
 
     menu.exec(screenPos);
@@ -892,6 +895,42 @@ void RoutingView::zoomBy(double factor, const QPoint& viewAnchor)
         view_->horizontalScrollBar()->value() - static_cast<int>(delta.x()));
     view_->verticalScrollBar()->setValue(
         view_->verticalScrollBar()->value() - static_cast<int>(delta.y()));
+}
+
+void RoutingView::updateSceneRect()
+{
+    constexpr qreal PADDING = 800.0;
+
+    QRectF itemsRect;
+    auto allNodes = {&inputNodes_, &trackNodes_, &busNodes_, &outputNodes_};
+    for (auto* list : allNodes)
+        for (auto* n : *list)
+            itemsRect = itemsRect.united(n->sceneBoundingRect());
+    if (masterNode_)
+        itemsRect = itemsRect.united(masterNode_->sceneBoundingRect());
+
+    if (itemsRect.isNull())
+        itemsRect = QRectF(0, 0, 1000, 600);
+
+    scene_->setSceneRect(itemsRect.adjusted(-PADDING, -PADDING, PADDING, PADDING));
+}
+
+void RoutingView::zoomToFit()
+{
+    QRectF itemsRect;
+    auto allNodes = {&inputNodes_, &trackNodes_, &busNodes_, &outputNodes_};
+    for (auto* list : allNodes)
+        for (auto* n : *list)
+            itemsRect = itemsRect.united(n->sceneBoundingRect());
+    if (masterNode_)
+        itemsRect = itemsRect.united(masterNode_->sceneBoundingRect());
+
+    if (itemsRect.isNull()) return;
+
+    constexpr qreal FIT_MARGIN = 40.0;
+    itemsRect.adjust(-FIT_MARGIN, -FIT_MARGIN, FIT_MARGIN, FIT_MARGIN);
+    view_->fitInView(itemsRect, Qt::KeepAspectRatio);
+    updateSceneRect();
 }
 
 } // namespace freedaw

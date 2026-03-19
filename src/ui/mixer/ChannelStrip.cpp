@@ -203,7 +203,21 @@ void ChannelStrip::setupUI()
 
     layout->addLayout(faderRow, 1);
 
+    volumeLabel_ = new QLabel("0.0", this);
+    volumeLabel_->setAccessibleName("Volume Level dB");
+    volumeLabel_->setToolTip("Volume in dB – double-click to type exact value");
+    volumeLabel_->setAlignment(Qt::AlignCenter);
+    volumeLabel_->setFixedHeight(16);
+    volumeLabel_->setStyleSheet(
+        QString("QLabel { color: %1; font-size: 9px; font-family: monospace; "
+                "background: %2; border: 1px solid %3; border-radius: 2px; padding: 0px 2px; }")
+            .arg(theme.text.name(), theme.background.name(), theme.border.name()));
+    volumeLabel_->installEventFilter(this);
+    layout->addWidget(volumeLabel_);
+    updateVolumeLabel();
+
     connect(fader_, &VolumeFader::valueChanged, this, [this](double v) {
+        updateVolumeLabel();
         if (isMaster_) {
             if (editMgr_ && editMgr_->edit())
                 editMgr_->edit()->setMasterVolumeSliderPos(float(v));
@@ -377,6 +391,7 @@ void ChannelStrip::refresh()
                 }
             }
         }
+        updateVolumeLabel();
         return;
     }
 
@@ -416,6 +431,7 @@ void ChannelStrip::refresh()
             break;
         }
     }
+    updateVolumeLabel();
 
     if (editMgr_ && inputCombo_)
         populateInputCombo();
@@ -582,10 +598,60 @@ void ChannelStrip::onArmToggled(bool armed)
     editMgr_->setTrackRecordEnabled(*track_, armed);
 }
 
+void ChannelStrip::updateVolumeLabel()
+{
+    if (!volumeLabel_ || !fader_) return;
+    double db = fader_->valueDb();
+    if (fader_->value() <= 0.001)
+        volumeLabel_->setText(QString::fromUtf8("-\xe2\x88\x9e dB"));
+    else
+        volumeLabel_->setText(QString("%1 dB").arg(db, 0, 'f', 1));
+}
+
+void ChannelStrip::startVolumeEdit()
+{
+    if (!fader_) return;
+
+    auto* edit = new QLineEdit(this);
+    edit->setAccessibleName("Volume dB Input");
+    double db = fader_->valueDb();
+    edit->setText(fader_->value() <= 0.001 ? "-60" : QString::number(db, 'f', 1));
+    edit->selectAll();
+    edit->setGeometry(volumeLabel_->geometry());
+    edit->setAlignment(Qt::AlignCenter);
+    edit->setStyleSheet(
+        "QLineEdit { background: #222; color: #eee; border: 1px solid #888; "
+        "font-size: 9px; font-family: monospace; padding: 0px 2px; border-radius: 2px; }");
+    edit->show();
+    edit->setFocus();
+    volumeLabel_->hide();
+
+    auto* faderPtr = fader_;
+    auto* volLabel = volumeLabel_;
+
+    connect(edit, &QLineEdit::editingFinished, edit, [edit, faderPtr, volLabel]() {
+        edit->hide();
+        edit->deleteLater();
+        if (volLabel) volLabel->show();
+
+        bool ok = false;
+        double db = edit->text().trimmed().remove("dB", Qt::CaseInsensitive).trimmed().toDouble(&ok);
+        if (!ok) return;
+        db = std::clamp(db, faderPtr->valueDb() - 60.0, 6.0);
+        db = std::clamp(db, -60.0, 6.0);
+        double norm = (db + 60.0) / 66.0;
+        faderPtr->setValue(norm);
+    });
+}
+
 bool ChannelStrip::eventFilter(QObject* obj, QEvent* event)
 {
     if (obj == nameLabel_ && event->type() == QEvent::MouseButtonDblClick && track_) {
         startRenameEdit();
+        return true;
+    }
+    if (obj == volumeLabel_ && event->type() == QEvent::MouseButtonDblClick) {
+        startVolumeEdit();
         return true;
     }
     return QWidget::eventFilter(obj, event);

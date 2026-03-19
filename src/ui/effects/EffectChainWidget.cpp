@@ -4,6 +4,7 @@
 #include "PluginEditorWindow.h"
 #include "utils/ThemeManager.h"
 #include <QHBoxLayout>
+#include <QGridLayout>
 
 namespace freedaw {
 
@@ -150,9 +151,10 @@ void EffectSlotWidget::buildControls()
 
     auto params = plugin_->getAutomatableParameters();
 
-    auto* paramsRow = new QHBoxLayout();
-    paramsRow->setSpacing(4);
+    auto* paramsGrid = new QGridLayout();
+    paramsGrid->setSpacing(4);
 
+    const int cols = 4;
     int maxKnobs = std::min(8, params.size());
     for (int i = 0; i < maxKnobs; ++i) {
         auto* param = params[i];
@@ -166,11 +168,10 @@ void EffectSlotWidget::buildControls()
             param->setParameter(float(v), juce::sendNotificationAsync);
         });
 
-        paramsRow->addWidget(knob);
+        paramsGrid->addWidget(knob, i / cols, i % cols);
     }
-    paramsRow->addStretch();
 
-    layout_->addLayout(paramsRow);
+    layout_->addLayout(paramsGrid);
 }
 
 // ── EffectChainWidget ───────────────────────────────────────────────────────

@@ -19,6 +19,7 @@
 namespace freedaw {
 
 class PianoRollEditor;
+class AudioClipEditor;
 
 class ShortcutFilter : public QObject {
     Q_OBJECT
@@ -55,6 +56,7 @@ private:
     void onEffectInsertRequested(te::AudioTrack* track, int slotIndex);
     void onInstrumentSelectRequested(te::AudioTrack* track);
     void onMidiClipDoubleClicked(te::MidiClip* clip);
+    void onAudioClipDoubleClicked(te::WaveAudioClip* clip);
 
     FreeDawApplication& app_;
     EditManager& editMgr_;
@@ -65,6 +67,7 @@ private:
     EffectChainWidget* effectChain_   = nullptr;
     FileBrowserPanel*  fileBrowser_   = nullptr;
     PianoRollEditor*   pianoRoll_     = nullptr;
+    AudioClipEditor*   audioClipEditor_ = nullptr;
     RoutingView*       routingView_   = nullptr;
     AiChatWidget*      aiChatWidget_  = nullptr;
     AiQuickPrompt*     aiQuickPrompt_ = nullptr;
@@ -73,6 +76,7 @@ private:
     QDockWidget* effectsDock_         = nullptr;
     QDockWidget* browserDock_         = nullptr;
     QDockWidget* pianoRollDock_       = nullptr;
+    QDockWidget* audioClipDock_      = nullptr;
     QDockWidget* routingDock_         = nullptr;
     QDockWidget* aiDock_              = nullptr;
 

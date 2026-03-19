@@ -130,6 +130,9 @@ signals:
     void midiClipDoubleClicked(te::MidiClip* clip);
     void midiClipSelected(te::MidiClip* clip);
     void midiClipModified(te::MidiClip* clip);
+    void audioClipDoubleClicked(te::WaveAudioClip* clip);
+    void audioClipSelected(te::WaveAudioClip* clip);
+    void audioClipModified(te::WaveAudioClip* clip);
 
 private:
     void teardownCurrentEdit();

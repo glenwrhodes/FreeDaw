@@ -1,4 +1,5 @@
 #include "WaveformCache.h"
+#include <algorithm>
 
 namespace freedaw {
 
@@ -29,8 +30,17 @@ WaveformData WaveformCache::getWaveform(const juce::File& file, int numPoints)
 
     result.sampleRate = reader->sampleRate;
     result.totalSamples = reader->lengthInSamples;
+    result.numChannels = static_cast<int>(reader->numChannels);
+    result.bitsPerSample = static_cast<int>(reader->bitsPerSample);
     result.minValues.resize(size_t(numPoints));
     result.maxValues.resize(size_t(numPoints));
+
+    result.channelMin.resize(size_t(result.numChannels));
+    result.channelMax.resize(size_t(result.numChannels));
+    for (int ch = 0; ch < result.numChannels; ++ch) {
+        result.channelMin[size_t(ch)].resize(size_t(numPoints));
+        result.channelMax[size_t(ch)].resize(size_t(numPoints));
+    }
 
     int64_t samplesPerPoint = reader->lengthInSamples / numPoints;
     if (samplesPerPoint < 1)
@@ -47,16 +57,21 @@ WaveformData WaveformCache::getWaveform(const juce::File& file, int numPoints)
 
         reader->read(&buffer, 0, int(count), start, true, true);
 
-        float minVal = 0.0f, maxVal = 0.0f;
+        float mixMin = 0.0f, mixMax = 0.0f;
         for (int ch = 0; ch < int(reader->numChannels); ++ch) {
             auto* data = buffer.getReadPointer(ch);
+            float chMin = 0.0f, chMax = 0.0f;
             for (int s = 0; s < int(count); ++s) {
-                if (data[s] < minVal) minVal = data[s];
-                if (data[s] > maxVal) maxVal = data[s];
+                chMin = std::min(chMin, data[s]);
+                chMax = std::max(chMax, data[s]);
             }
+            result.channelMin[size_t(ch)][size_t(i)] = chMin;
+            result.channelMax[size_t(ch)][size_t(i)] = chMax;
+            mixMin = std::min(mixMin, chMin);
+            mixMax = std::max(mixMax, chMax);
         }
-        result.minValues[size_t(i)] = minVal;
-        result.maxValues[size_t(i)] = maxVal;
+        result.minValues[size_t(i)] = mixMin;
+        result.maxValues[size_t(i)] = mixMax;
     }
 
     cache_[key] = CacheEntry{result, numPoints};

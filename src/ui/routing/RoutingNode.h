@@ -105,7 +105,7 @@ private:
     QStringList outputJackLabels_;
     te::AudioTrack* track_ = nullptr;
     juce::String deviceName_;
-    bool groupMoveGuard_ = false;
+    static bool groupMoveGuard_;
     bool warning_ = false;
 };
 

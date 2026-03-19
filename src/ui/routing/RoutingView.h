@@ -63,6 +63,8 @@ private:
     void deselectAllNodes();
     void deleteSelectedBuses();
     void zoomBy(double factor, const QPoint& viewAnchor);
+    void updateSceneRect();
+    void zoomToFit();
 
     EditManager* editMgr_;
     QGraphicsScene* scene_;

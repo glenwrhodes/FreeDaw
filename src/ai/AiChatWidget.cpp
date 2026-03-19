@@ -3,6 +3,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/PluginScanner.h"
 #include "utils/ThemeManager.h"
+#include "utils/IconFont.h"
 #include <QHBoxLayout>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -80,13 +81,19 @@ void AiChatWidget::setupUi()
         showToolOutput_ = s.value("ai/showToolOutput", false).toBool();
     }
 
-    toolToggleBtn_ = new QPushButton(showToolOutput_ ? "Tools: ON" : "Tools: OFF", headerBar_);
+    const auto miFont = icons::materialIcons(14);
+    toolToggleBtn_ = new QPushButton(headerBar_);
     toolToggleBtn_->setAccessibleName("Toggle Tool Output Display");
-    toolToggleBtn_->setFixedSize(68, 24);
+    toolToggleBtn_->setFont(miFont);
+    toolToggleBtn_->setText(showToolOutput_ ? QString(icons::mi::Visibility)
+                                            : QString(icons::mi::VisibilityOff));
+    toolToggleBtn_->setToolTip(showToolOutput_ ? "Tool calls visible – click to hide"
+                                               : "Tool calls hidden – click to show");
+    toolToggleBtn_->setFixedSize(28, 24);
     toolToggleBtn_->setCheckable(true);
     toolToggleBtn_->setChecked(showToolOutput_);
     toolToggleBtn_->setStyleSheet(
-        QString("QPushButton { font-size: 10px; background: %1; color: %2; "
+        QString("QPushButton { font-size: 14px; background: %1; color: %2; "
                 "border: 1px solid %3; border-radius: 3px; }"
                 "QPushButton:hover { background: %4; }"
                 "QPushButton:checked { background: %5; color: #fff; }")
@@ -95,7 +102,10 @@ void AiChatWidget::setupUi()
                  theme.accent.darker(130).name()));
     connect(toolToggleBtn_, &QPushButton::toggled, this, [this](bool on) {
         showToolOutput_ = on;
-        toolToggleBtn_->setText(on ? "Tools: ON" : "Tools: OFF");
+        toolToggleBtn_->setText(on ? QString(icons::mi::Visibility)
+                                   : QString(icons::mi::VisibilityOff));
+        toolToggleBtn_->setToolTip(on ? "Tool calls visible – click to hide"
+                                      : "Tool calls hidden – click to show");
         QSettings s;
         s.setValue("ai/showToolOutput", on);
         updateToolBubbleVisibility();

@@ -47,6 +47,8 @@ private:
     void updateSelectionStyle();
     void applyToggleStyle(QPushButton* btn, const QColor& activeColor);
     void updateMonoButtonVisual(bool mono);
+    void updateVolumeLabel();
+    void startVolumeEdit();
     void populateInputCombo();
     void onInputComboChanged(int index);
     void populateOutputCombo();
@@ -71,6 +73,7 @@ private:
     QPushButton* soloBtn_ = nullptr;
     QPushButton* armBtn_ = nullptr;
     QPushButton* monoBtn_ = nullptr;
+    QLabel* volumeLabel_ = nullptr;
     QLabel* frozenLabel_ = nullptr;
 
     QTimer meterTimer_;

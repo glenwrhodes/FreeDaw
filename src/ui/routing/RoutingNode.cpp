@@ -11,6 +11,8 @@
 
 namespace freedaw {
 
+bool RoutingNode::groupMoveGuard_ = false;
+
 // ── JackItem ─────────────────────────────────────────────────────────────────
 
 JackItem::JackItem(bool isInput, int index, RoutingNode* parentNode)
@@ -94,8 +96,6 @@ QVariant RoutingNode::itemChange(GraphicsItemChange change, const QVariant& valu
 {
     if (change == ItemPositionChange && scene()) {
         QPointF newPos = value.toPointF();
-        newPos.setX(std::max(0.0, newPos.x()));
-        newPos.setY(std::max(0.0, newPos.y()));
 
         if (!groupMoveGuard_ && isSelected()) {
             groupMoveGuard_ = true;

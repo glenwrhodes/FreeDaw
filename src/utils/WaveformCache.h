@@ -12,6 +12,10 @@ namespace freedaw {
 struct WaveformData {
     std::vector<float> minValues;
     std::vector<float> maxValues;
+    std::vector<std::vector<float>> channelMin;
+    std::vector<std::vector<float>> channelMax;
+    int numChannels = 0;
+    int bitsPerSample = 0;
     double sampleRate = 0;
     int64_t totalSamples = 0;
 };

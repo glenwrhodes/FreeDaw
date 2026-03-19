@@ -81,6 +81,11 @@ set(FREEDAW_SOURCES
     src/ui/effects/EffectSelectorDialog.h src/ui/effects/EffectSelectorDialog.cpp
     src/ui/effects/VstSelectorDialog.h    src/ui/effects/VstSelectorDialog.cpp
     src/ui/effects/PluginEditorWindow.h   src/ui/effects/PluginEditorWindow.cpp
+    src/ui/audioclip/WaveformSelection.h
+    src/ui/audioclip/AudioFileUndoManager.h  src/ui/audioclip/AudioFileUndoManager.cpp
+    src/ui/audioclip/AudioFileOperations.h   src/ui/audioclip/AudioFileOperations.cpp
+    src/ui/audioclip/AudioClipEditor.h       src/ui/audioclip/AudioClipEditor.cpp
+    src/ui/audioclip/AudioWaveformView.h     src/ui/audioclip/AudioWaveformView.cpp
     src/ui/pianoroll/PianoRollEditor.h    src/ui/pianoroll/PianoRollEditor.cpp
     src/ui/pianoroll/PianoKeyboard.h      src/ui/pianoroll/PianoKeyboard.cpp
     src/ui/pianoroll/NoteGrid.h           src/ui/pianoroll/NoteGrid.cpp

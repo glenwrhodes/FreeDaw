@@ -285,6 +285,12 @@ void ClipItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
                 }
             });
             menu.addSeparator();
+        } else {
+            menu.addAction("Edit Audio Clip", [this]() {
+                if (auto* wc = dynamic_cast<te::WaveAudioClip*>(clip_))
+                    emit editMgr_->audioClipDoubleClicked(wc);
+            });
+            menu.addSeparator();
         }
 
         menu.addAction("Duplicate", [this]() {
@@ -408,6 +414,9 @@ void ClipItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
         if (isMidiClip_ && editMgr_) {
             if (auto* mc = dynamic_cast<te::MidiClip*>(clip_))
                 emit editMgr_->midiClipSelected(mc);
+        } else if (!isMidiClip_ && editMgr_) {
+            if (auto* wc = dynamic_cast<te::WaveAudioClip*>(clip_))
+                emit editMgr_->audioClipSelected(wc);
         }
 
         event->accept();
@@ -613,6 +622,12 @@ void ClipItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
     if (isMidiClip_ && editMgr_ && clip_) {
         if (auto* midiClip = dynamic_cast<te::MidiClip*>(clip_))
             emit editMgr_->midiClipDoubleClicked(midiClip);
+        event->accept();
+        return;
+    }
+    if (!isMidiClip_ && editMgr_ && clip_) {
+        if (auto* waveClip = dynamic_cast<te::WaveAudioClip*>(clip_))
+            emit editMgr_->audioClipDoubleClicked(waveClip);
         event->accept();
         return;
     }
