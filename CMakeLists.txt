@@ -1,9 +1,44 @@
 cmake_minimum_required(VERSION 3.22)
-project(FreeDaw VERSION 1.0.0 LANGUAGES C CXX)
+project(FreeDaw VERSION 0.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# ── Version from git tag ─────────────────────────────────────────────────────
+# Runs early so the parsed version is available for JUCE's exe metadata.
+find_package(Git QUIET)
+if(GIT_FOUND)
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} describe --tags --abbrev=0 --always
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE FREEDAW_GIT_RAW
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE GIT_DESCRIBE_RESULT)
+    if(NOT GIT_DESCRIBE_RESULT EQUAL 0)
+        set(FREEDAW_GIT_RAW "dev")
+    endif()
+else()
+    set(FREEDAW_GIT_RAW "dev")
+endif()
+
+# Strip leading "v" for display (v1.0.003 -> 1.0.003)
+string(REGEX REPLACE "^v" "" FREEDAW_DISPLAY_VERSION "${FREEDAW_GIT_RAW}")
+
+# Extract numeric major.minor.patch for Windows exe metadata
+string(REGEX MATCH "^v?([0-9]+)\\.([0-9]+)\\.([0-9]+)" _ver_match "${FREEDAW_GIT_RAW}")
+if(_ver_match)
+    math(EXPR _major "${CMAKE_MATCH_1}")
+    math(EXPR _minor "${CMAKE_MATCH_2}")
+    math(EXPR _patch "${CMAKE_MATCH_3}")
+    set(FREEDAW_NUMERIC_VERSION "${_major}.${_minor}.${_patch}")
+else()
+    set(FREEDAW_NUMERIC_VERSION "0.0.0")
+endif()
+
+message(STATUS "FreeDaw display version : ${FREEDAW_DISPLAY_VERSION}")
+message(STATUS "FreeDaw numeric version : ${FREEDAW_NUMERIC_VERSION}")
 
 # ── Qt6 ──────────────────────────────────────────────────────────────────────
 set(CMAKE_PREFIX_PATH "c:/qt/6.10.2/msvc2022_64" CACHE STRING "Qt prefix path")
@@ -70,6 +105,7 @@ set(FREEDAW_SOURCES
 
 # ── Create the FreeDaw JUCE GUI App target ───────────────────────────────────
 juce_add_gui_app(FreeDaw
+    VERSION "${FREEDAW_NUMERIC_VERSION}"
     PRODUCT_NAME "FreeDaw"
     COMPANY_NAME "FreeDaw"
     BUNDLE_ID "com.freedaw.app"
@@ -119,25 +155,8 @@ if(MSVC)
     target_compile_options(FreeDaw PRIVATE /EHsc /bigobj)
 endif()
 
-# ── Version from git tag ─────────────────────────────────────────────────────
-find_package(Git QUIET)
-if(GIT_FOUND)
-    execute_process(
-        COMMAND ${GIT_EXECUTABLE} describe --tags --always
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        OUTPUT_VARIABLE FREEDAW_GIT_VERSION
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        ERROR_QUIET
-        RESULT_VARIABLE GIT_DESCRIBE_RESULT)
-    if(NOT GIT_DESCRIBE_RESULT EQUAL 0)
-        set(FREEDAW_GIT_VERSION "dev")
-    endif()
-else()
-    set(FREEDAW_GIT_VERSION "dev")
-endif()
-message(STATUS "FreeDaw version: ${FREEDAW_GIT_VERSION}")
 target_compile_definitions(FreeDaw PRIVATE
-    FREEDAW_VERSION="${FREEDAW_GIT_VERSION}")
+    FREEDAW_VERSION="${FREEDAW_DISPLAY_VERSION}")
 
 if(WIN32)
     target_link_libraries(FreeDaw PRIVATE winmm)

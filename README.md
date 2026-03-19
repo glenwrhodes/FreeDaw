@@ -346,6 +346,20 @@ cmd /c "`"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\B
 
 The first build takes 2-4 minutes (compiling JUCE and Tracktion Engine). Subsequent rebuilds are fast (10-15 seconds).
 
+### Quick Build Script
+
+Instead of the manual steps above, you can use the included `build.ps1` PowerShell script:
+
+```powershell
+# Incremental build (fast, ~10-15 seconds)
+.\build.ps1
+
+# Full reconfigure + build (needed after CMakeLists.txt changes or new git tags)
+.\build.ps1 -Clean
+```
+
+The script automatically sets up the MSVC environment, configures if needed, and builds. It will also kill any running FreeDaw instance before building. Use `-Clean` after updating a git tag so the new version number gets picked up.
+
 ### 5. Run
 
 ```powershell
