@@ -123,7 +123,8 @@ jobs:
         run: cmake --build build --config Release
 
       - name: Deploy Qt into app bundle
-        run: "${{ env.QT_ROOT_DIR }}/bin/macdeployqt" "build/FreeDaw_artefacts/Release/FreeDaw.app"
+        run: |
+          "${{ env.QT_ROOT_DIR }}/bin/macdeployqt" "build/FreeDaw_artefacts/Release/FreeDaw.app"
 
       - name: Package DMG
         run: |
