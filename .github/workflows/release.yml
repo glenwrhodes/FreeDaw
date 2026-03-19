@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -77,6 +77,81 @@ jobs:
             /DLicenseDir="$PWD" `
             "installer\freedaw.iss"
 
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: |
+            FreeDaw-v*-portable.zip
+            FreeDaw-v*-setup.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Pin JUCE to required commit
+        run: |
+          cd libs/JUCE
+          git fetch origin 7c89e11f6b7316c369f3d3f22227c60e816e738b
+          git checkout 7c89e11f6b7316c369f3d3f22227c60e816e738b
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.0'
+          host: 'mac'
+          target: 'desktop'
+          arch: 'clang_64'
+          cache: true
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure CMake
+        run: >
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="${{ env.QT_ROOT_DIR }}"
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Deploy Qt into app bundle
+        run: "${{ env.QT_ROOT_DIR }}/bin/macdeployqt" "build/FreeDaw_artefacts/Release/FreeDaw.app"
+
+      - name: Package DMG
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          hdiutil create -volname "FreeDaw" \
+            -srcfolder "build/FreeDaw_artefacts/Release/FreeDaw.app" \
+            -ov -format UDZO \
+            "FreeDaw-v${VERSION}-mac.dmg"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifacts
+          path: FreeDaw-v*-mac.dmg
+
+  release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -87,3 +162,4 @@ jobs:
           files: |
             FreeDaw-v${{ steps.version.outputs.VERSION }}-portable.zip
             FreeDaw-v${{ steps.version.outputs.VERSION }}-setup.exe
+            FreeDaw-v${{ steps.version.outputs.VERSION }}-mac.dmg
