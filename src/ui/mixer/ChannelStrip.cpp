@@ -169,10 +169,8 @@ void ChannelStrip::setupUI()
 
     connect(panKnob_, &RotaryKnob::valueChanged, this, [this](double v) {
         if (isMaster_) {
-            if (editMgr_ && editMgr_->edit()) {
-                if (auto masterVol = editMgr_->edit()->getMasterVolumePlugin())
-                    masterVol->setPan(float(v));
-            }
+            if (editMgr_ && editMgr_->edit())
+                editMgr_->edit()->setMasterPanPos(float(v));
             return;
         }
 
@@ -296,7 +294,11 @@ void ChannelStrip::setupUI()
     // Automation mode button (Off -> Read -> Write cycle)
     autoModeBtn_ = new QPushButton("OFF", this);
     autoModeBtn_->setAccessibleName("Automation Mode");
-    autoModeBtn_->setToolTip("Automation: Off / Read / Write (click to cycle)");
+    autoModeBtn_->setToolTip("Automation mode (click to cycle):\n"
+                              "READ - Play existing automation\n"
+                              "TOUCH - Record only while moving a control\n"
+                              "LATCH - Record from first touch, hold last value\n"
+                              "WRITE - Record all params from playback start");
     autoModeBtn_->setFixedHeight(18);
     autoModeBtn_->setStyleSheet(
         QString("QPushButton { background: %1; color: %2; border: 1px solid %3; "
@@ -305,27 +307,29 @@ void ChannelStrip::setupUI()
             .arg(theme.surface.name(), theme.textDim.name(),
                  theme.border.name(), theme.accent.name()));
     connect(autoModeBtn_, &QPushButton::clicked, this, [this]() {
-        if (!editMgr_ || !editMgr_->edit() || !track_) return;
-        auto currentMode = track_->automationMode.get();
+        if (!editMgr_ || !editMgr_->edit()) return;
+
+        te::Track* modeTrack = track_;
+        if (isMaster_)
+            modeTrack = editMgr_->edit()->getMasterTrack();
+        if (!modeTrack) return;
+
+        auto currentMode = modeTrack->automationMode.get();
         te::AutomationMode newMode;
         if (currentMode == te::AutomationMode::read)
-            newMode = te::AutomationMode::write;
-        else if (currentMode == te::AutomationMode::write)
+            newMode = te::AutomationMode::touch;
+        else if (currentMode == te::AutomationMode::touch)
             newMode = te::AutomationMode::latch;
         else if (currentMode == te::AutomationMode::latch)
-            newMode = te::AutomationMode::read;
+            newMode = te::AutomationMode::write;
         else
             newMode = te::AutomationMode::read;
-        track_->automationMode = newMode;
+        modeTrack->automationMode = newMode;
 
         auto& arm = editMgr_->edit()->getAutomationRecordManager();
-        if (newMode == te::AutomationMode::write || newMode == te::AutomationMode::latch) {
-            arm.setReadingAutomation(true);
-            arm.setWritingAutomation(true);
-        } else {
-            arm.setReadingAutomation(true);
-            arm.setWritingAutomation(false);
-        }
+        bool anyWriting = (newMode != te::AutomationMode::read);
+        arm.setReadingAutomation(true);
+        arm.setWritingAutomation(anyWriting);
         updateAutoModeButton();
     });
     layout->addWidget(autoModeBtn_);
@@ -498,22 +502,49 @@ void ChannelStrip::updateMeter()
         meter_->setLevel(dbToNormalized(levelL.dB), dbToNormalized(levelR.dB));
     }
 
-    if (!track_ || isMaster_) return;
-    if (!editMgr_->transport().isPlaying()) return;
+    // Only track automation values to controls when playing, or when the
+    // playhead has been scrubbed to a new position. When stopped and
+    // stationary, don't fight with the user's manual fader/knob drags.
+    bool isPlaying = editMgr_->transport().isPlaying();
+    double currentSecs = editMgr_->transport().getPosition().inSeconds();
+    bool playheadMoved = std::abs(currentSecs - lastTrackedPlayheadSecs_) > 0.001;
+    bool shouldTrack = isPlaying || playheadMoved;
+    lastTrackedPlayheadSecs_ = currentSecs;
+
+    if (!shouldTrack) return;
+
+    if (isMaster_) {
+        if (auto masterVol = editMgr_->edit()->getMasterVolumePlugin()) {
+            auto* mt = editMgr_->edit()->getMasterTrack();
+            auto mode = mt ? mt->automationMode.get() : te::AutomationMode::read;
+            bool isWriting = isPlaying && (mode == te::AutomationMode::write);
+            if (fader_ && !isWriting) {
+                QSignalBlocker block(fader_);
+                fader_->setValue(masterVol->getSliderPos());
+            }
+            if (panKnob_ && !isWriting) {
+                QSignalBlocker block(panKnob_);
+                panKnob_->setValue(masterVol->getPan());
+            }
+            updateVolumeLabel();
+        }
+        return;
+    }
+
+    if (!track_) return;
 
     auto mode = track_->automationMode.get();
-    if (mode == te::AutomationMode::write || mode == te::AutomationMode::latch)
-        return;
+    bool isWriting = isPlaying && (mode == te::AutomationMode::write);
 
     for (auto* plugin : track_->pluginList.getPlugins()) {
         if (auto* vp = dynamic_cast<te::VolumeAndPanPlugin*>(plugin)) {
-            if (fader_) {
+            if (fader_ && !isWriting) {
                 float dbVal = te::volumeFaderPositionToDB(vp->volParam->getCurrentValue());
                 double norm = (dbVal + 60.0) / 66.0;
                 QSignalBlocker block(fader_);
                 fader_->setValue(std::clamp(norm, 0.0, 1.0));
             }
-            if (panKnob_) {
+            if (panKnob_ && !isWriting) {
                 QSignalBlocker block(panKnob_);
                 panKnob_->setValue(vp->panParam->getCurrentValue());
             }
@@ -572,8 +603,12 @@ void ChannelStrip::updateAutoModeButton()
     auto& theme = ThemeManager::instance().current();
 
     auto mode = te::AutomationMode::read;
-    if (track_)
+    if (track_) {
         mode = track_->automationMode.get();
+    } else if (isMaster_ && editMgr_ && editMgr_->edit()) {
+        if (auto* mt = editMgr_->edit()->getMasterTrack())
+            mode = mt->automationMode.get();
+    }
 
     QString text;
     QColor bg, fg;

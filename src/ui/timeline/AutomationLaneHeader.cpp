@@ -88,6 +88,15 @@ AutomationLaneHeader::AutomationLaneHeader(te::AudioTrack* track, EditManager* e
             });
     mainLayout->addWidget(paramCombo_);
 
+    if (editMgr_) {
+        connect(editMgr_, &EditManager::tracksChanged, this, [this]() {
+            auto* currentParam = selectedParam();
+            populateParamCombo();
+            if (currentParam)
+                selectParam(currentParam);
+        });
+    }
+
     mainLayout->addStretch();
 
     auto* separator = new QFrame(this);

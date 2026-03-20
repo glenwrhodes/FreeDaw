@@ -39,7 +39,7 @@ double VolumeFader::valueDb() const
 QRectF VolumeFader::trackRect() const
 {
     double trackW = 4.0;
-    double margin = 14.0;
+    double margin = 8.0;
     return QRectF((width() - trackW) / 2.0, margin,
                   trackW, height() - 2.0 * margin);
 }

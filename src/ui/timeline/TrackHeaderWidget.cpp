@@ -532,21 +532,26 @@ void TrackHeaderWidget::updateMeter()
         meter_->setLevel(dbToNormalized(levelL.dB), dbToNormalized(levelR.dB));
     }
 
-    if (!editMgr_->transport().isPlaying()) return;
+    bool isPlaying = editMgr_->transport().isPlaying();
+    double currentSecs = editMgr_->transport().getPosition().inSeconds();
+    bool playheadMoved = std::abs(currentSecs - lastTrackedPlayheadSecs_) > 0.001;
+    bool shouldTrack = isPlaying || playheadMoved;
+    lastTrackedPlayheadSecs_ = currentSecs;
+
+    if (!shouldTrack) return;
 
     auto mode = track_->automationMode.get();
-    if (mode == te::AutomationMode::write || mode == te::AutomationMode::latch)
-        return;
+    bool isWriting = isPlaying && (mode == te::AutomationMode::write);
 
     for (auto* plugin : track_->pluginList.getPlugins()) {
         if (auto* vp = dynamic_cast<te::VolumeAndPanPlugin*>(plugin)) {
-            if (volumeSlider_) {
+            if (volumeSlider_ && !isWriting) {
                 float dbVal = te::volumeFaderPositionToDB(vp->volParam->getCurrentValue());
                 double norm = (dbVal + 60.0) / 66.0;
                 QSignalBlocker block(volumeSlider_);
                 volumeSlider_->setValue(static_cast<int>(std::clamp(norm, 0.0, 1.0) * 100.0));
             }
-            if (panKnob_) {
+            if (panKnob_ && !isWriting) {
                 QSignalBlocker block(panKnob_);
                 panKnob_->setValue(vp->panParam->getCurrentValue());
             }

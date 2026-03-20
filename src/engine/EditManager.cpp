@@ -93,7 +93,7 @@ void EditManager::createDefaultEdit()
     edit_->getTransport().ensureContextAllocated();
 
     auto& arm = edit_->getAutomationRecordManager();
-    arm.setReadingAutomation(false);
+    arm.setReadingAutomation(true);
     arm.setWritingAutomation(false);
 
     currentFile_ = juce::File();
@@ -148,7 +148,7 @@ bool EditManager::loadEdit(const juce::File& file)
     qDebug() << "[loadEdit] playback context ready";
 
     auto& arm = edit_->getAutomationRecordManager();
-    arm.setReadingAutomation(false);
+    arm.setReadingAutomation(true);
     arm.setWritingAutomation(false);
 
     qDebug() << "[loadEdit] restoring disconnected outputs";

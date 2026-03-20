@@ -22,6 +22,7 @@ public:
                      QWidget* parent = nullptr);
 
     te::Plugin* plugin() const { return plugin_; }
+    void updateKnobsFromAutomation();
 
 signals:
     void removeRequested(te::Plugin* plugin);
@@ -37,6 +38,12 @@ private:
     QPushButton* editBtn_ = nullptr;
     QPushButton* removeBtn_;
     QComboBox* sidechainCombo_ = nullptr;
+
+    struct ParamKnob {
+        te::AutomatableParameter* param;
+        RotaryKnob* knob;
+    };
+    QVector<ParamKnob> paramKnobs_;
 };
 
 class EffectChainWidget : public QWidget {
@@ -71,6 +78,7 @@ private:
     QWidget* slotsContainer_;
     QVBoxLayout* slotsLayout_;
     QTimer rebuildTimer_;
+    QTimer automationPollTimer_;
 };
 
 } // namespace freedaw

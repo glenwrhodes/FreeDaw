@@ -1,5 +1,9 @@
 #include "PluginEditorWindow.h"
 
+#if JUCE_WINDOWS
+ #include <windows.h>
+#endif
+
 namespace freedaw {
 
 std::vector<std::unique_ptr<PluginEditorWindow>> PluginEditorWindow::openWindows_;
@@ -12,6 +16,7 @@ PluginEditorWindow::PluginEditorWindow(te::ExternalPlugin& plugin)
 {
     setUsingNativeTitleBar(true);
     setResizable(true, false);
+    setAlwaysOnTop(false);
 
     if (auto* instance = plugin.getAudioPluginInstance()) {
         if (auto* editor = instance->createEditorIfNeeded()) {
@@ -22,6 +27,15 @@ PluginEditorWindow::PluginEditorWindow(te::ExternalPlugin& plugin)
     centreWithSize(getWidth(), getHeight());
     setVisible(true);
     toFront(true);
+
+#if JUCE_WINDOWS
+    if (auto* peer = getPeer()) {
+        if (auto hwnd = (HWND) peer->getNativeHandle()) {
+            SetForegroundWindow(hwnd);
+            SetFocus(hwnd);
+        }
+    }
+#endif
 }
 
 PluginEditorWindow::~PluginEditorWindow()

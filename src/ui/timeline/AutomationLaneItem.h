@@ -50,6 +50,7 @@ private:
     void clearPointItems();
     void rebuildPointItems();
     QVector<EnvelopePoint> getPointsFromCurve() const;
+    QPainterPath buildSampledPath() const;
 
     te::AutomatableParameter* param_ = nullptr;
     te::Edit* edit_ = nullptr;

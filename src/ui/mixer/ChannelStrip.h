@@ -81,6 +81,7 @@ private:
     QTimer meterTimer_;
     te::LevelMeasurer::Client meterClient_;
     te::LevelMeterPlugin* levelMeterPlugin_ = nullptr;
+    double lastTrackedPlayheadSecs_ = -1.0;
 };
 
 } // namespace freedaw

@@ -111,20 +111,54 @@ void AutomationLaneItem::rebuildPointItems()
     }
 }
 
+QPainterPath AutomationLaneItem::buildSampledPath() const
+{
+    QPainterPath path;
+    if (!param_ || !edit_ || cachedPoints_.size() < 2) {
+        if (cachedPoints_.size() == 1) {
+            float minVal = param_->getValueRange().getStart();
+            float maxVal = param_->getValueRange().getEnd();
+            double x = EnvelopeUtils::beatToX(cachedPoints_[0].beat, pixelsPerBeat_);
+            double y = EnvelopeUtils::valueToY(cachedPoints_[0].value, minVal, maxVal, laneHeight_);
+            path.moveTo(x, y);
+        }
+        return path;
+    }
+
+    float minVal = param_->getValueRange().getStart();
+    float maxVal = param_->getValueRange().getEnd();
+    auto& curve = param_->getCurve();
+    auto& ts = edit_->tempoSequence;
+
+    double firstBeat = cachedPoints_.first().beat;
+    double lastBeat = cachedPoints_.last().beat;
+
+    double startX = EnvelopeUtils::beatToX(firstBeat, pixelsPerBeat_);
+    auto firstTimePos = ts.toTime(tracktion::BeatPosition::fromBeats(firstBeat));
+    float firstVal = curve.getValueAt(te::EditPosition(firstTimePos), param_->getCurrentBaseValue());
+    path.moveTo(startX, EnvelopeUtils::valueToY(firstVal, minVal, maxVal, laneHeight_));
+
+    constexpr double kPixelsPerSample = 3.0;
+    double totalPixels = (lastBeat - firstBeat) * pixelsPerBeat_;
+    int numSamples = std::max(2, static_cast<int>(totalPixels / kPixelsPerSample));
+
+    for (int i = 1; i <= numSamples; ++i) {
+        double t = double(i) / double(numSamples);
+        double beat = firstBeat + t * (lastBeat - firstBeat);
+        auto timePos = ts.toTime(tracktion::BeatPosition::fromBeats(beat));
+        float val = curve.getValueAt(te::EditPosition(timePos), param_->getCurrentBaseValue());
+        double px = EnvelopeUtils::beatToX(beat, pixelsPerBeat_);
+        double py = EnvelopeUtils::valueToY(val, minVal, maxVal, laneHeight_);
+        path.lineTo(px, py);
+    }
+
+    return path;
+}
+
 void AutomationLaneItem::rebuildFromCurve()
 {
     cachedPoints_ = getPointsFromCurve();
-
-    float minVal = 0.0f, maxVal = 1.0f;
-    if (param_) {
-        minVal = param_->getValueRange().getStart();
-        maxVal = param_->getValueRange().getEnd();
-    }
-
-    bool discrete = param_ && param_->isDiscrete();
-    curvePath_ = EnvelopeUtils::buildEnvelopePath(
-        cachedPoints_, pixelsPerBeat_, minVal, maxVal, laneHeight_, 0.0, discrete);
-
+    curvePath_ = buildSampledPath();
     rebuildPointItems();
     update();
 }
@@ -132,17 +166,7 @@ void AutomationLaneItem::rebuildFromCurve()
 void AutomationLaneItem::updateCurvePathOnly()
 {
     cachedPoints_ = getPointsFromCurve();
-
-    float minVal = 0.0f, maxVal = 1.0f;
-    if (param_) {
-        minVal = param_->getValueRange().getStart();
-        maxVal = param_->getValueRange().getEnd();
-    }
-
-    bool discrete = param_ && param_->isDiscrete();
-    curvePath_ = EnvelopeUtils::buildEnvelopePath(
-        cachedPoints_, pixelsPerBeat_, minVal, maxVal, laneHeight_, 0.0, discrete);
-
+    curvePath_ = buildSampledPath();
     update();
 }
 

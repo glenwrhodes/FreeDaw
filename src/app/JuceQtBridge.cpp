@@ -8,7 +8,7 @@ JuceQtBridge::JuceQtBridge(QObject* parent)
 {
     connect(&pumpTimer_, &QTimer::timeout, this, []() {
         if (auto* mm = juce::MessageManager::getInstanceWithoutCreating())
-            mm->runDispatchLoopUntil(1);
+            mm->runDispatchLoopUntil(4);
     });
 }
 
@@ -19,7 +19,7 @@ JuceQtBridge::~JuceQtBridge()
 
 void JuceQtBridge::start()
 {
-    pumpTimer_.start(10);
+    pumpTimer_.start(5);
 }
 
 void JuceQtBridge::stop()

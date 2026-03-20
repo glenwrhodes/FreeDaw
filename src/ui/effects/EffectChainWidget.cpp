@@ -5,6 +5,7 @@
 #include "utils/ThemeManager.h"
 #include <QHBoxLayout>
 #include <QGridLayout>
+#include <QSignalBlocker>
 
 namespace freedaw {
 
@@ -154,6 +155,7 @@ void EffectSlotWidget::buildControls()
     auto* paramsGrid = new QGridLayout();
     paramsGrid->setSpacing(4);
 
+    paramKnobs_.clear();
     const int cols = 4;
     int maxKnobs = std::min(8, params.size());
     for (int i = 0; i < maxKnobs; ++i) {
@@ -169,9 +171,19 @@ void EffectSlotWidget::buildControls()
         });
 
         paramsGrid->addWidget(knob, i / cols, i % cols);
+        paramKnobs_.append({param, knob});
     }
 
     layout_->addLayout(paramsGrid);
+}
+
+void EffectSlotWidget::updateKnobsFromAutomation()
+{
+    for (auto& pk : paramKnobs_) {
+        if (!pk.param || !pk.knob) continue;
+        QSignalBlocker block(pk.knob);
+        pk.knob->setValue(double(pk.param->getCurrentValue()));
+    }
 }
 
 // ── EffectChainWidget ───────────────────────────────────────────────────────
@@ -245,6 +257,15 @@ EffectChainWidget::EffectChainWidget(EditManager* editMgr, QWidget* parent)
     connect(editMgr_, &EditManager::editChanged, this, [this]() {
         if (track_) scheduleRebuild();
     });
+
+    connect(&automationPollTimer_, &QTimer::timeout, this, [this]() {
+        if (!editMgr_ || !editMgr_->edit()) return;
+        for (int i = 0; i < slotsLayout_->count(); ++i) {
+            if (auto* slot = qobject_cast<EffectSlotWidget*>(slotsLayout_->itemAt(i)->widget()))
+                slot->updateKnobsFromAutomation();
+        }
+    });
+    automationPollTimer_.start(33);
 }
 
 void EffectChainWidget::setTrack(te::AudioTrack* track)
