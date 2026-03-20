@@ -25,30 +25,19 @@ void VelocityLane::refresh()
     update();
 }
 
-te::MidiNote* VelocityLane::noteAtX(double x) const
+std::vector<te::MidiNote*> VelocityLane::notesAtX(double x) const
 {
-    if (!clip_) return nullptr;
+    std::vector<te::MidiNote*> result;
+    if (!clip_) return result;
 
-    double beat = (x + scrollOffset_) / pixelsPerBeat_;
     auto& seq = clip_->getSequence();
-    te::MidiNote* closest = nullptr;
-    double closestDist = 999999.0;
-
     for (auto* note : seq.getNotes()) {
-        double noteCenter = note->getStartBeat().inBeats()
-                          + note->getLengthBeats().inBeats() * 0.5;
         double barX = note->getStartBeat().inBeats() * pixelsPerBeat_ - scrollOffset_;
         double barW = std::max(4.0, note->getLengthBeats().inBeats() * pixelsPerBeat_);
-
-        if (x >= barX && x <= barX + barW) {
-            double dist = std::abs(beat - noteCenter);
-            if (dist < closestDist) {
-                closestDist = dist;
-                closest = note;
-            }
-        }
+        if (x >= barX && x <= barX + barW)
+            result.push_back(note);
     }
-    return closest;
+    return result;
 }
 
 void VelocityLane::paintEvent(QPaintEvent*)
@@ -83,13 +72,14 @@ void VelocityLane::paintEvent(QPaintEvent*)
 void VelocityLane::mousePressEvent(QMouseEvent* event)
 {
     if (height() <= 0) return;
-    draggingNote_ = noteAtX(event->position().x());
-    if (draggingNote_) {
+    draggingNotes_ = notesAtX(event->position().x());
+    if (!draggingNotes_.empty()) {
         int vel = static_cast<int>(
             127.0 * (1.0 - event->position().y() / height()));
         vel = std::clamp(vel, 1, 127);
         auto* um = clip_ ? &clip_->edit.getUndoManager() : nullptr;
-        draggingNote_->setVelocity(vel, um);
+        for (auto* note : draggingNotes_)
+            note->setVelocity(vel, um);
         update();
         emit velocityChanged();
     }
@@ -100,24 +90,25 @@ void VelocityLane::mouseMoveEvent(QMouseEvent* event)
     if (height() <= 0) return;
     if (!(event->buttons() & Qt::LeftButton)) return;
 
-    auto* noteUnderCursor = noteAtX(event->position().x());
-    if (noteUnderCursor)
-        draggingNote_ = noteUnderCursor;
+    auto notes = notesAtX(event->position().x());
+    if (!notes.empty())
+        draggingNotes_ = notes;
 
-    if (!draggingNote_) return;
+    if (draggingNotes_.empty()) return;
 
     int vel = static_cast<int>(
         127.0 * (1.0 - event->position().y() / height()));
     vel = std::clamp(vel, 1, 127);
     auto* um = clip_ ? &clip_->edit.getUndoManager() : nullptr;
-    draggingNote_->setVelocity(vel, um);
+    for (auto* note : draggingNotes_)
+        note->setVelocity(vel, um);
     update();
     emit velocityChanged();
 }
 
 void VelocityLane::mouseReleaseEvent(QMouseEvent* /*event*/)
 {
-    draggingNote_ = nullptr;
+    draggingNotes_.clear();
 }
 
 } // namespace freedaw

@@ -49,6 +49,7 @@ void AudioWaveformView::setClip(te::WaveAudioClip* clip, EditManager* editMgr)
         reversed_ = clip_->getIsReversed();
         playheadTimer_.start();
         rebuild();
+        horizontalScrollBar()->setValue(0);
     } else {
         playheadTimer_.stop();
         scene_->clear();
@@ -70,6 +71,7 @@ void AudioWaveformView::setClip(te::WaveAudioClip* clip, EditManager* editMgr)
         selectionOverlay_ = nullptr;
         selHandleL_ = nullptr;
         selHandleR_ = nullptr;
+        clipStartBeat_ = 0.0;
         waveMin_.clear();
         waveMax_.clear();
         chanMin_.clear();
@@ -101,6 +103,9 @@ void AudioWaveformView::rebuild()
     selHandleR_ = nullptr;
 
     if (!clip_) return;
+
+    auto& ts = clip_->edit.tempoSequence;
+    clipStartBeat_ = ts.toBeats(clip_->getPosition().getStart()).inBeats();
 
     loadWaveformData();
     redrawWaveformPath();
@@ -174,8 +179,8 @@ void AudioWaveformView::selectAll()
     emit selectionChanged();
 }
 
-double AudioWaveformView::beatToX(double beat) const { return beat * pixelsPerBeat_; }
-double AudioWaveformView::xToBeat(double x) const { return x / pixelsPerBeat_; }
+double AudioWaveformView::beatToX(double beat) const { return (beat - clipStartBeat_) * pixelsPerBeat_; }
+double AudioWaveformView::xToBeat(double x) const { return x / pixelsPerBeat_ + clipStartBeat_; }
 
 double AudioWaveformView::timeToX(double seconds) const
 {
@@ -610,6 +615,7 @@ void AudioWaveformView::mousePressEvent(QMouseEvent* event)
     if (trimLeftHandle_ && std::abs(scenePos.x() - xStart) < kHandleWidth * 2) {
         dragMode_ = DragMode::TrimLeft;
         dragStartX_ = scenePos.x();
+        dragStartValue_ = clipStartBeat_;
         event->accept();
         return;
     }
@@ -756,7 +762,7 @@ void AudioWaveformView::mouseMoveEvent(QMouseEvent* event)
 
     if (dragMode_ == DragMode::TrimLeft) {
         double clipEndBeat = ts.toBeats(clip_->getPosition().getEnd()).inBeats();
-        double startBeat = xToBeat(scenePos.x());
+        double startBeat = scenePos.x() / pixelsPerBeat_ + dragStartValue_;
         double interval = snapper_.gridIntervalBeats();
         if (interval > 0.0)
             startBeat = std::min(clipEndBeat - interval, std::round(startBeat / interval) * interval);
@@ -824,8 +830,8 @@ void AudioWaveformView::drawBackground(QPainter* painter, const QRectF& rect)
     double interval = snapper_.gridIntervalBeats();
     if (interval <= 0.0) interval = 1.0;
 
-    double firstBeat = std::floor(rect.left() / pixelsPerBeat_);
-    double lastBeat = std::ceil(rect.right() / pixelsPerBeat_);
+    double firstBeat = std::floor(xToBeat(rect.left()));
+    double lastBeat = std::ceil(xToBeat(rect.right()));
 
     int timeSigNum = 4;
     if (editMgr_) timeSigNum = editMgr_->getTimeSigNumerator();
@@ -833,7 +839,8 @@ void AudioWaveformView::drawBackground(QPainter* painter, const QRectF& rect)
     for (double b = firstBeat; b <= lastBeat; b += interval) {
         double x = beatToX(b);
         if (x < rect.left() || x > rect.right()) continue;
-        bool isMajor = (timeSigNum > 0 && std::fmod(b, timeSigNum) < 0.001);
+        double localBeat = b - clipStartBeat_;
+        bool isMajor = (timeSigNum > 0 && std::fmod(localBeat, timeSigNum) < 0.001);
         painter->setPen(QPen(isMajor ? theme.gridLineMajor : theme.gridLine, 1));
         painter->drawLine(QPointF(x, 0), QPointF(x, kWaveHeight));
     }
@@ -842,10 +849,11 @@ void AudioWaveformView::drawBackground(QPainter* painter, const QRectF& rect)
     QFont f = painter->font();
     f.setPixelSize(9);
     painter->setFont(f);
-    for (double b = std::max(0.0, firstBeat); b <= lastBeat; b += 1.0) {
+    for (double b = firstBeat; b <= lastBeat; b += 1.0) {
         double x = beatToX(b);
         if (x < rect.left() || x > rect.right()) continue;
-        painter->drawText(QPointF(x + 2, 10), QString::number(static_cast<int>(b) + 1));
+        int localBeat = static_cast<int>(std::round(b - clipStartBeat_));
+        painter->drawText(QPointF(x + 2, 10), QString::number(localBeat + 1));
     }
 }
 

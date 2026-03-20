@@ -76,6 +76,8 @@ set(FREEDAW_SOURCES
     src/ui/controls/LevelMeter.h    src/ui/controls/LevelMeter.cpp
     src/ui/controls/WaveformWidget.h src/ui/controls/WaveformWidget.cpp
     src/ui/dialogs/ExportDialog.h        src/ui/dialogs/ExportDialog.cpp
+    src/ui/dialogs/RecoveryDialog.h      src/ui/dialogs/RecoveryDialog.cpp
+    src/ui/dialogs/AudioSettingsDialog.h src/ui/dialogs/AudioSettingsDialog.cpp
     src/ui/effects/EffectChainWidget.h   src/ui/effects/EffectChainWidget.cpp
     src/ui/effects/DelayEffectWidget.h   src/ui/effects/DelayEffectWidget.cpp
     src/ui/effects/EffectSelectorDialog.h src/ui/effects/EffectSelectorDialog.cpp
@@ -91,6 +93,7 @@ set(FREEDAW_SOURCES
     src/ui/pianoroll/NoteGrid.h           src/ui/pianoroll/NoteGrid.cpp
     src/ui/pianoroll/NoteItem.h           src/ui/pianoroll/NoteItem.cpp
     src/ui/pianoroll/VelocityLane.h       src/ui/pianoroll/VelocityLane.cpp
+    src/ui/pianoroll/PianoRollRuler.h     src/ui/pianoroll/PianoRollRuler.cpp
     src/ui/routing/RoutingView.h          src/ui/routing/RoutingView.cpp
     src/ui/routing/RoutingNode.h          src/ui/routing/RoutingNode.cpp
     src/ui/routing/CableItem.h            src/ui/routing/CableItem.cpp

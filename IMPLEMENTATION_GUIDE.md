@@ -14,7 +14,7 @@
 
 ## 1. Data Safety and Project Reliability
 
-### 1.1 Unsaved-changes prompt on close **[MUST]**
+### 1.1 ~~Unsaved-changes prompt on close~~ **[MUST]** -- DONE
 
 **What:** Warn the user before losing work when closing the window or quitting.
 
@@ -38,7 +38,7 @@
 
 ---
 
-### 1.2 Periodic autosave **[MUST]**
+### 1.2 ~~Periodic autosave~~ **[MUST]** -- DONE
 
 **What:** Automatically save a recovery snapshot at a regular interval so work is not lost on crash.
 
@@ -62,7 +62,7 @@
 
 ---
 
-### 1.3 Crash recovery on startup **[MUST]**
+### 1.3 ~~Crash recovery on startup~~ **[MUST]** -- DONE
 
 **What:** On launch, detect leftover autosave files and offer to restore them.
 
@@ -85,7 +85,7 @@
 
 ---
 
-### 1.4 Window title with project name **[SHOULD]**
+### 1.4 ~~Window title with project name~~ **[SHOULD]** -- DONE
 
 **What:** Show the current project filename in the title bar, with a dirty indicator.
 
@@ -112,7 +112,7 @@
 
 ## 2. Audio Device and Performance
 
-### 2.1 Audio settings dialog **[MUST]**
+### 2.1 ~~Audio settings dialog~~ **[MUST]** -- DONE
 
 **What:** Let users choose audio device, sample rate, and buffer size.
 
@@ -140,7 +140,7 @@
 
 ---
 
-### 2.2 Live status bar **[MUST]**
+### 2.2 ~~Live status bar~~ **[MUST]** -- DONE
 
 **What:** Replace the static `"44100 Hz"`, `"512 samples"`, and `"CPU: 0%"` labels with live values.
 
@@ -836,11 +836,11 @@ Quick-reference of every task sorted by priority.
 
 | ID | Task | Section |
 |----|------|---------|
-| 1.1 | Unsaved-changes prompt on close | Data Safety |
-| 1.2 | Periodic autosave | Data Safety |
-| 1.3 | Crash recovery on startup | Data Safety |
-| 2.1 | Audio settings dialog | Device/Performance |
-| 2.2 | Live status bar | Device/Performance |
+| ~~1.1~~ | ~~Unsaved-changes prompt on close~~ | ~~Data Safety~~ DONE |
+| ~~1.2~~ | ~~Periodic autosave~~ | ~~Data Safety~~ DONE |
+| ~~1.3~~ | ~~Crash recovery on startup~~ | ~~Data Safety~~ DONE |
+| ~~2.1~~ | ~~Audio settings dialog~~ | ~~Device/Performance~~ DONE |
+| ~~2.2~~ | ~~Live status bar~~ | ~~Device/Performance~~ DONE |
 | 3.1 | Automation lane UI on timeline | Automation |
 | 4.1 | CC lane editor in piano roll | MIDI |
 | 4.2 | MIDI channel selection | MIDI |
@@ -855,7 +855,7 @@ Quick-reference of every task sorted by priority.
 
 | ID | Task | Section |
 |----|------|---------|
-| 1.4 | Window title with project name | Data Safety |
+| ~~1.4~~ | ~~Window title with project name~~ | ~~Data Safety~~ DONE |
 | 1.5 | Recent projects list | Data Safety |
 | 3.2 | Automation read/write modes on mixer | Automation |
 | 4.3 | Quantize strength and swing | MIDI |

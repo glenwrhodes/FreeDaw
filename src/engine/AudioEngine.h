@@ -18,6 +18,7 @@ public:
     te::DeviceManager& deviceManager();
 
     void setDefaultAudioDevice();
+    void restoreSavedAudioSettings();
     juce::StringArray getAvailableInputDevices() const;
     juce::StringArray getAvailableOutputDevices() const;
 

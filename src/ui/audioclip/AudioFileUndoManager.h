@@ -24,6 +24,10 @@ public:
     QString undoDescription() const;
     QString redoDescription() const;
 
+    void savePristineBackup(const juce::File& targetFile);
+    juce::File pristineBackupPath(const juce::File& targetFile) const;
+    bool hasPristineBackup(const juce::File& targetFile) const;
+
     void clear();
     void setMaxDepth(int depth);
 

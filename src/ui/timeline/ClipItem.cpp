@@ -301,11 +301,13 @@ void ClipItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
             if (!clipTrack) return;
 
             if (auto* srcWave = dynamic_cast<te::WaveAudioClip*>(clip_)) {
+                auto srcFile = srcWave->getOriginalFile();
                 if (auto nc = te::insertWaveClip(
-                        *clipTrack, srcWave->getName(), srcWave->getOriginalFile(),
+                        *clipTrack, srcWave->getName(), srcFile,
                         {{endTime, endTime + clipDuration}},
                         te::DeleteExistingClips::no)) {
                     nc->cloneFrom(srcWave);
+                    nc->getSourceFileReference().setToDirectFileReference(srcFile, false);
                     nc->setStart(endTime, false, true);
                 }
             } else {
@@ -554,13 +556,15 @@ void ClipItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
                 if (newTrack >= 0 && newTrack < tracks.size()) {
                     if (auto* dstClipTrack = dynamic_cast<te::ClipTrack*>(tracks[newTrack])) {
                         if (auto* srcWave = dynamic_cast<te::WaveAudioClip*>(clip_)) {
+                            auto srcFile = srcWave->getOriginalFile();
                             if (auto newClip = te::insertWaveClip(
                                     *dstClipTrack,
                                     srcWave->getName(),
-                                    srcWave->getOriginalFile(),
+                                    srcFile,
                                     {{newStartTime, newStartTime + clipDuration}},
                                     te::DeleteExistingClips::no)) {
                                 newClip->cloneFrom(srcWave);
+                                newClip->getSourceFileReference().setToDirectFileReference(srcFile, false);
                                 newClip->setStart(newStartTime, false, true);
                             }
                         } else {

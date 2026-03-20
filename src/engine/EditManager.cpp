@@ -3,6 +3,13 @@
 #include <tracktion_engine/tracktion_engine.h>
 #include <QDebug>
 #include <QPointF>
+#include <QStandardPaths>
+#include <QDir>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QFile>
+#include <QCryptographicHash>
+#include <QDateTime>
 
 namespace freedaw {
 
@@ -22,13 +29,26 @@ static bool hasInstrumentPlugin(te::AudioTrack* track)
     return false;
 }
 
+static bool hasMidiClips(te::AudioTrack* track)
+{
+    if (!track) return false;
+    for (auto* clip : track->getClips())
+        if (dynamic_cast<te::MidiClip*>(clip) != nullptr)
+            return true;
+    return false;
+}
+
 EditManager::EditManager(AudioEngine& engine, QObject* parent)
     : QObject(parent), audioEngine_(engine)
 {
+    connect(&autosaveTimer_, &QTimer::timeout, this, &EditManager::performAutosave);
     createDefaultEdit();
 }
 
-EditManager::~EditManager() = default;
+EditManager::~EditManager()
+{
+    stopAutosave();
+}
 
 void EditManager::teardownCurrentEdit()
 {
@@ -56,6 +76,12 @@ void EditManager::teardownCurrentEdit()
     qDebug() << "[teardown] complete";
 }
 
+void EditManager::markDirtyAndNotify()
+{
+    hasUnsavedChanges_ = true;
+    emit editChanged();
+}
+
 void EditManager::createDefaultEdit()
 {
     teardownCurrentEdit();
@@ -66,8 +92,11 @@ void EditManager::createDefaultEdit()
     enableAllWaveInputDevices();
     edit_->getTransport().ensureContextAllocated();
     currentFile_ = juce::File();
+    edit_->getUndoManager().clearUndoHistory();
+    hasUnsavedChanges_ = false;
     emit editChanged();
     emit tracksChanged();
+    startAutosave();
 }
 
 void EditManager::newEdit()
@@ -97,7 +126,7 @@ bool EditManager::loadEdit(const juce::File& file)
 
     qDebug() << "[loadEdit] detecting MIDI tracks";
     for (auto* track : te::getAudioTracks(*edit_)) {
-        if (hasInstrumentPlugin(track))
+        if (hasInstrumentPlugin(track) || hasMidiClips(track))
             midiTrackIds_.insert(track->itemID.getRawID());
     }
 
@@ -119,10 +148,13 @@ bool EditManager::loadEdit(const juce::File& file)
             track->getOutput().setOutputToTrack(nullptr);
     }
 
+    edit_->getUndoManager().clearUndoHistory();
+    hasUnsavedChanges_ = false;
     qDebug() << "[loadEdit] emitting editChanged";
     emit editChanged();
     qDebug() << "[loadEdit] emitting tracksChanged";
     emit tracksChanged();
+    startAutosave();
     qDebug() << "[loadEdit] done";
     return true;
 }
@@ -133,6 +165,8 @@ bool EditManager::saveEdit()
         return false;
     unfreezeAllTracks();
     te::EditFileOperations(*edit_).save(true, true, false);
+    clearAutosave();
+    hasUnsavedChanges_ = false;
     return true;
 }
 
@@ -144,6 +178,8 @@ bool EditManager::saveEditAs(const juce::File& file)
     edit_->editFileRetriever = [file]() { return file; };
     te::EditFileOperations(*edit_).save(true, true, false);
     currentFile_ = file;
+    clearAutosave();
+    hasUnsavedChanges_ = false;
     return true;
 }
 
@@ -186,7 +222,7 @@ void EditManager::removeTrack(te::Track* track)
     edit_->deleteTrack(track);
     emit tracksChanged();
     emit routingChanged();
-    emit editChanged();
+    markDirtyAndNotify();
 }
 
 int EditManager::trackCount() const
@@ -262,14 +298,59 @@ void EditManager::addAudioClipToTrack(te::AudioTrack& track,
         }
     }
 
-    emit editChanged();
+    markDirtyAndNotify();
+}
+
+void EditManager::midiPanic()
+{
+    if (!edit_ || engineSuspended_) return;
+
+    transport().stop(false, false);
+
+    for (auto* track : getAudioTracks()) {
+        for (int ch = 1; ch <= 16; ++ch) {
+            track->injectLiveMidiMessage(
+                juce::MidiMessage::allSoundOff(ch), 0);
+            track->injectLiveMidiMessage(
+                juce::MidiMessage::allNotesOff(ch), 0);
+        }
+    }
+}
+
+void EditManager::suspendEngine()
+{
+    if (engineSuspended_ || !edit_) return;
+
+    auto& t = edit_->getTransport();
+    if (t.isPlaying())
+        t.stop(false, false);
+
+    t.freePlaybackContext();
+    audioEngine_.deviceManager().deviceManager.closeAudioDevice();
+    engineSuspended_ = true;
+}
+
+void EditManager::resumeEngine()
+{
+    if (!engineSuspended_) return;
+
+    audioEngine_.setDefaultAudioDevice();
+    audioEngine_.restoreSavedAudioSettings();
+    audioEngine_.enableAllMidiInputDevices();
+
+    if (edit_) {
+        enableAllWaveInputDevices();
+        edit_->getTransport().ensureContextAllocated();
+    }
+
+    engineSuspended_ = false;
 }
 
 void EditManager::undo()
 {
     if (!edit_) return;
     edit_->getUndoManager().undo();
-    emit editChanged();
+    markDirtyAndNotify();
     emit tracksChanged();
 }
 
@@ -277,7 +358,7 @@ void EditManager::redo()
 {
     if (!edit_) return;
     edit_->getUndoManager().redo();
-    emit editChanged();
+    markDirtyAndNotify();
     emit tracksChanged();
 }
 
@@ -293,7 +374,7 @@ void EditManager::setBpm(double bpm)
     if (!edit_)
         return;
     edit_->tempoSequence.getTempo(0)->setBpm(bpm);
-    emit editChanged();
+    markDirtyAndNotify();
 }
 
 int EditManager::getTimeSigNumerator() const
@@ -317,7 +398,7 @@ void EditManager::setTimeSignature(int num, int den)
     auto* ts = edit_->tempoSequence.getTimeSig(0);
     ts->numerator   = num;
     ts->denominator = den;
-    emit editChanged();
+    markDirtyAndNotify();
 }
 
 te::AudioTrack* EditManager::addMidiTrack()
@@ -343,7 +424,7 @@ te::MidiClip* EditManager::addMidiClipToTrack(te::AudioTrack& track,
         tracktion::TimeRange(startTime, endTime),
         nullptr);
 
-    emit editChanged();
+    markDirtyAndNotify();
     return clipRef.get();
 }
 
@@ -466,7 +547,7 @@ te::MidiClip* EditManager::importMidiFileToTrack(te::AudioTrack& track,
         }
     }
 
-    emit editChanged();
+    markDirtyAndNotify();
     return firstClip;
 }
 
@@ -475,7 +556,7 @@ bool EditManager::isMidiTrack(te::AudioTrack* track) const
     if (!track) return false;
     if (midiTrackIds_.count(track->itemID.getRawID()) > 0)
         return true;
-    return hasInstrumentPlugin(track);
+    return hasInstrumentPlugin(track) || hasMidiClips(track);
 }
 
 bool EditManager::isTrackMono(te::AudioTrack* track) const
@@ -535,7 +616,7 @@ void EditManager::setTrackMono(te::AudioTrack& track, bool mono)
     }
 
     if (changed) {
-        emit editChanged();
+        markDirtyAndNotify();
         emit tracksChanged();
     }
 }
@@ -560,7 +641,7 @@ void EditManager::setTrackInstrument(te::AudioTrack& track,
     if (auto plugin = edit_->getPluginCache().createNewPlugin(pluginState)) {
         track.pluginList.insertPlugin(plugin, 0, nullptr);
         markAsMidiTrack(&track);
-        emit editChanged();
+        markDirtyAndNotify();
         emit tracksChanged();
     }
 }
@@ -676,14 +757,14 @@ void EditManager::assignInputToTrack(te::AudioTrack& track, const juce::String& 
         }
     }
 
-    emit editChanged();
+    markDirtyAndNotify();
     emit routingChanged();
 }
 
 void EditManager::clearTrackInput(te::AudioTrack& track)
 {
     clearTrackInputInternal(track);
-    emit editChanged();
+    markDirtyAndNotify();
     emit routingChanged();
 }
 
@@ -714,7 +795,7 @@ void EditManager::setTrackRecordEnabled(te::AudioTrack& track, bool enabled)
         }
     }
 
-    emit editChanged();
+    markDirtyAndNotify();
 }
 
 bool EditManager::isTrackRecordEnabled(te::AudioTrack* track) const
@@ -755,7 +836,7 @@ void EditManager::setTrackOutputToMaster(te::AudioTrack& track)
                             &edit_->getUndoManager());
     track.getOutput().setOutputToDefaultDevice(false);
     emit routingChanged();
-    emit editChanged();
+    markDirtyAndNotify();
 }
 
 void EditManager::setTrackOutputToTrack(te::AudioTrack& src, te::AudioTrack& dest)
@@ -769,7 +850,7 @@ void EditManager::setTrackOutputToTrack(te::AudioTrack& src, te::AudioTrack& des
                           &edit_->getUndoManager());
     src.getOutput().setOutputToTrack(&dest);
     emit routingChanged();
-    emit editChanged();
+    markDirtyAndNotify();
 }
 
 void EditManager::clearTrackOutput(te::AudioTrack& track)
@@ -779,7 +860,7 @@ void EditManager::clearTrackOutput(te::AudioTrack& track)
                             &edit_->getUndoManager());
     track.getOutput().setOutputToTrack(nullptr);
     emit routingChanged();
-    emit editChanged();
+    markDirtyAndNotify();
 }
 
 te::AudioTrack* EditManager::getTrackOutputDestination(te::AudioTrack* track) const
@@ -1203,7 +1284,7 @@ void EditManager::freezeTrack(te::AudioTrack& track)
 
     emit trackFreezeStateChanged(&track);
     emit tracksChanged();
-    emit editChanged();
+    markDirtyAndNotify();
 }
 
 void EditManager::unfreezeTrack(te::AudioTrack& track)
@@ -1249,7 +1330,7 @@ void EditManager::unfreezeTrack(te::AudioTrack& track)
 
     emit trackFreezeStateChanged(&track);
     emit tracksChanged();
-    emit editChanged();
+    markDirtyAndNotify();
 }
 
 bool EditManager::bounceTrackToAudio(te::AudioTrack& track)
@@ -1327,8 +1408,109 @@ bool EditManager::bounceTrackToAudio(te::AudioTrack& track)
     addAudioClipToTrack(track, bounceFile, 0.0);
 
     emit tracksChanged();
-    emit editChanged();
+    markDirtyAndNotify();
     return true;
+}
+
+// ── Autosave ─────────────────────────────────────────────────────────────────
+
+QString EditManager::autosaveDir()
+{
+    auto dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+               + "/autosave";
+    QDir().mkpath(dir);
+    return dir;
+}
+
+QString EditManager::autosaveFileId() const
+{
+    QString source;
+    if (currentFile_ != juce::File())
+        source = QString::fromStdString(currentFile_.getFullPathName().toStdString());
+    else
+        source = "untitled";
+    return QString(QCryptographicHash::hash(source.toUtf8(),
+                                            QCryptographicHash::Md5).toHex());
+}
+
+void EditManager::startAutosave()
+{
+    autosaveTimer_.start(60000);
+}
+
+void EditManager::stopAutosave()
+{
+    autosaveTimer_.stop();
+}
+
+void EditManager::performAutosave()
+{
+    if (!edit_) return;
+
+    auto dir = autosaveDir();
+    auto id = autosaveFileId();
+    auto editPath = dir + "/" + id + ".tracktionedit";
+    auto sidecarPath = dir + "/" + id + ".json";
+
+    juce::File autosaveFile(juce::String(editPath.toUtf8().constData()));
+
+    edit_->editFileRetriever = [currentFile = currentFile_, autosaveFile]() {
+        return autosaveFile;
+    };
+
+    te::EditFileOperations(*edit_).save(true, true, false);
+
+    if (currentFile_ != juce::File()) {
+        edit_->editFileRetriever = [f = currentFile_]() { return f; };
+    } else {
+        edit_->editFileRetriever = []() { return juce::File(); };
+    }
+
+    QJsonObject sidecar;
+    if (currentFile_ != juce::File())
+        sidecar["originalPath"] = QString::fromStdString(
+            currentFile_.getFullPathName().toStdString());
+    else
+        sidecar["originalPath"] = QString();
+    sidecar["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+
+    QFile jsonFile(sidecarPath);
+    if (jsonFile.open(QIODevice::WriteOnly))
+        jsonFile.write(QJsonDocument(sidecar).toJson(QJsonDocument::Compact));
+
+    qDebug() << "[autosave] saved to" << editPath;
+}
+
+void EditManager::clearAutosave()
+{
+    auto dir = autosaveDir();
+    auto id = autosaveFileId();
+    QFile::remove(dir + "/" + id + ".tracktionedit");
+    QFile::remove(dir + "/" + id + ".json");
+}
+
+QList<EditManager::RecoveryInfo> EditManager::findRecoveryFiles()
+{
+    QList<RecoveryInfo> results;
+    QDir dir(autosaveDir());
+    auto entries = dir.entryList({"*.tracktionedit"}, QDir::Files);
+    for (auto& entry : entries) {
+        auto baseName = entry.left(entry.lastIndexOf('.'));
+        auto sidecarPath = dir.filePath(baseName + ".json");
+        RecoveryInfo info;
+        info.autosavePath = dir.filePath(entry);
+
+        QFile jsonFile(sidecarPath);
+        if (jsonFile.open(QIODevice::ReadOnly)) {
+            auto doc = QJsonDocument::fromJson(jsonFile.readAll());
+            auto obj = doc.object();
+            info.originalPath = obj["originalPath"].toString();
+            info.timestamp = obj["timestamp"].toString();
+        }
+
+        results.append(info);
+    }
+    return results;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

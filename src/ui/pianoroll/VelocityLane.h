@@ -29,12 +29,12 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
 
 private:
-    te::MidiNote* noteAtX(double x) const;
+    std::vector<te::MidiNote*> notesAtX(double x) const;
 
     te::MidiClip* clip_ = nullptr;
     double pixelsPerBeat_ = 60.0;
     int scrollOffset_ = 0;
-    te::MidiNote* draggingNote_ = nullptr;
+    std::vector<te::MidiNote*> draggingNotes_;
 };
 
 } // namespace freedaw

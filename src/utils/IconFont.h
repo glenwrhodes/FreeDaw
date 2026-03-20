@@ -145,6 +145,7 @@ namespace mi {
     inline const QChar Redo              {0xE15A};
     inline const QChar Description       {0xE873};
     inline const QChar Chat              {0xE0B7};
+    inline const QChar Warning           {0xE002};
 }
 
 } // namespace icons

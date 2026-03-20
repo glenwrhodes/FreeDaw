@@ -7,7 +7,8 @@ enum class SnapMode {
     Beat,
     Bar,
     HalfBeat,
-    QuarterBeat
+    QuarterBeat,
+    EighthBeat
 };
 
 class GridSnapper {

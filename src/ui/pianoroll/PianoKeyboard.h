@@ -19,10 +19,14 @@ public:
 
 signals:
     void noteClicked(int noteNumber);
+    void noteReleased(int noteNumber);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void leaveEvent(QEvent* event) override;
 
 private:
     static bool isBlackKey(int note);
@@ -31,6 +35,7 @@ private:
 
     double noteRowHeight_ = 14.0;
     int scrollOffset_ = 0;
+    int pressedNote_ = -1;
     static constexpr int TOTAL_NOTES = 128;
     static constexpr int KEY_WIDTH = 60;
 };

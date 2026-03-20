@@ -31,6 +31,28 @@ juce::File AudioFileUndoManager::makeBackupPath(const juce::File& targetFile) co
     return dir.getChildFile(name);
 }
 
+juce::File AudioFileUndoManager::pristineBackupPath(const juce::File& targetFile) const
+{
+    auto dir = backupDir(targetFile);
+    return dir.getChildFile(targetFile.getFileNameWithoutExtension() + "_ORIGINAL.wav");
+}
+
+void AudioFileUndoManager::savePristineBackup(const juce::File& targetFile)
+{
+    auto pristine = pristineBackupPath(targetFile);
+    if (pristine.existsAsFile())
+        return;
+
+    auto dir = backupDir(targetFile);
+    dir.createDirectory();
+    targetFile.copyFileTo(pristine);
+}
+
+bool AudioFileUndoManager::hasPristineBackup(const juce::File& targetFile) const
+{
+    return pristineBackupPath(targetFile).existsAsFile();
+}
+
 void AudioFileUndoManager::pushUndo(const juce::File& targetFile, const QString& description)
 {
     auto backupPath = makeBackupPath(targetFile);
@@ -97,6 +119,7 @@ void AudioFileUndoManager::clear()
         e.backupFile.deleteFile();
     undoStack_.clear();
     redoStack_.clear();
+    // Pristine _ORIGINAL backups are intentionally preserved forever
 }
 
 void AudioFileUndoManager::setMaxDepth(int depth)

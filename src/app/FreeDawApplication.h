@@ -5,6 +5,7 @@
 #include "engine/PluginScanner.h"
 #include "JuceQtBridge.h"
 #include <QObject>
+#include <QWidget>
 #include <memory>
 
 namespace freedaw {
@@ -19,6 +20,7 @@ public:
     ~FreeDawApplication() override;
 
     bool initialize();
+    void checkRecovery(QWidget* splashToHide = nullptr);
     void showMainWindow();
 
     AudioEngine&  audioEngine()  { return *audioEngine_; }

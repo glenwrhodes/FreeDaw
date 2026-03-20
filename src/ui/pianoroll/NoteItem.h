@@ -26,6 +26,9 @@ public:
     enum { Type = QGraphicsItem::UserType + 10 };
     int type() const override { return Type; }
 
+    static int parsePitchString(const QString& text, bool* ok = nullptr);
+    static QString pitchToString(int midiNote);
+
 protected:
     void paint(QPainter* painter,
                const QStyleOptionGraphicsItem* option,
@@ -33,8 +36,21 @@ protected:
     void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
     void mouseMoveEvent(QGraphicsSceneMouseEvent* event) override;
     void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
+    void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
 
 private:
+    void showEditDialog();
+    void collectPeers();
+    void createGhosts();
+    void destroyGhosts();
+
+    struct PeerState {
+        NoteItem* item;
+        double origBeat;
+        double origLength;
+        int origPitch;
+    };
+
     te::MidiNote* note_;
     te::MidiClip* clip_;
     GridSnapper* snapper_ = nullptr;
@@ -51,6 +67,10 @@ private:
     double origStartBeat_ = 0;
     double origLengthBeats_ = 0;
     int origPitch_ = 0;
+
+    std::vector<PeerState> peers_;
+    std::vector<QGraphicsRectItem*> ghostItems_;
+    int previewingNote_ = -1;
 };
 
 } // namespace freedaw

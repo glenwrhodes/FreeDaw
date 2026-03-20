@@ -91,6 +91,7 @@ private:
     GridSnapper snapper_;
     double pixelsPerBeat_ = 80.0;
 
+    double clipStartBeat_ = 0.0;
     double gainMultiplier_ = 1.0;
     bool reversed_ = false;
     bool splitStereo_ = false;

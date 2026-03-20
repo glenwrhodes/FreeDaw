@@ -4,6 +4,7 @@
 #include "ui/pianoroll/PianoRollEditor.h"
 #include "ui/audioclip/AudioClipEditor.h"
 #include "ui/dialogs/ExportDialog.h"
+#include "ui/dialogs/AudioSettingsDialog.h"
 #include "ui/SplashScreen.h"
 #include "utils/ThemeManager.h"
 #include "utils/IconFont.h"
@@ -108,6 +109,9 @@ MainWindow::MainWindow(FreeDawApplication& app, QWidget* parent)
 
     resizeDocks({mixerDock_}, {350}, Qt::Vertical);
 
+    connect(&editMgr_, &EditManager::editChanged, this, &MainWindow::updateWindowTitle);
+    updateWindowTitle();
+
     aiQuickPrompt_ = new AiQuickPrompt(this);
     connect(aiQuickPrompt_, &AiQuickPrompt::promptSubmitted,
             this, [this](const QString& text) {
@@ -120,6 +124,72 @@ MainWindow::MainWindow(FreeDawApplication& app, QWidget* parent)
 }
 
 MainWindow::~MainWindow() = default;
+
+bool MainWindow::maybeSaveBeforeAction()
+{
+    if (!editMgr_.edit() || !editMgr_.hasUnsavedChanges()) {
+        editMgr_.clearAutosave();
+        return true;
+    }
+
+    auto answer = QMessageBox::question(
+        this, "Unsaved Changes",
+        "Save changes to the current project?",
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
+        QMessageBox::Save);
+
+    if (answer == QMessageBox::Cancel)
+        return false;
+    if (answer == QMessageBox::Save)
+        onSaveProject();
+    else
+        editMgr_.clearAutosave();
+    return true;
+}
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+    if (maybeSaveBeforeAction()) {
+        editMgr_.stopAutosave();
+        editMgr_.clearAutosave();
+        event->accept();
+    } else {
+        event->ignore();
+    }
+}
+
+void MainWindow::updateWindowTitle()
+{
+    QString title = "FreeDaw";
+    auto currentFile = editMgr_.currentFile();
+    if (currentFile != juce::File()) {
+        auto name = QString::fromStdString(currentFile.getFileNameWithoutExtension().toStdString());
+        title = QString("FreeDaw - %1").arg(name);
+    } else {
+        title = "FreeDaw - Untitled";
+    }
+
+    if (editMgr_.hasUnsavedChanges())
+        title = "* " + title;
+
+    setWindowTitle(title);
+}
+
+void MainWindow::updateStatusBar()
+{
+    auto& dm = app_.audioEngine().deviceManager();
+    auto* device = dm.deviceManager.getCurrentAudioDevice();
+
+    if (device) {
+        double sr = device->getCurrentSampleRate();
+        int buf = device->getCurrentBufferSizeSamples();
+        sampleRateLabel_->setText(QString("%1 Hz").arg(static_cast<int>(sr)));
+        bufferLabel_->setText(QString("%1 samples").arg(buf));
+    }
+
+    int cpuPercent = static_cast<int>(dm.getCpuUsage() * 100.0f);
+    cpuLabel_->setText(QString("CPU: %1%").arg(cpuPercent));
+}
 
 void MainWindow::applyGlobalStyle()
 {
@@ -228,6 +298,12 @@ void MainWindow::createMenus()
             aiChatWidget_->openSettings();
     });
     editMenu->addSeparator();
+    editMenu->addAction("&Audio Settings...", this, [this]() {
+        AudioSettingsDialog dlg(app_.audioEngine(), this);
+        dlg.exec();
+        updateStatusBar();
+    });
+    editMenu->addSeparator();
     editMenu->addAction("Scan &VST Plugins...", this,
         &MainWindow::onScanVstPlugins);
 
@@ -299,6 +375,14 @@ void MainWindow::createMenus()
     transportMenu->addAction("&Record", QKeySequence("R"), this, [this]() {
         editMgr_.transport().record(false);
     });
+
+    transportMenu->addSeparator();
+    auto* panicAction = transportMenu->addAction("MIDI &Panic",
+        QKeySequence("Ctrl+Shift+P"), this, [this]() {
+            editMgr_.midiPanic();
+        });
+    panicAction->setShortcutContext(Qt::WindowShortcut);
+    addAction(panicAction);
 
     // Help menu
     auto* helpMenu = menuBar->addMenu("&Help");
@@ -628,43 +712,44 @@ void MainWindow::createStatusBar()
     auto* status = statusBar();
     auto& theme = ThemeManager::instance().current();
 
-    auto* sampleRateLabel = new QLabel("44100 Hz", this);
-    sampleRateLabel->setAccessibleName("Sample Rate");
-    sampleRateLabel->setStyleSheet(
-        QString("color: %1; font-size: 10px; padding: 0 8px;")
-            .arg(theme.textDim.name()));
+    auto labelStyle = QString("color: %1; font-size: 10px; padding: 0 8px;")
+                          .arg(theme.textDim.name());
 
-    auto* bufferLabel = new QLabel("512 samples", this);
-    bufferLabel->setAccessibleName("Buffer Size");
-    bufferLabel->setStyleSheet(sampleRateLabel->styleSheet());
+    sampleRateLabel_ = new QLabel("-- Hz", this);
+    sampleRateLabel_->setAccessibleName("Sample Rate");
+    sampleRateLabel_->setStyleSheet(labelStyle);
 
-    auto* cpuLabel = new QLabel("CPU: 0%", this);
-    cpuLabel->setAccessibleName("CPU Usage");
-    cpuLabel->setStyleSheet(sampleRateLabel->styleSheet());
+    bufferLabel_ = new QLabel("-- samples", this);
+    bufferLabel_->setAccessibleName("Buffer Size");
+    bufferLabel_->setStyleSheet(labelStyle);
 
-    status->addPermanentWidget(sampleRateLabel);
-    status->addPermanentWidget(bufferLabel);
-    status->addPermanentWidget(cpuLabel);
+    cpuLabel_ = new QLabel("CPU: 0%", this);
+    cpuLabel_->setAccessibleName("CPU Usage");
+    cpuLabel_->setStyleSheet(labelStyle);
+
+    status->addPermanentWidget(sampleRateLabel_);
+    status->addPermanentWidget(bufferLabel_);
+    status->addPermanentWidget(cpuLabel_);
 
     status->showMessage("Ready");
+
+    statusBarTimer_ = new QTimer(this);
+    connect(statusBarTimer_, &QTimer::timeout, this, &MainWindow::updateStatusBar);
+    statusBarTimer_->start(1000);
+    updateStatusBar();
 }
 
 void MainWindow::onNewProject()
 {
-    if (editMgr_.edit() && editMgr_.edit()->getUndoManager().canUndo()) {
-        auto answer = QMessageBox::question(
-            this, "New Project",
-            "Save changes to the current project?",
-            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
-            QMessageBox::Save);
-        if (answer == QMessageBox::Cancel) return;
-        if (answer == QMessageBox::Save) onSaveProject();
-    }
+    if (!maybeSaveBeforeAction()) return;
     editMgr_.newEdit();
+    updateWindowTitle();
 }
 
 void MainWindow::onOpenProject()
 {
+    if (!maybeSaveBeforeAction()) return;
+
     QSettings settings;
     QString startDir = settings.value("paths/lastFileDialogDir", QDir::homePath()).toString();
     if (startDir.isEmpty() || !QDir(startDir).exists())
@@ -679,6 +764,7 @@ void MainWindow::onOpenProject()
 
     juce::File file(juce::String(path.toUtf8().constData()));
     editMgr_.loadEdit(file);
+    updateWindowTitle();
 }
 
 void MainWindow::onSaveProject()
@@ -689,6 +775,7 @@ void MainWindow::onSaveProject()
     }
     if (routingView_) routingView_->flushNodePositions();
     editMgr_.saveEdit();
+    updateWindowTitle();
 }
 
 void MainWindow::onSaveProjectAs()
@@ -708,6 +795,7 @@ void MainWindow::onSaveProjectAs()
     if (routingView_) routingView_->flushNodePositions();
     juce::File file(juce::String(path.toUtf8().constData()));
     editMgr_.saveEditAs(file);
+    updateWindowTitle();
 }
 
 void MainWindow::onExportAudio()

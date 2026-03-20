@@ -41,8 +41,8 @@ struct Theme {
     QColor pianoRollBlackKey      {20, 20, 25};
     QColor pianoRollWhiteKey      {50, 50, 55};
     QColor pianoRollGrid          {40, 40, 45};
-    QColor pianoKeyWhite          {230, 230, 230};
-    QColor pianoKeyBlack          {30, 30, 30};
+    QColor pianoKeyWhite          {215, 215, 218};
+    QColor pianoKeyBlack          {38, 38, 42};
     QColor pianoKeyBorder         {160, 160, 160};
     QColor pianoRollVelocityBar   {100, 180, 255};
 };

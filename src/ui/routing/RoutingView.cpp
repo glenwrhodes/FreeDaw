@@ -77,6 +77,7 @@ RoutingView::RoutingView(EditManager* editMgr, QWidget* parent)
     layout->addWidget(toolbar_);
 
     scene_ = new QGraphicsScene(this);
+    scene_->setItemIndexMethod(QGraphicsScene::NoIndex);
     scene_->setBackgroundBrush(QBrush(theme.background.darker(110)));
 
     view_ = new QGraphicsView(scene_, this);
@@ -95,6 +96,13 @@ RoutingView::RoutingView(EditManager* editMgr, QWidget* parent)
     rebuildTimer_.setSingleShot(true);
     rebuildTimer_.setInterval(50);
     connect(&rebuildTimer_, &QTimer::timeout, this, &RoutingView::rebuild);
+
+    sceneRectTimer_.setSingleShot(true);
+    sceneRectTimer_.setInterval(0);
+    connect(&sceneRectTimer_, &QTimer::timeout, this, &RoutingView::updateSceneRect);
+
+    physicsTimer_.setInterval(16);
+    connect(&physicsTimer_, &QTimer::timeout, this, &RoutingView::tickCablePhysics);
 
     connect(scene_, &QGraphicsScene::selectionChanged,
             this, &RoutingView::onSceneSelectionChanged);
@@ -125,7 +133,12 @@ void RoutingView::clearAll()
     busNodes_.clear();
     masterNode_ = nullptr;
     outputNodes_.clear();
+
+    disconnect(scene_, &QGraphicsScene::selectionChanged,
+               this, &RoutingView::onSceneSelectionChanged);
     scene_->clear();
+    connect(scene_, &QGraphicsScene::selectionChanged,
+            this, &RoutingView::onSceneSelectionChanged);
 }
 
 void RoutingView::flushNodePositions()
@@ -142,6 +155,16 @@ void RoutingView::scheduleRebuild()
 void RoutingView::rebuild()
 {
     rebuildTimer_.stop();
+
+    if (dragCable_ || panning_ || scene_->mouseGrabberItem()) {
+        qDebug() << "[REBUILD] DEFERRED: dragCable=" << (quintptr)dragCable_
+                 << "panning=" << panning_
+                 << "grabber=" << (quintptr)scene_->mouseGrabberItem();
+        rebuildTimer_.start(100);
+        return;
+    }
+
+    qDebug() << "[REBUILD] executing full rebuild";
     clearAll();
     if (!editMgr_ || !editMgr_->edit()) return;
     buildNodes();
@@ -149,18 +172,47 @@ void RoutingView::rebuild()
     restoreNodePositions();
     buildCables();
     updateSceneRect();
+    qDebug() << "[REBUILD] done: inputs=" << inputNodes_.size()
+             << "tracks=" << trackNodes_.size()
+             << "cables=" << cables_.size();
 }
 
 void RoutingView::updateAllCablePaths()
 {
     for (auto* c : cables_)
         c->updatePath();
+    startCablePhysics();
+}
+
+void RoutingView::startCablePhysics()
+{
+    if (!physicsTimer_.isActive())
+        physicsTimer_.start();
+}
+
+void RoutingView::tickCablePhysics()
+{
+    constexpr qreal dt = 0.016;
+    bool anyMoving = false;
+
+    for (auto* c : cables_) {
+        if (c->stepPhysics(dt))
+            anyMoving = true;
+    }
+    if (dragCable_ && dragCable_->stepPhysics(dt))
+        anyMoving = true;
+
+    if (!anyMoving)
+        physicsTimer_.stop();
 }
 
 void RoutingView::connectNodeSignals(RoutingNode* node)
 {
     connect(node, &RoutingNode::nodeMoved, this, &RoutingView::updateAllCablePaths);
-    connect(node, &RoutingNode::nodeMoved, this, &RoutingView::updateSceneRect);
+    connect(node, &RoutingNode::nodeMoved, this, [this]() {
+        if (!sceneRectTimer_.isActive())
+            sceneRectTimer_.start();
+    });
     connect(node, &RoutingNode::renameRequested, this, [this, node](const QString& newName) {
         switch (node->nodeType()) {
             case NodeType::Track:
@@ -680,6 +732,7 @@ void RoutingView::updateCableDrag(const QPointF& scenePos)
 {
     if (!dragCable_) return;
     dragCable_->setDanglingEnd(scenePos);
+    startCablePhysics();
 
     auto* target = findJackAt(scenePos, true);
     // Could highlight the target jack here in the future

@@ -8,6 +8,8 @@
 #include <QGraphicsSimpleTextItem>
 #include <tracktion_engine/tracktion_engine.h>
 #include <vector>
+#include <unordered_set>
+#include <set>
 
 class QShowEvent;
 
@@ -27,6 +29,13 @@ protected:
 signals:
     void emptyAreaClicked(double beat, int pitch);
     void emptyAreaDoubleClicked(double sceneX, double sceneY);
+};
+
+struct ClipboardNote {
+    int pitch;
+    double beatOffset;
+    double length;
+    int velocity;
 };
 
 class NoteGrid : public QGraphicsView {
@@ -53,14 +62,56 @@ public:
     void rebuildNotes();
     void deleteSelectedNotes();
     void selectAllNotes();
-    void quantizeNotes();
+    void deselectAllNotes();
     void scrollToMidiNote(int midiNote);
+
+    // Clipboard
+    void copySelectedNotes();
+    void cutSelectedNotes();
+    void pasteNotes(double atBeat);
+    void duplicateSelectedNotes();
+
+    // Transpose
+    void transposeSelected(int semitones);
+    void showTransposeDialog();
+
+    // Transforms
+    void quantizeNotes();
+    void showQuantizeDialog();
+    void reverseSelectedNotes();
+    void showSwingDialog();
+    void showHumanizeDialog();
+    void legatoSelectedNotes();
+
+    // Musical typing
+    void setMusicalTypingEnabled(bool enabled);
+    bool musicalTypingEnabled() const { return musicalTypingEnabled_; }
+
+    // Step record
+    void setStepRecordEnabled(bool enabled);
+    bool stepRecordEnabled() const { return stepRecordEnabled_; }
+
+    // Note preview (audition through virtual instrument)
+    void playNotePreview(int noteNumber, int velocity = 100);
+    void stopNotePreview(int noteNumber);
+    void stopAllPreviews();
+
+    // Copy-drag selection (called by NoteItem after copy-drag)
+    void setPendingCopySelect(std::vector<ClipboardNote> notes);
+
+    // Step cursor position (for ruler sync)
+    void setTypingCursorBeat(double beat);
+    double typingCursorBeat() const { return typingCursorBeat_; }
 
 signals:
     void notesChanged();
     void zoomChanged();
     void verticalScrollChanged(int value);
     void horizontalScrollChanged(int value);
+    void editModeRequested();
+    void musicalTypingToggled(bool enabled);
+    void stepRecordToggled(bool enabled);
+    void typingCursorMoved(double beat);
 
 protected:
     void mousePressEvent(QMouseEvent* event) override;
@@ -68,6 +119,7 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void keyReleaseEvent(QKeyEvent* event) override;
     void contextMenuEvent(QContextMenuEvent* event) override;
     void showEvent(QShowEvent* event) override;
 
@@ -81,6 +133,12 @@ private:
     void clearDrawPreview();
     QString midiNoteName(int midiNote) const;
     void updateDrawPreviewAppearance();
+
+    // Musical typing helpers
+    int musicalTypingKeyToPitch(int qtKey) const;
+    void insertNoteAtCursor(int pitch);
+    void advanceCursor();
+    void updateTypingCursorVisual();
 
     te::MidiClip* clip_ = nullptr;
     NoteGridScene* scene_;
@@ -107,6 +165,26 @@ private:
     double drawCurrentBeat_ = 0.0;
     QGraphicsRectItem* drawPreviewItem_ = nullptr;
     QGraphicsSimpleTextItem* drawPreviewText_ = nullptr;
+
+    // Clipboard (shared across instances)
+    static std::vector<ClipboardNote> clipboard_;
+    double lastContextMenuBeat_ = 0.0;
+
+    // Selection persistence
+    std::vector<ClipboardNote> pendingCopySelect_;
+
+    // Musical typing / step record
+    bool musicalTypingEnabled_ = false;
+    bool stepRecordEnabled_ = false;
+    int typingOctave_ = 4;
+    int typingVelocity_ = 100;
+    double typingCursorBeat_ = 0.0;
+    QGraphicsLineItem* typingCursorLine_ = nullptr;
+    QGraphicsSimpleTextItem* typingCursorLabel_ = nullptr;
+    std::set<int> heldTypingKeys_;
+
+    // Note preview tracking
+    std::set<int> activePreviewNotes_;
 };
 
 } // namespace freedaw

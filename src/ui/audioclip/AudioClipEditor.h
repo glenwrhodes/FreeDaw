@@ -10,6 +10,7 @@
 #include <QSlider>
 #include <QDoubleSpinBox>
 #include <QTimer>
+#include <QSet>
 #include <tracktion_engine/tracktion_engine.h>
 
 namespace te = tracktion::engine;
@@ -52,6 +53,8 @@ private:
     void updateSelectionInfo();
     void updateUndoButtons();
 
+    bool confirmDestructiveEdit(const juce::File& file);
+    void updateWarningBanner();
     void executeEdit(const QString& description,
                      std::function<bool(const juce::File&)> operation);
 
@@ -80,6 +83,11 @@ private:
     EditManager* editMgr_ = nullptr;
     AudioFileUndoManager* undoManager_ = nullptr;
     juce::AudioBuffer<float> clipboard_;
+    QSet<QString> confirmedFiles_;
+
+    // Warning banner
+    QWidget* warningBanner_ = nullptr;
+    QLabel* warningLabel_ = nullptr;
 
     // Mini transport
     QPushButton* playFromStartBtn_ = nullptr;

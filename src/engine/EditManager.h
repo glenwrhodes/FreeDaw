@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QString>
 #include <QList>
+#include <QTimer>
 #include <unordered_set>
 #include <map>
 #include <string>
@@ -100,6 +101,12 @@ public:
     void saveRoutingLayout(const QMap<QString, QPointF>& positions);
     QMap<QString, QPointF> loadRoutingLayout() const;
 
+    void midiPanic();
+
+    void suspendEngine();
+    void resumeEngine();
+    bool isEngineSuspended() const { return engineSuspended_; }
+
     void undo();
     void redo();
 
@@ -110,6 +117,18 @@ public:
     void   setTimeSignature(int num, int den);
 
     juce::File currentFile() const { return currentFile_; }
+    bool hasUnsavedChanges() const { return hasUnsavedChanges_; }
+
+    void startAutosave();
+    void stopAutosave();
+    void clearAutosave();
+    static QString autosaveDir();
+    struct RecoveryInfo {
+        QString autosavePath;
+        QString originalPath;
+        QString timestamp;
+    };
+    static QList<RecoveryInfo> findRecoveryFiles();
 
     // Export / Freeze / Bounce
     bool isRenderInProgress() const { return renderInProgress_; }
@@ -143,10 +162,13 @@ private:
 
     void saveInputDisplayNames();
     void loadInputDisplayNames();
+    void markDirtyAndNotify();
 
     void unfreezeAllTracks();
     void cleanupFreezeState(te::AudioTrack& track);
     static juce::String sanitizeForFilename(const juce::String& name);
+    void performAutosave();
+    QString autosaveFileId() const;
 
     AudioEngine& audioEngine_;
     std::unique_ptr<te::Edit> edit_;
@@ -154,6 +176,9 @@ private:
     std::unordered_set<uint64_t> midiTrackIds_;
     std::map<std::string, QString> inputDisplayNames_;
     bool renderInProgress_ = false;
+    bool hasUnsavedChanges_ = false;
+    bool engineSuspended_ = false;
+    QTimer autosaveTimer_;
     struct FreezeState {
         juce::File freezeFile;
         std::vector<te::EditItemID> mutedClipIds;

@@ -28,12 +28,15 @@ private slots:
     void onStop();
     void onRecord();
     void onLoop();
+    void onPanic();
+    void onEngineToggle();
     void onBpmChanged(double bpm);
     void onTimeSigNumChanged(int num);
     void updatePosition();
 
 private:
     void applyButtonStyle(QPushButton* btn, const QColor& activeColor);
+    void updateEngineButtonStyle();
 
     EditManager* editMgr_;
 
@@ -41,6 +44,8 @@ private:
     QPushButton* stopBtn_;
     QPushButton* recordBtn_;
     QPushButton* loopBtn_;
+    QPushButton* panicBtn_;
+    QPushButton* engineBtn_;
     QLabel*      positionLabel_;
     QLabel*      beatLabel_;
     QDoubleSpinBox* bpmSpin_;

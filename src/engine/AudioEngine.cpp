@@ -1,4 +1,5 @@
 #include "AudioEngine.h"
+#include <QSettings>
 
 namespace freedaw {
 
@@ -23,6 +24,43 @@ void AudioEngine::setDefaultAudioDevice()
     // asynchronously via triggerAsyncUpdate(). Pump the JUCE message
     // loop now so they exist before the UI enumerates them.
     juce::MessageManager::getInstance()->runDispatchLoopUntil(200);
+}
+
+void AudioEngine::restoreSavedAudioSettings()
+{
+    QSettings settings;
+    if (!settings.contains("audio/sampleRate"))
+        return;
+
+    auto& adm = engine_->getDeviceManager().deviceManager;
+
+    auto savedType = settings.value("audio/deviceType").toString();
+    if (!savedType.isEmpty()) {
+        auto& types = adm.getAvailableDeviceTypes();
+        for (auto* type : types) {
+            if (QString::fromStdString(type->getTypeName().toStdString()) == savedType) {
+                adm.setCurrentAudioDeviceType(type->getTypeName(), true);
+                break;
+            }
+        }
+    }
+
+    juce::AudioDeviceManager::AudioDeviceSetup setup;
+    adm.getAudioDeviceSetup(setup);
+
+    auto savedOutput = settings.value("audio/outputDevice").toString();
+    if (!savedOutput.isEmpty())
+        setup.outputDeviceName = juce::String(savedOutput.toUtf8().constData());
+
+    double sr = settings.value("audio/sampleRate", 0.0).toDouble();
+    if (sr > 0.0)
+        setup.sampleRate = sr;
+
+    int buf = settings.value("audio/bufferSize", 0).toInt();
+    if (buf > 0)
+        setup.bufferSize = buf;
+
+    adm.setAudioDeviceSetup(setup, true);
 }
 
 juce::StringArray AudioEngine::getAvailableInputDevices() const

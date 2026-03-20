@@ -102,8 +102,11 @@ QVariant RoutingNode::itemChange(GraphicsItemChange change, const QVariant& valu
             QPointF delta = newPos - pos();
             for (auto* item : scene()->selectedItems()) {
                 if (item != this) {
-                    if (auto* node = dynamic_cast<RoutingNode*>(item))
+                    if (auto* node = dynamic_cast<RoutingNode*>(item)) {
+                        node->blockSignals(true);
                         node->moveBy(delta.x(), delta.y());
+                        node->blockSignals(false);
+                    }
                 }
             }
             groupMoveGuard_ = false;

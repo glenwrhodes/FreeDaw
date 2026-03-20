@@ -65,6 +65,8 @@ private:
     void zoomBy(double factor, const QPoint& viewAnchor);
     void updateSceneRect();
     void zoomToFit();
+    void startCablePhysics();
+    void tickCablePhysics();
 
     EditManager* editMgr_;
     QGraphicsScene* scene_;
@@ -87,6 +89,8 @@ private:
     int panStartVScroll_ = 0;
 
     QTimer rebuildTimer_;
+    QTimer sceneRectTimer_;
+    QTimer physicsTimer_;
     QMap<QString, QPointF> savedPositions_;
 
     static constexpr qreal COL_INPUTS = 30.0;

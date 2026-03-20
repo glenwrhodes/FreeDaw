@@ -8,6 +8,7 @@ double GridSnapper::gridIntervalBeats() const
 {
     switch (mode_) {
     case SnapMode::Off:          return 0.0;
+    case SnapMode::EighthBeat:   return 0.125;
     case SnapMode::QuarterBeat:  return 0.25;
     case SnapMode::HalfBeat:     return 0.5;
     case SnapMode::Beat:         return 1.0;

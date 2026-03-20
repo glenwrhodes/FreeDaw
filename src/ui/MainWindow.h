@@ -15,6 +15,9 @@
 #include <QToolBar>
 #include <QStatusBar>
 #include <QAction>
+#include <QCloseEvent>
+#include <QLabel>
+#include <QTimer>
 
 namespace freedaw {
 
@@ -36,7 +39,13 @@ public:
     explicit MainWindow(FreeDawApplication& app, QWidget* parent = nullptr);
     ~MainWindow() override;
 
+protected:
+    void closeEvent(QCloseEvent* event) override;
+
 private:
+    bool maybeSaveBeforeAction();
+    void updateWindowTitle();
+    void updateStatusBar();
     void createMenus();
     void createToolBar();
     void createDocks();
@@ -83,6 +92,11 @@ private:
     QToolBar* transportToolBar_       = nullptr;
     QToolBar* mainToolBar_            = nullptr;
     QAction* splitClipAction_         = nullptr;
+
+    QLabel* sampleRateLabel_          = nullptr;
+    QLabel* bufferLabel_              = nullptr;
+    QLabel* cpuLabel_                 = nullptr;
+    QTimer* statusBarTimer_           = nullptr;
 };
 
 } // namespace freedaw

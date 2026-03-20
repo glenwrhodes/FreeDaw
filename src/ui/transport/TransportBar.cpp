@@ -2,6 +2,8 @@
 #include "ui/timeline/GridSnapper.h"
 #include "utils/ThemeManager.h"
 #include "utils/IconFont.h"
+#include <QDialog>
+#include <QVBoxLayout>
 #include <cmath>
 
 namespace freedaw {
@@ -42,10 +44,37 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
     recordBtn_ = makeTransportBtn(icons::fa::Record, "Record", theme.transportRecord, true);
     loopBtn_   = makeTransportBtn(icons::fa::Loop,   "Loop",   theme.accent, true);
 
+    const QFont miFont = icons::materialIcons(16);
+    panicBtn_ = new QPushButton(this);
+    panicBtn_->setAccessibleName("MIDI Panic - Stop All Notes");
+    panicBtn_->setToolTip("MIDI Panic — stop all notes & reset (Ctrl+Shift+P)");
+    panicBtn_->setFont(miFont);
+    panicBtn_->setText(QString(icons::mi::Warning));
+    panicBtn_->setFixedSize(transportButtonSize);
+    panicBtn_->setStyleSheet(
+        QString("QPushButton { background: %1; color: %2; border: 1px solid %3; "
+                "border-radius: 4px; font-weight: bold; }"
+                "QPushButton:hover { background: %4; color: #ff3333; }"
+                "QPushButton:pressed { background: #cc2222; color: white; }")
+            .arg(theme.surface.name(), QColor(220, 80, 60).name(),
+                 theme.border.name(), theme.surfaceLight.name()));
+
+    engineBtn_ = new QPushButton(this);
+    engineBtn_->setAccessibleName("Audio Engine Toggle");
+    engineBtn_->setToolTip("Audio Engine — click to disable/enable");
+    engineBtn_->setFont(iconFont);
+    engineBtn_->setText(QString(icons::fa::Powerswitch));
+    engineBtn_->setCheckable(true);
+    engineBtn_->setChecked(true);
+    engineBtn_->setFixedSize(transportButtonSize);
+    updateEngineButtonStyle();
+
     connect(stopBtn_,   &QPushButton::clicked, this, &TransportBar::onStop);
     connect(playBtn_,   &QPushButton::clicked, this, &TransportBar::onPlay);
     connect(recordBtn_, &QPushButton::clicked, this, &TransportBar::onRecord);
     connect(loopBtn_,   &QPushButton::clicked, this, &TransportBar::onLoop);
+    connect(panicBtn_,  &QPushButton::clicked, this, &TransportBar::onPanic);
+    connect(engineBtn_, &QPushButton::clicked, this, &TransportBar::onEngineToggle);
 
     // Position display
     positionLabel_ = new QLabel("00:00.000", this);
@@ -75,6 +104,13 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
     layout->addWidget(playBtn_);
     layout->addWidget(recordBtn_);
     layout->addWidget(loopBtn_);
+
+    auto* sepPanic = new QFrame(this);
+    sepPanic->setFrameShape(QFrame::VLine);
+    sepPanic->setStyleSheet(QString("color: %1;").arg(theme.border.name()));
+    layout->addWidget(sepPanic);
+    layout->addWidget(panicBtn_);
+    layout->addWidget(engineBtn_);
 
     auto* sep2 = new QFrame(this);
     sep2->setFrameShape(QFrame::VLine);
@@ -217,6 +253,78 @@ void TransportBar::onLoop()
     loopBtn_->setChecked(t.looping.get());
 }
 
+void TransportBar::onPanic()
+{
+    if (!editMgr_) return;
+    editMgr_->midiPanic();
+    playBtn_->setChecked(false);
+    recordBtn_->setChecked(false);
+    isRecording_ = false;
+}
+
+void TransportBar::onEngineToggle()
+{
+    if (!editMgr_) return;
+
+    bool turningOn = engineBtn_->isChecked();
+
+    if (turningOn) {
+        auto& theme = ThemeManager::instance().current();
+        auto* busyDlg = new QDialog(window());
+        busyDlg->setWindowTitle("Audio Engine");
+        busyDlg->setAccessibleName("Audio Engine Initializing");
+        busyDlg->setModal(true);
+        busyDlg->setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint);
+        busyDlg->setFixedSize(320, 100);
+
+        auto* label = new QLabel("Initializing audio engine...", busyDlg);
+        label->setAccessibleName("Engine Status");
+        label->setAlignment(Qt::AlignCenter);
+        label->setStyleSheet(
+            QString("QLabel { color: %1; font-size: 12px; font-weight: bold; }")
+                .arg(theme.text.name()));
+        auto* dlgLayout = new QVBoxLayout(busyDlg);
+        dlgLayout->addWidget(label);
+
+        QTimer::singleShot(50, busyDlg, [this, busyDlg]() {
+            editMgr_->resumeEngine();
+            busyDlg->accept();
+        });
+
+        busyDlg->exec();
+        delete busyDlg;
+    } else {
+        editMgr_->suspendEngine();
+    }
+
+    updateEngineButtonStyle();
+    playBtn_->setChecked(false);
+    recordBtn_->setChecked(false);
+    isRecording_ = false;
+}
+
+void TransportBar::updateEngineButtonStyle()
+{
+    auto& theme = ThemeManager::instance().current();
+    bool active = engineBtn_->isChecked();
+
+    if (active) {
+        engineBtn_->setStyleSheet(
+            QString("QPushButton { background: %1; color: %2; border: 1px solid %3; "
+                    "border-radius: 4px; font-weight: bold; }"
+                    "QPushButton:hover { background: %4; }")
+                .arg(QColor(25, 120, 50).name(), QColor(70, 230, 70).name(),
+                     QColor(35, 150, 60).name(), QColor(30, 140, 55).name()));
+    } else {
+        engineBtn_->setStyleSheet(
+            QString("QPushButton { background: %1; color: %2; border: 1px solid %3; "
+                    "border-radius: 4px; font-weight: bold; }"
+                    "QPushButton:hover { background: %4; }")
+                .arg(theme.surface.name(), theme.textDim.name(),
+                     theme.border.name(), theme.surfaceLight.name()));
+    }
+}
+
 void TransportBar::onBpmChanged(double bpm)
 {
     if (!editMgr_ || !editMgr_->edit()) return;
@@ -238,6 +346,12 @@ void TransportBar::onTimeSigNumChanged(int num)
 void TransportBar::updatePosition()
 {
     if (!editMgr_ || !editMgr_->edit()) return;
+
+    if (editMgr_->isEngineSuspended()) {
+        positionLabel_->setText("-- OFF --");
+        beatLabel_->setText("---");
+        return;
+    }
 
     auto pos = editMgr_->transport().getPosition();
     double secs = std::max(0.0, pos.inSeconds());

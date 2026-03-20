@@ -27,6 +27,34 @@ AudioClipEditor::AudioClipEditor(QWidget* parent)
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
 
+    // ── Destructive editing warning banner ───────────────────────────────────
+    warningBanner_ = new QWidget(this);
+    warningBanner_->setAccessibleName("Destructive Editing Warning");
+    warningBanner_->setFixedHeight(26);
+    warningBanner_->setStyleSheet(
+        "background: qlineargradient(x1:0,y1:0,x2:1,y2:0,"
+        "stop:0 #8B4000, stop:1 #A04800);"
+        "border-bottom: 1px solid #C05500;");
+
+    auto* bannerLayout = new QHBoxLayout(warningBanner_);
+    bannerLayout->setContentsMargins(10, 2, 10, 2);
+    bannerLayout->setSpacing(6);
+
+    auto* warningIcon = new QLabel(QString::fromUtf8("\xe2\x9a\xa0"), warningBanner_);
+    warningIcon->setAccessibleName("Warning Icon");
+    warningIcon->setStyleSheet("color: #FFD54F; font-size: 13px; background: transparent; border: none;");
+    bannerLayout->addWidget(warningIcon);
+
+    warningLabel_ = new QLabel(warningBanner_);
+    warningLabel_->setAccessibleName("Destructive Edit Warning Text");
+    warningLabel_->setStyleSheet(
+        "color: #FFE0B2; font-size: 11px; font-weight: bold; background: transparent; border: none;");
+    bannerLayout->addWidget(warningLabel_);
+
+    bannerLayout->addStretch();
+    warningBanner_->setVisible(false);
+    mainLayout->addWidget(warningBanner_);
+
     // ── Toolbar Row 1 ────────────────────────────────────────────────────────
     auto* toolbar = new QWidget(this);
     toolbar->setFixedHeight(34);
@@ -448,6 +476,50 @@ AudioClipEditor::AudioClipEditor(QWidget* parent)
     onSnapChanged(3);
 }
 
+// ── Destructive edit warning / confirmation ───────────────────────────────────
+
+bool AudioClipEditor::confirmDestructiveEdit(const juce::File& file)
+{
+    auto path = QString::fromStdString(file.getFullPathName().toStdString());
+    if (confirmedFiles_.contains(path))
+        return true;
+
+    QMessageBox dlg(this);
+    dlg.setWindowTitle("Destructive Edit Warning");
+    dlg.setIcon(QMessageBox::Warning);
+    dlg.setText(QString("<b>This will permanently modify your source file:</b><br><br>"
+                        "<code>%1</code><br><br>"
+                        "A backup of the original will be saved, but all changes "
+                        "are written directly to the file on disk.")
+                    .arg(path.toHtmlEscaped()));
+    dlg.setInformativeText("Do you want to continue?");
+    dlg.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+    dlg.setDefaultButton(QMessageBox::No);
+    dlg.button(QMessageBox::Yes)->setText("Edit Source File");
+    dlg.button(QMessageBox::No)->setText("Cancel");
+    dlg.setAccessibleName("Destructive Edit Confirmation");
+
+    if (dlg.exec() != QMessageBox::Yes)
+        return false;
+
+    confirmedFiles_.insert(path);
+    return true;
+}
+
+void AudioClipEditor::updateWarningBanner()
+{
+    if (!clip_) {
+        warningBanner_->setVisible(false);
+        return;
+    }
+    auto file = clip_->getOriginalFile();
+    auto path = QString::fromStdString(file.getFullPathName().toStdString());
+    warningLabel_->setText(
+        QString("DESTRUCTIVE MODE \xe2\x80\x94 Edits modify source file: %1")
+            .arg(QString::fromStdString(file.getFileName().toStdString())));
+    warningBanner_->setVisible(true);
+}
+
 // ── executeEdit: the universal destructive-edit dispatch ──────────────────────
 
 void AudioClipEditor::executeEdit(const QString& description,
@@ -457,6 +529,10 @@ void AudioClipEditor::executeEdit(const QString& description,
     auto file = clip_->getOriginalFile();
     if (!file.existsAsFile()) return;
 
+    if (!confirmDestructiveEdit(file))
+        return;
+
+    undoManager_->savePristineBackup(file);
     undoManager_->pushUndo(file, description);
 
     if (!operation(file)) {
@@ -835,11 +911,13 @@ void AudioClipEditor::setClip(te::WaveAudioClip* clip, EditManager* editMgr)
 
         updateInfoBar();
         updateUndoButtons();
+        updateWarningBanner();
     } else {
         positionTimer_->stop();
         clipNameLabel_->setText("No clip selected");
         positionLabel_->setText("0:00.000");
         selectionInfoLabel_->setText("No selection");
+        warningBanner_->setVisible(false);
         infoBpmLabel_->setText("BPM: --");
         infoBeatsLabel_->setText("Beats: --");
         infoDurationLabel_->setText("Duration: --");

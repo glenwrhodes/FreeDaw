@@ -7,7 +7,7 @@ This document defines the feature set needed for a completed FreeDaw v1, based o
 
 | Area                  | Implemented (code-backed)                                                                                       | Missing / Partial (v1 gaps)                                                                                               |
 | --------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Project lifecycle     | New/open/save/save-as in `src/engine/EditManager.cpp` and `src/ui/MainWindow.cpp`                               | No autosave, crash/session recovery, or close-with-unsaved-changes prompt                                                 |
+| Project lifecycle     | New/open/save/save-as, autosave, crash recovery, unsaved-changes prompt, window title with dirty indicator       | ~~No autosave, crash/session recovery, or close-with-unsaved-changes prompt~~ **DONE**                                    |
 | Transport             | Play/stop/record/loop toggle, BPM, time signature in `src/ui/transport/TransportBar.cpp`                        | No loop in/out range UI, no count-in/pre-roll, no punch in/out                                                            |
 | Timeline editing      | Drag/resize/split/delete clips and drag-drop import in `src/ui/timeline/TimelineView.cpp` and `ClipItem.cpp`    | No automation lanes, no marker lane, no comping/take lanes                                                                |
 | Audio editing         | Trim/fade/normalize/reverse/silence in `src/ui/audioclip/AudioClipEditor.cpp` and `AudioWaveformView.cpp`       | No integrated time-stretch workflow for clip warping across timeline                                                      |
@@ -15,7 +15,7 @@ This document defines the feature set needed for a completed FreeDaw v1, based o
 | Mixer and routing     | Channel strip controls + routing graph in `src/ui/mixer/ChannelStrip.cpp` and `src/ui/routing/RoutingView.cpp`  | No automation controls surfaced from mixer for writing/reading envelopes                                                  |
 | Plugins and FX        | VST3 scan/cache in `src/engine/PluginScanner.cpp`, effect chain and plugin editor UI in `src/ui/effects/`       | No plugin blacklist UI, no custom scan path UI, VST3-only scan                                                            |
 | Export/render         | Mix export, freeze, bounce in `src/engine/EditManager.cpp`; export dialog in `src/ui/dialogs/ExportDialog.cpp`  | Export is WAV-only, no stem/per-track export workflow                                                                     |
-| Device/performance UX | Base engine device init in `src/engine/AudioEngine.cpp`                                                         | No audio settings panel; status bar shows static values (`44100 Hz`, `512 samples`, `CPU: 0%`) in `src/ui/MainWindow.cpp` |
+| Device/performance UX | Audio settings dialog, live status bar, device persistence in `src/engine/AudioEngine.cpp`                       | ~~No audio settings panel; status bar shows static values~~ **DONE**                                                      |
 | Editing tools UX      | Toolbar icons for pointer/pen/eraser in `src/ui/MainWindow.cpp`                                                 | Tool actions are not wired to actual edit modes                                                                           |
 | File browser ingest   | File browser emits `fileDoubleClicked` in `src/ui/browser/FileBrowserPanel.cpp`                                 | `fileDoubleClicked` is not connected; double-click import path is missing                                                 |
 
@@ -35,13 +35,13 @@ This document defines the feature set needed for a completed FreeDaw v1, based o
   - Loop in/out range handles in transport/timeline.
   - Metronome click while playing/recording.
   - Optional count-in before record starts.
-4. **Data safety and continuity**
-  - Unsaved-changes prompt on app close/project switch.
-  - Periodic autosave snapshots.
-  - Startup recovery flow after abnormal exit.
-5. **Device and latency control**
-  - Audio settings dialog for input/output device, sample rate, buffer size.
-  - Live status bar values for sample rate, buffer, and CPU.
+4. **Data safety and continuity** -- **DONE**
+  - ~~Unsaved-changes prompt on app close/project switch.~~
+  - ~~Periodic autosave snapshots.~~
+  - ~~Startup recovery flow after abnormal exit.~~
+5. **Device and latency control** -- **DONE**
+  - ~~Audio settings dialog for input/output device, sample rate, buffer size.~~
+  - ~~Live status bar values for sample rate, buffer, and CPU.~~
 
 ### Should-have for strong v1 usability
 
@@ -72,7 +72,7 @@ FreeDaw v1 is complete when all items below are true:
 
 - User can set loop start/end visually and record repeated passes against that loop.
 - User can enable metronome and optional count-in and hear click in recording workflow.
-- User can configure audio device and latency without leaving the app.
+- ~~User can configure audio device and latency without leaving the app.~~ **DONE**
 
 ### MIDI creation workflow
 
@@ -86,9 +86,9 @@ FreeDaw v1 is complete when all items below are true:
 
 ### Reliability and data protection
 
-- User is warned before losing unsaved changes on close/open/new.
-- Autosave captures recoverable snapshots during active editing.
-- App offers restoration after crash and can restore a usable recent state.
+- ~~User is warned before losing unsaved changes on close/open/new.~~ **DONE**
+- ~~Autosave captures recoverable snapshots during active editing.~~ **DONE**
+- ~~App offers restoration after crash and can restore a usable recent state.~~ **DONE**
 
 ### Export and delivery
 
@@ -97,7 +97,7 @@ FreeDaw v1 is complete when all items below are true:
 
 ## Suggested Execution Order
 
-1. Data safety (`unsaved prompt` + `autosave` + `recovery`) and audio settings panel.
+1. ~~Data safety (`unsaved prompt` + `autosave` + `recovery`) and audio settings panel.~~ **DONE**
 2. Automation lanes (engine model + timeline UI + persistence).
 3. MIDI CC lanes and channel assignment.
 4. Loop in/out UI, metronome, and count-in.
