@@ -1,7 +1,9 @@
 #include <QApplication>
 #include <QFile>
+#include <QFileInfo>
 #include <QDateTime>
 #include <QTimer>
+#include <QIcon>
 #include <juce_events/juce_events.h>
 #include "app/FreeDawApplication.h"
 #include "ui/MainWindow.h"
@@ -83,6 +85,8 @@ int main(int argc, char* argv[])
     qtApp.setApplicationVersion(FREEDAW_VERSION);
     qtApp.setOrganizationName("FreeDaw");
 
+    qtApp.setWindowIcon(QIcon(":/icon.png"));
+
     qtApp.setStyleSheet(
         "QToolTip { background: #3a3a3a; color: #dcdcdc; border: 1px solid #666; "
         "padding: 3px; font-size: 11px; }");
@@ -112,6 +116,21 @@ int main(int argc, char* argv[])
     app.checkRecovery(splash);
 
     app.showMainWindow();
+
+    // Load a .tracktionedit file passed as a command-line argument (drag-onto-exe)
+    QString fileToLoad;
+    const QStringList args = qtApp.arguments();
+    for (int i = 1; i < args.size(); ++i) {
+        if (args[i].endsWith(".tracktionedit", Qt::CaseInsensitive)
+            && QFileInfo::exists(args[i])) {
+            fileToLoad = args[i];
+            break;
+        }
+    }
+
+    if (!fileToLoad.isEmpty()) {
+        app.mainWindow()->loadFile(fileToLoad);
+    }
 
     splash->finish();
     splash->update();

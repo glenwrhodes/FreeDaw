@@ -51,25 +51,30 @@ class EffectChainWidget : public QWidget {
 
 public:
     explicit EffectChainWidget(EditManager* editMgr, QWidget* parent = nullptr);
-    void setPluginList(juce::KnownPluginList* list) { pluginList_ = list; }
+    void setPluginList(juce::KnownPluginList* list) { knownPlugins_ = list; }
 
     void setTrack(te::AudioTrack* track);
+    void setMasterMode();
     te::AudioTrack* currentTrack() const { return track_; }
+    bool isMasterMode() const { return masterMode_; }
 
 public slots:
     void rebuild();
 
 private:
-    void addEffectToTrack(const QString& effectName);
-    void addVstEffectToTrack(const juce::PluginDescription& desc);
-    void removeEffectFromTrack(te::Plugin* plugin);
+    void addEffect(const QString& effectName);
+    void addVstEffect(const juce::PluginDescription& desc);
+    void removeEffect(te::Plugin* plugin);
+
+    te::PluginList* targetPluginList() const;
 
     void scheduleRebuild();
 
-    juce::KnownPluginList* pluginList_ = nullptr;
+    juce::KnownPluginList* knownPlugins_ = nullptr;
 
     EditManager* editMgr_;
     te::AudioTrack* track_ = nullptr;
+    bool masterMode_ = false;
 
     QVBoxLayout* mainLayout_;
     QLabel* trackLabel_;

@@ -123,14 +123,27 @@ juce_add_gui_app(FreeDaw
     PRODUCT_NAME "FreeDaw"
     COMPANY_NAME "FreeDaw"
     BUNDLE_ID "com.freedaw.app"
+    ICON_BIG "${CMAKE_SOURCE_DIR}/resources/icon.png"
+    ICON_SMALL "${CMAKE_SOURCE_DIR}/resources/icon.png"
     MICROPHONE_PERMISSION_ENABLED TRUE
     MICROPHONE_PERMISSION_TEXT "FreeDaw needs microphone access for audio recording")
 
 juce_generate_juce_header(FreeDaw)
 
 target_sources(FreeDaw PRIVATE ${FREEDAW_SOURCES})
+
+# ── Windows application icon ─────────────────────────────────────────────────
+# JUCE's generated RC expects icon.ico next to FreeDaw_resources.rc
+if(WIN32)
+    file(COPY "${CMAKE_SOURCE_DIR}/resources/freedaw.ico"
+         DESTINATION "${CMAKE_BINARY_DIR}/FreeDaw_artefacts/JuceLibraryCode")
+    file(RENAME
+         "${CMAKE_BINARY_DIR}/FreeDaw_artefacts/JuceLibraryCode/freedaw.ico"
+         "${CMAKE_BINARY_DIR}/FreeDaw_artefacts/JuceLibraryCode/icon.ico")
+endif()
 qt_add_resources(FreeDaw "freedaw_resources" PREFIX "/" BASE resources FILES
     resources/splash.png
+    resources/icon.png
     resources/fontaudio.ttf
     resources/MaterialSymbolsOutlined.ttf)
 target_include_directories(FreeDaw PRIVATE src)

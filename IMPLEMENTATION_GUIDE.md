@@ -245,26 +245,35 @@
 
 ---
 
-### 4.2 MIDI channel selection **[MUST]**
+### 4.2 ~~MIDI channel selection and multi-channel piano roll~~ **[MUST]** -- DONE
 
-**What:** Let users choose which MIDI channel (1-16) a track or clip sends on.
+**What:** Let users work with multiple MIDI channels on a single track for multi-timbral instruments (e.g., orchestral libraries with violin on ch1, horn on ch2, etc.).
 
-**Where to start:**
-- `src/ui/pianoroll/PianoRollEditor.cpp` -- add a channel combo to the toolbar.
-- `src/ui/mixer/ChannelStrip.cpp` -- add a channel selector for MIDI tracks.
+**Files created:**
+- `src/ui/pianoroll/ChannelColors.h` -- Header-only 16-color palette with `channelColor(int ch)` helper.
 
-**Tracktion Engine API:**
-- `te::MidiClip` has `setMidiChannel(te::MidiChannel)` and `getMidiChannel()`.
-- `te::MidiChannel` is constructed from 1-16.
+**Files modified:**
+- `PianoRollEditor.h/.cpp` -- New `setClip(clip, editMgr)` signature. Right-side channel panel with all 16 channels: visibility toggle (filled/hollow circle), color swatch, editable name, click-to-activate. Lazy clip creation via `ensureClipForActiveChannel()`. CC combo moved into CC lane header.
+- `NoteGrid.h/.cpp` -- Refactored from single `clip_` to `primaryClip_` + `allClips_` + `hiddenChannels_`. `rebuildNotes()` iterates all clips with per-channel colors and active/dim opacity. `ensureClipCb_` callback for on-demand clip creation.
+- `NoteItem.h/.cpp` -- `channelNumber_`, `isActiveChannel_`, `beatOffset_` members. `paint()` uses channel colors with 35% opacity for non-active channels.
+- `VelocityLane.h/.cpp` -- Multi-clip aware with `setClips()`, shows only active channel.
+- `EditManager.h/.cpp` -- `addLinkedMidiChannel()`, `getLinkedMidiClips()`, `isLinkedSecondary()`, `linkedChannelCount()`, `propagateClipPosition()`, `setChannelName()`, `getChannelName()`. Channel names stored in clip ValueTree as `channelDisplayName`.
+- `ChannelStrip.h/.cpp` -- MIDI channel combo per MIDI track.
+- `ClipItem.h/.cpp` -- `linkedChannelCount_` badge rendering ("3ch"), `loadMidiPreviewFromClips()` for aggregated multi-channel preview.
+- `TimelineView.cpp` -- `rebuildClips()` skips secondary linked clips, passes linked set for preview. `deleteSelectedClips()` and `splitSelectedClipsAtPlayhead()` propagate to linked clips.
+- `MainWindow.cpp` -- Updated all `setClip` calls to pass `&editMgr_`.
+- `AiToolExecutor.cpp` / `AiToolDefs.cpp` -- `setup_midi_channels`, `set_channel_name`, `get_channel_names` AI tools.
+- `CMakeLists.txt` -- Added `ChannelColors.h`.
 
-**Implementation:**
-1. Add a `QComboBox` with channels 1-16 in `PianoRollEditor`.
-2. On change, call `clip->setMidiChannel(te::MidiChannel(ch))`.
-3. Optionally add the same control in `ChannelStrip` for MIDI tracks.
-
-**Acceptance criteria:**
-- User can set MIDI channel per clip.
-- Playback sends notes on the selected channel.
+**Features implemented:**
+- All 16 MIDI channels visible in a right-side panel with visibility toggles, color swatches, and editable names.
+- Click a channel to make it active; notes draw into that channel's clip.
+- Per-channel color-coded notes in the piano roll; non-active channels dim to 35% opacity.
+- Linked clips: co-located clips on the same track share position/length. One clip per channel, created lazily only when notes are drawn.
+- Single aggregated clip on the timeline with multi-channel badge ("Nch"). Move/resize/delete/split propagates to all linked clips.
+- Channel names stored in project file (clip ValueTree) with format "CustomName (chN)" or default "Ch N".
+- AI tools for batch channel setup (e.g., "Make an orchestra: Violin 1, Violin 2, Viola, Cello, Bass").
+- CC lane and velocity lane show only the active channel's data.
 
 ---
 
@@ -300,72 +309,53 @@
 
 ## 5. Transport and Recording
 
-### 5.1 Loop in/out region UI **[MUST]**
+### 5.1 ~~Loop in/out region UI~~ **[MUST]** -- DONE
 
 **What:** Let users set the loop start and end points visually on the timeline.
 
-**Where to start:**
-- `src/ui/timeline/TimeRuler.cpp` -- the ruler already handles click-to-seek. Add loop region overlay here.
-- `src/ui/transport/TransportBar.cpp` -- loop toggle exists (line ~212); extend it to display/set loop range.
+**Files modified:**
+- `TimeRuler.h/.cpp` -- Loop region overlay with translucent shading, draggable flag handles at loop in/out boundaries, right-click context menu ("Set Loop In/Out Here"), `loopRegionChanged` / `loopInRequested` / `loopOutRequested` signals, hover cursor feedback.
+- `TimelineView.h/.cpp` -- Loop overlay `QGraphicsRectItem` across the full scene height (z=90), wired ruler signals to `transport.loopPoint1`/`loopPoint2` via tempo sequence beat-to-time conversion, keyboard shortcuts `I` (set loop in at playhead) and `O` (set loop out at playhead), `syncLoopStateFromTransport()` on edit load.
+- `TransportBar.h/.cpp` -- `onLoop()` now creates a default 4-bar loop range from playhead when enabling loop with no range set; emits `loopToggled(bool)` signal.
+- `MainWindow.cpp` -- Connected `TransportBar::loopToggled` to `TimelineView::onLoopToggled`.
 
-**Tracktion Engine API:**
-- `te::TransportControl` has `loopPoint1` and `loopPoint2` properties (type `juce::CachedValue<double>`).
-- Setting these defines the loop range when `looping` is enabled.
-
-**Implementation:**
-1. Add two draggable handles on the `TimeRuler` for loop start and loop end.
-2. Draw a shaded overlay between the two handles.
-3. On drag, update `transport.loopPoint1` and `transport.loopPoint2` (these are beat positions converted via the tempo sequence).
-4. Alternatively, allow setting loop points from the transport bar with numeric entry.
-5. Keyboard shortcuts: `I` to set loop-in at playhead, `O` to set loop-out at playhead.
-
-**Acceptance criteria:**
-- User can drag loop start/end on the ruler.
-- Loop playback respects the set range.
-- Loop region is visually distinct on the timeline.
+**Features implemented:**
+- Translucent accent-colored loop region overlay on both the ruler and the scene.
+- Two flag handles (triangles) at loop in/out that can be dragged to resize the loop range.
+- Ruler right-click context menu to set loop in/out at any position.
+- `I`/`O` keyboard shortcuts to set loop boundaries at the snapped playhead position.
+- Default 4-bar loop range auto-created when loop is first enabled with no range.
+- Loop state restored from transport on edit load.
+- Loop overlay updates on scene rebuild (zoom, track changes, etc.).
 
 ---
 
-### 5.2 Metronome / click track **[MUST]**
+### 5.2 ~~Metronome / click track~~ **[MUST]** -- DONE
 
 **What:** Audible click during playback and recording.
 
-**Where to start:**
-- `src/ui/transport/TransportBar.cpp` -- add a metronome toggle button.
-- `src/engine/AudioEngine.h` / `.cpp` -- enable the click in Tracktion Engine.
+**Files modified:**
+- `TransportBar.h/.cpp` -- `metronomeBtn_` (checkable, `icons::fa::Metronome` glyph), `onMetronome()` slot toggles `edit->clickTrackEnabled` and persists to `QSettings("transport/metronomeEnabled")`. State restored on construction.
 
-**Tracktion Engine API:**
-- `te::Edit` has `clickTrackEnabled` (a `juce::CachedValue<bool>`).
-- Setting `edit->clickTrackEnabled = true` enables the built-in click.
-- Volume/panning of the click can be adjusted via `edit->getClickTrackVolume()` / `setClickTrackVolume()`.
-
-**Implementation:**
-1. Add a metronome button to `TransportBar` (checkable toggle).
-2. On toggle: `editMgr_->edit()->clickTrackEnabled = checked`.
-3. Persist the preference in `QSettings`.
-4. Optional: add click volume knob in a settings popover.
-
-**Acceptance criteria:**
-- Metronome audible during playback when enabled.
-- Metronome audible during recording when enabled.
-- Toggle state persists across sessions.
+**Features implemented:**
+- Metronome toggle button in the transport bar between Loop and Count-in.
+- Wired to Tracktion Engine's built-in click track (`edit->clickTrackEnabled`).
+- Toggle state persists across sessions via QSettings.
 
 ---
 
-### 5.3 Count-in before recording **[MUST]**
+### 5.3 ~~Count-in before recording~~ **[MUST]** -- DONE
 
 **What:** Play a configurable number of bars of metronome click before recording starts.
 
-**Where to start:** `src/ui/transport/TransportBar.cpp`, `onRecord()` (line ~197).
+**Files modified:**
+- `TransportBar.h/.cpp` -- `countInBtn_` (checkable "1-2" text button), `countInCombo_` (QComboBox: "1 Bar", "2 Bars", "1 Beat", "2 Beats"), `onCountIn()`/`onCountInModeChanged()` slots, `syncCountInToEngine()` helper. Uses `edit->setCountInMode(CountIn)` with Tracktion Engine's built-in pre-roll. Persists enabled state and mode to QSettings. Combo disabled when count-in is off.
 
-**Tracktion Engine API:**
-- `te::TransportControl::setRecordingPreCount(int numBarsCountIn)` or manual approach: start playback N bars before the punch-in point, then begin recording.
-- Tracktion Engine supports a pre-count internally.
-
-**Implementation:**
-1. Add a "Count-in" toggle (and optionally a bar count spinner) in `TransportBar`.
-2. Before calling `transport.record(false)`, if count-in is enabled, set the appropriate pre-count on the transport or manually offset the start position.
-3. Ensure the metronome is audible during the count-in bars.
+**Features implemented:**
+- Count-in toggle button and length selector in the transport bar.
+- Wired to Tracktion Engine's `te::Edit::CountIn` enum (none/oneBar/twoBar/oneBeat/twoBeat).
+- Tracktion Engine handles the pre-roll automatically during `transport.record()`.
+- State persists across sessions via QSettings.
 
 ---
 
@@ -820,6 +810,7 @@
 | `src/ui/timeline/AutomationLaneHeader.h/.cpp` | Automation lane header with parameter selector | DONE |
 | `src/ui/timeline/EnvelopeUtils.h` | Shared coordinate/path utilities for automation and CC lanes | DONE |
 | `src/ui/pianoroll/CcLane.h/.cpp` | CC event drawing and editing lane in piano roll | DONE |
+| `src/ui/pianoroll/ChannelColors.h` | 16-color channel palette for multi-channel piano roll | DONE |
 
 All other tasks modify existing files. Remember to add new `.h`/`.cpp` pairs to `FREEDAW_SOURCES` in `CMakeLists.txt`.
 
@@ -838,10 +829,10 @@ Quick-reference of every task sorted by priority.
 | ~~2.2~~ | ~~Live status bar~~ | ~~Device/Performance~~ DONE |
 | ~~3.1~~ | ~~Automation lane UI on timeline~~ | ~~Automation~~ DONE |
 | ~~4.1~~ | ~~CC lane editor in piano roll~~ | ~~MIDI~~ DONE |
-| 4.2 | MIDI channel selection | MIDI |
-| 5.1 | Loop in/out region UI | Transport |
-| 5.2 | Metronome / click track | Transport |
-| 5.3 | Count-in before recording | Transport |
+| ~~4.2~~ | ~~MIDI channel selection + multi-channel piano roll~~ | ~~MIDI~~ DONE |
+| ~~5.1~~ | ~~Loop in/out region UI~~ | ~~Transport~~ DONE |
+| ~~5.2~~ | ~~Metronome / click track~~ | ~~Transport~~ DONE |
+| ~~5.3~~ | ~~Count-in before recording~~ | ~~Transport~~ DONE |
 | 9.1 | Clip copy / paste / cut on timeline | Timeline Editing |
 | 9.2 | Arrow key nudge for clips and notes | Timeline Editing |
 | 11.1 | Input monitoring (hear-through) | Recording |

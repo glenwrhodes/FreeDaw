@@ -78,17 +78,19 @@ MainWindow::MainWindow(FreeDawApplication& app, QWidget* parent)
                 timelineView_->snapper().setMode(static_cast<SnapMode>(mode));
             });
 
+    // Connect loop toggle from transport bar to timeline view
+    connect(transportBar_, &TransportBar::loopToggled,
+            timelineView_, &TimelineView::onLoopToggled);
+
     connect(timelineView_, &TimelineView::instrumentSelectRequested,
             this, &MainWindow::onInstrumentSelectRequested);
 
     connect(timelineView_, &TimelineView::trackSelected,
             this, [this](te::AudioTrack* track) {
-                if (effectChain_) {
+                if (effectChain_)
                     effectChain_->setTrack(track);
-                }
-                if (mixerView_) {
+                if (mixerView_)
                     mixerView_->setSelectedTrack(track);
-                }
             });
 
     connect(timelineView_, &TimelineView::selectedClipsDeleted,
@@ -585,6 +587,17 @@ void MainWindow::createDocks()
                     effectChain_->setTrack(track);
             });
 
+    connect(mixerView_, &MixerView::masterSelected,
+            this, [this]() {
+                if (timelineView_)
+                    timelineView_->clearTrackSelection();
+                if (effectChain_) {
+                    effectChain_->setMasterMode();
+                    effectsDock_->setVisible(true);
+                    effectsDock_->raise();
+                }
+            });
+
     // Piano Roll dock (bottom, tabbed with mixer)
     pianoRollDock_ = new QDockWidget("Piano Roll", this);
     pianoRollDock_->setAccessibleName("Piano Roll Dock");
@@ -676,6 +689,19 @@ void MainWindow::createDocks()
                     effectsDock_->setVisible(true);
                     effectsDock_->raise();
                 }
+            });
+
+    connect(routingView_, &RoutingView::masterSelected,
+            this, [this]() {
+                if (timelineView_)
+                    timelineView_->clearTrackSelection();
+                if (effectChain_) {
+                    effectChain_->setMasterMode();
+                    effectsDock_->setVisible(true);
+                    effectsDock_->raise();
+                }
+                if (mixerView_)
+                    mixerView_->setMasterSelected();
             });
 
     tabifyDockWidget(mixerDock_, pianoRollDock_);
@@ -775,6 +801,20 @@ void MainWindow::onOpenProject()
     juce::File file(juce::String(path.toUtf8().constData()));
     editMgr_.loadEdit(file);
     updateWindowTitle();
+}
+
+void MainWindow::loadFile(const QString& path)
+{
+    QFileInfo fi(path);
+    if (!fi.exists() || fi.suffix().toLower() != "tracktionedit")
+        return;
+
+    juce::File file(juce::String(fi.absoluteFilePath().toUtf8().constData()));
+    editMgr_.loadEdit(file);
+    updateWindowTitle();
+
+    QSettings settings;
+    settings.setValue("paths/lastFileDialogDir", fi.absolutePath());
 }
 
 void MainWindow::onSaveProject()

@@ -1091,6 +1091,149 @@ void AiToolExecutor::registerHandlers()
         }
         return ok(id, result);
     };
+
+    // ── MIDI Clip / Note Creation ────────────────────────────────────────────
+
+    handlers_["create_midi_clip"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* track = resolveTrack(input["track"]);
+        if (!track) return err(id, "Track not found.");
+
+        double startBeat = input["start_beat"].toDouble();
+        double lengthBeats = input["length_beats"].toDouble();
+        if (lengthBeats <= 0.0) return err(id, "length_beats must be positive.");
+
+        auto* clip = editMgr_->addMidiClipToTrack(*track, startBeat, lengthBeats);
+        if (!clip) return err(id, "Failed to create MIDI clip.");
+
+        if (input.contains("name") && !input["name"].toString().isEmpty())
+            clip->setName(juce::String(input["name"].toString().toStdString()));
+
+        if (!editMgr_->isMidiTrack(track))
+            editMgr_->markAsMidiTrack(track);
+
+        int clipIndex = 0;
+        for (auto* c : track->getClips()) {
+            if (c == clip) break;
+            clipIndex++;
+        }
+
+        emit editMgr_->editChanged();
+        emit editMgr_->tracksChanged();
+
+        QJsonObject result;
+        result["clip_index"] = clipIndex;
+        result["name"] = QString::fromStdString(clip->getName().toStdString());
+        result["start_beat"] = startBeat;
+        result["length_beats"] = lengthBeats;
+        return ok(id, result);
+    };
+
+    handlers_["add_midi_notes"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* track = resolveTrack(input["track"]);
+        if (!track) return err(id, "Track not found.");
+
+        int clipIdx = input["clip_index"].toInt(-1);
+        if (clipIdx < 0) return err(id, "Invalid clip_index.");
+
+        auto clips = track->getClips();
+        if (clipIdx >= clips.size())
+            return err(id, QString("clip_index %1 out of range (track has %2 clips).").arg(clipIdx).arg(clips.size()));
+
+        auto* midiClip = dynamic_cast<te::MidiClip*>(clips[clipIdx]);
+        if (!midiClip)
+            return err(id, QString("Clip at index %1 is not a MIDI clip.").arg(clipIdx));
+
+        QJsonArray notes = input["notes"].toArray();
+        if (notes.isEmpty()) return err(id, "No notes provided.");
+
+        auto& seq = midiClip->getSequence();
+        int added = 0;
+
+        for (const auto& noteVal : notes) {
+            QJsonObject noteObj = noteVal.toObject();
+            int noteNum = noteObj["note"].toInt(-1);
+            double startBeat = noteObj["start_beat"].toDouble(0.0);
+            double lenBeats = noteObj["length_beats"].toDouble(1.0);
+            int velocity = noteObj.contains("velocity") ? noteObj["velocity"].toInt(100) : 100;
+            int channel = noteObj.contains("channel") ? noteObj["channel"].toInt(1) : 1;
+
+            if (noteNum < 0 || noteNum > 127) continue;
+            velocity = std::clamp(velocity, 1, 127);
+            channel = std::clamp(channel, 1, 16);
+            if (lenBeats <= 0.0) lenBeats = 0.25;
+
+            seq.addNote(noteNum,
+                        tracktion::BeatPosition::fromBeats(startBeat),
+                        tracktion::BeatDuration::fromBeats(lenBeats),
+                        velocity, channel - 1, nullptr);
+            added++;
+        }
+
+        emit editMgr_->editChanged();
+        if (added > 0)
+            emit editMgr_->midiClipModified(midiClip);
+
+        QJsonObject result;
+        result["added"] = added;
+        result["total_notes"] = seq.getNotes().size();
+        return ok(id, result);
+    };
+
+    handlers_["get_clips_on_track"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* track = resolveTrack(input["track"]);
+        if (!track) return err(id, "Track not found.");
+
+        auto& ts = editMgr_->edit()->tempoSequence;
+        QJsonArray arr;
+        int idx = 0;
+        for (auto* clip : track->getClips()) {
+            QJsonObject obj;
+            obj["index"] = idx++;
+            obj["name"] = QString::fromStdString(clip->getName().toStdString());
+
+            double startBeat = ts.toBeats(clip->getPosition().getStart()).inBeats();
+            double endBeat = ts.toBeats(clip->getPosition().getEnd()).inBeats();
+            obj["start_beat"] = startBeat;
+            obj["length_beats"] = endBeat - startBeat;
+
+            if (auto* mc = dynamic_cast<te::MidiClip*>(clip)) {
+                obj["type"] = "midi";
+                obj["note_count"] = mc->getSequence().getNotes().size();
+            } else {
+                obj["type"] = "audio";
+            }
+
+            arr.append(obj);
+        }
+        return ok(id, arr);
+    };
+
+    handlers_["clear_midi_notes"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* track = resolveTrack(input["track"]);
+        if (!track) return err(id, "Track not found.");
+
+        int clipIdx = input["clip_index"].toInt(-1);
+        if (clipIdx < 0) return err(id, "Invalid clip_index.");
+
+        auto clips = track->getClips();
+        if (clipIdx >= clips.size())
+            return err(id, QString("clip_index %1 out of range.").arg(clipIdx));
+
+        auto* midiClip = dynamic_cast<te::MidiClip*>(clips[clipIdx]);
+        if (!midiClip)
+            return err(id, QString("Clip at index %1 is not a MIDI clip.").arg(clipIdx));
+
+        auto& seq = midiClip->getSequence();
+        int removed = seq.getNotes().size();
+        seq.removeAllNotes(nullptr);
+
+        emit editMgr_->editChanged();
+        emit editMgr_->midiClipModified(midiClip);
+
+        return ok(id, QString("Removed %1 notes from clip '%2'.")
+                      .arg(removed)
+                      .arg(QString::fromStdString(midiClip->getName().toStdString())));
+    };
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────

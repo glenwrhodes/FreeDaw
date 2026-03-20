@@ -22,11 +22,13 @@ public slots:
     void rebuildStrips();
     void refreshStrips();
     void setSelectedTrack(te::AudioTrack* track);
+    void setMasterSelected();
 
 signals:
     void effectInsertRequested(te::AudioTrack* track, int slotIndex);
     void instrumentSelectRequested(te::AudioTrack* track);
     void trackSelected(te::AudioTrack* track);
+    void masterSelected();
 
 private:
     bool eventFilter(QObject* watched, QEvent* event) override;

@@ -39,6 +39,8 @@ public:
     explicit MainWindow(FreeDawApplication& app, QWidget* parent = nullptr);
     ~MainWindow() override;
 
+    void loadFile(const QString& path);
+
 protected:
     void closeEvent(QCloseEvent* event) override;
 

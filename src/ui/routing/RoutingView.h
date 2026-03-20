@@ -23,6 +23,7 @@ public:
 
 signals:
     void trackSelected(te::AudioTrack* track);
+    void masterSelected();
 
 public slots:
     void rebuild();

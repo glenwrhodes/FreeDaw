@@ -14,6 +14,15 @@ ChannelStrip* findParentStrip(QWidget* w)
     }
     return nullptr;
 }
+
+void installFilterRecursive(QWidget* widget, QObject* filter)
+{
+    widget->installEventFilter(filter);
+    for (auto* child : widget->children()) {
+        if (auto* cw = qobject_cast<QWidget*>(child))
+            installFilterRecursive(cw, filter);
+    }
+}
 }
 
 MixerView::MixerView(EditManager* editMgr, QWidget* parent)
@@ -62,6 +71,7 @@ MixerView::MixerView(EditManager* editMgr, QWidget* parent)
     mainLayout->addWidget(sep);
 
     masterStrip_ = ChannelStrip::createMasterStrip(editMgr_, this);
+    installFilterRecursive(masterStrip_, this);
     mainLayout->addWidget(masterStrip_);
 
     connect(editMgr_, &EditManager::aboutToChangeEdit, this, [this]() {
@@ -123,27 +133,49 @@ void MixerView::setSelectedTrack(te::AudioTrack* track)
     selectedTrack_ = track;
     for (auto* strip : strips_)
         strip->setSelected(strip->track() == selectedTrack_);
+    if (masterStrip_)
+        masterStrip_->setSelected(false);
+}
+
+void MixerView::setMasterSelected()
+{
+    selectedTrack_ = nullptr;
+    for (auto* strip : strips_)
+        strip->setSelected(false);
+    if (masterStrip_)
+        masterStrip_->setSelected(true);
 }
 
 bool MixerView::eventFilter(QObject* watched, QEvent* event)
 {
-    if ((watched == stripContainer_ || watched == scrollArea_->viewport())
-        && event->type() == QEvent::MouseButtonPress) {
+    if (event->type() == QEvent::MouseButtonPress) {
         auto* mouseEvent = static_cast<QMouseEvent*>(event);
         if (mouseEvent->button() != Qt::LeftButton)
             return QWidget::eventFilter(watched, event);
 
-        QPoint containerPos = mouseEvent->pos();
-        if (watched == scrollArea_->viewport())
-            containerPos = stripContainer_->mapFrom(scrollArea_->viewport(), mouseEvent->pos());
+        auto* watchedWidget = qobject_cast<QWidget*>(watched);
+        if (masterStrip_ && watchedWidget
+            && (watchedWidget == masterStrip_ || findParentStrip(watchedWidget) == masterStrip_)) {
+            if (!masterStrip_->isSelected()) {
+                setMasterSelected();
+                emit masterSelected();
+            }
+            return QWidget::eventFilter(watched, event);
+        }
 
-        auto* clickedWidget = stripContainer_->childAt(containerPos);
-        auto* clickedStrip = findParentStrip(clickedWidget);
+        if (watched == stripContainer_ || watched == scrollArea_->viewport()) {
+            QPoint containerPos = mouseEvent->pos();
+            if (watched == scrollArea_->viewport())
+                containerPos = stripContainer_->mapFrom(scrollArea_->viewport(), mouseEvent->pos());
 
-        if (clickedStrip && clickedStrip->track()) {
-            emit trackSelected(clickedStrip->track());
-        } else {
-            emit trackSelected(nullptr);
+            auto* clickedWidget = stripContainer_->childAt(containerPos);
+            auto* clickedStrip = findParentStrip(clickedWidget);
+
+            if (clickedStrip && clickedStrip->track()) {
+                emit trackSelected(clickedStrip->track());
+            } else {
+                emit trackSelected(nullptr);
+            }
         }
     }
 

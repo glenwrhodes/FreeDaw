@@ -99,9 +99,11 @@ public slots:
     void onTracksChanged();
     void onEditChanged();
     void onTransportPositionChanged();
+    void onLoopToggled(bool enabled);
     void splitSelectedClipsAtPlayhead();
     void deleteSelectedClips();
     void setSelectedTrack(te::AudioTrack* track);
+    void clearTrackSelection();
 
 private:
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -136,6 +138,7 @@ private:
     GridSnapper snapper_;
 
     QGraphicsLineItem* playheadLine_ = nullptr;
+    QGraphicsRectItem* loopOverlayItem_ = nullptr;
     QTimer playheadTimer_;
 
     std::vector<ClipItem*> clipItems_;
@@ -156,6 +159,11 @@ private:
     std::vector<QGraphicsRectItem*> laneResizeHandles_;
 
     void rebuildLayout();
+    void updateLoopOverlay();
+    void setLoopInAtPlayhead();
+    void setLoopOutAtPlayhead();
+    void applyLoopRegionToTransport(double inBeat, double outBeat);
+    void syncLoopStateFromTransport();
     void toggleAutomation(te::AudioTrack* track, bool visible);
     void onAutomationParamChanged(int trackIndex, te::AutomatableParameter* param);
     int trackIndexAtSceneY(double sceneY) const;

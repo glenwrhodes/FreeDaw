@@ -198,6 +198,7 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
     topRowLayout_->addWidget(headerCorner_);
 
     ruler_ = new TimeRuler(topRow);
+    ruler_->setSnapFunction([this](double beat) { return snapper_.snapBeat(beat); });
     topRowLayout_->addWidget(ruler_, 1);
 
     outerLayout->addWidget(topRow);
@@ -256,6 +257,15 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
     playheadLine_ = scene_->addLine(0, 0, 0, 2000, QPen(theme.playhead, 1.5));
     playheadLine_->setZValue(100);
 
+    // Loop region overlay on the scene (behind playhead, in front of clips)
+    {
+        QColor loopColor = theme.accent;
+        loopColor.setAlpha(25);
+        loopOverlayItem_ = scene_->addRect(0, 0, 0, 0, Qt::NoPen, loopColor);
+        loopOverlayItem_->setZValue(90);
+        loopOverlayItem_->setVisible(false);
+    }
+
     // Sync ruler scroll with graphics view horizontal scroll
     connect(graphicsView_->horizontalScrollBar(), &QScrollBar::valueChanged,
             this, [this](int val) {
@@ -282,6 +292,29 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
         auto& ts = editMgr_->edit()->tempoSequence;
         auto time = ts.toTime(tracktion::BeatPosition::fromBeats(beat));
         editMgr_->transport().setPosition(time);
+    });
+
+    // Loop region handle drag -> update transport loop points
+    connect(ruler_, &TimeRuler::loopRegionChanged, this,
+            [this](double inBeat, double outBeat) {
+                applyLoopRegionToTransport(inBeat, outBeat);
+            });
+
+    // Right-click "Set Loop In/Out Here" on ruler
+    connect(ruler_, &TimeRuler::loopInRequested, this, [this](double beat) {
+        beat = snapper_.snapBeat(beat);
+        double outBeat = ruler_->loopOutBeat();
+        if (beat >= outBeat) outBeat = beat + editMgr_->getTimeSigNumerator();
+        ruler_->setLoopRegion(beat, outBeat);
+        applyLoopRegionToTransport(beat, outBeat);
+    });
+
+    connect(ruler_, &TimeRuler::loopOutRequested, this, [this](double beat) {
+        beat = snapper_.snapBeat(beat);
+        double inBeat = ruler_->loopInBeat();
+        if (beat <= inBeat) inBeat = std::max(0.0, beat - editMgr_->getTimeSigNumerator());
+        ruler_->setLoopRegion(inBeat, beat);
+        applyLoopRegionToTransport(inBeat, beat);
     });
 
     // Scene drop -> add audio clip
@@ -520,6 +553,16 @@ bool TimelineView::eventFilter(QObject* watched, QEvent* event)
                 keyEvent->accept();
                 return true;
             }
+            if (keyEvent->key() == Qt::Key_I && !(keyEvent->modifiers() & Qt::ControlModifier)) {
+                setLoopInAtPlayhead();
+                keyEvent->accept();
+                return true;
+            }
+            if (keyEvent->key() == Qt::Key_O && !(keyEvent->modifiers() & Qt::ControlModifier)) {
+                setLoopOutAtPlayhead();
+                keyEvent->accept();
+                return true;
+            }
             if (keyEvent->key() == Qt::Key_A && selectedTrack_) {
                 int trackIdx = -1;
                 auto tracks = editMgr_->getAudioTracks();
@@ -564,6 +607,7 @@ void TimelineView::onEditChanged()
     rebuildClips();
     for (auto* header : trackHeaders_)
         header->refresh();
+    syncLoopStateFromTransport();
     qDebug() << "[TimelineView] onEditChanged done";
 }
 
@@ -950,6 +994,7 @@ void TimelineView::rebuildClips()
     }
 
     rebuildAutomationLanes(sceneWidth);
+    updateLoopOverlay();
     qDebug() << "[rebuildClips] done";
 }
 
@@ -1006,6 +1051,93 @@ void TimelineView::updatePlayhead()
             graphicsView_->viewport()->rect().center()).y(),
             50, 10, 50, 0);
     }
+}
+
+// ── Loop region helpers ──────────────────────────────────────────────────────
+
+void TimelineView::updateLoopOverlay()
+{
+    if (!loopOverlayItem_) return;
+
+    bool visible = ruler_->loopEnabled() && ruler_->loopOutBeat() > ruler_->loopInBeat();
+    loopOverlayItem_->setVisible(visible);
+    if (visible) {
+        double x1 = ruler_->loopInBeat() * pixelsPerBeat_;
+        double x2 = ruler_->loopOutBeat() * pixelsPerBeat_;
+        double h = scene_->sceneRect().height();
+        if (h < 1.0) h = 2000.0;
+        loopOverlayItem_->setRect(x1, 0, x2 - x1, h);
+    }
+}
+
+void TimelineView::setLoopInAtPlayhead()
+{
+    if (!editMgr_ || !editMgr_->edit()) return;
+    auto& ts = editMgr_->edit()->tempoSequence;
+    double beat = ts.toBeats(editMgr_->transport().getPosition()).inBeats();
+    beat = snapper_.snapBeat(std::max(0.0, beat));
+
+    double outBeat = ruler_->loopOutBeat();
+    if (outBeat <= beat)
+        outBeat = beat + editMgr_->getTimeSigNumerator();
+
+    ruler_->setLoopRegion(beat, outBeat);
+    ruler_->setLoopEnabled(true);
+    applyLoopRegionToTransport(beat, outBeat);
+    updateLoopOverlay();
+}
+
+void TimelineView::setLoopOutAtPlayhead()
+{
+    if (!editMgr_ || !editMgr_->edit()) return;
+    auto& ts = editMgr_->edit()->tempoSequence;
+    double beat = ts.toBeats(editMgr_->transport().getPosition()).inBeats();
+    beat = snapper_.snapBeat(std::max(0.0, beat));
+
+    double inBeat = ruler_->loopInBeat();
+    if (inBeat >= beat)
+        inBeat = std::max(0.0, beat - editMgr_->getTimeSigNumerator());
+
+    ruler_->setLoopRegion(inBeat, beat);
+    ruler_->setLoopEnabled(true);
+    applyLoopRegionToTransport(inBeat, beat);
+    updateLoopOverlay();
+}
+
+void TimelineView::applyLoopRegionToTransport(double inBeat, double outBeat)
+{
+    if (!editMgr_ || !editMgr_->edit()) return;
+    auto& ts = editMgr_->edit()->tempoSequence;
+    auto& transport = editMgr_->transport();
+
+    auto inTime = ts.toTime(tracktion::BeatPosition::fromBeats(inBeat));
+    auto outTime = ts.toTime(tracktion::BeatPosition::fromBeats(outBeat));
+
+    transport.loopPoint1 = inTime;
+    transport.loopPoint2 = outTime;
+
+    updateLoopOverlay();
+}
+
+void TimelineView::onLoopToggled(bool enabled)
+{
+    Q_UNUSED(enabled);
+    syncLoopStateFromTransport();
+}
+
+void TimelineView::syncLoopStateFromTransport()
+{
+    if (!editMgr_ || !editMgr_->edit()) return;
+    auto& ts = editMgr_->edit()->tempoSequence;
+    auto& transport = editMgr_->transport();
+
+    bool looping = transport.looping.get();
+    double inBeat = ts.toBeats(transport.loopPoint1.get()).inBeats();
+    double outBeat = ts.toBeats(transport.loopPoint2.get()).inBeats();
+
+    ruler_->setLoopRegion(std::max(0.0, inBeat), std::max(0.0, outBeat));
+    ruler_->setLoopEnabled(looping);
+    updateLoopOverlay();
 }
 
 void TimelineView::handleFileDrop(const QString& path, double xPos, int yPos)
@@ -1149,6 +1281,13 @@ void TimelineView::selectTrack(te::AudioTrack* track)
 void TimelineView::setSelectedTrack(te::AudioTrack* track)
 {
     selectTrack(track);
+}
+
+void TimelineView::clearTrackSelection()
+{
+    selectedTrack_ = nullptr;
+    for (auto* h : trackHeaders_)
+        h->setSelected(false);
 }
 
 void TimelineView::handleEmptyAreaDoubleClick(double sceneX, double sceneY)

@@ -22,12 +22,16 @@ public:
 
 signals:
     void snapModeRequested(int mode);
+    void loopToggled(bool enabled);
 
 private slots:
     void onPlay();
     void onStop();
     void onRecord();
     void onLoop();
+    void onMetronome();
+    void onCountIn();
+    void onCountInModeChanged(int index);
     void onPanic();
     void onEngineToggle();
     void onBpmChanged(double bpm);
@@ -37,6 +41,7 @@ private slots:
 private:
     void applyButtonStyle(QPushButton* btn, const QColor& activeColor);
     void updateEngineButtonStyle();
+    void syncCountInToEngine();
 
     EditManager* editMgr_;
 
@@ -44,6 +49,9 @@ private:
     QPushButton* stopBtn_;
     QPushButton* recordBtn_;
     QPushButton* loopBtn_;
+    QPushButton* metronomeBtn_;
+    QPushButton* countInBtn_;
+    QComboBox*   countInCombo_;
     QPushButton* panicBtn_;
     QPushButton* engineBtn_;
     QLabel*      positionLabel_;
@@ -55,6 +63,7 @@ private:
 
     QTimer positionTimer_;
     bool isRecording_ = false;
+    bool deferredLoopActivation_ = false;
 };
 
 } // namespace freedaw

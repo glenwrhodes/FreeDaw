@@ -561,6 +561,68 @@ QJsonArray AiToolDefs::allTools()
         {{"track", trackProp()}},
         QJsonArray({"track"})));
 
+    // ── MIDI Clip / Note Creation ────────────────────────────────────────────
+
+    {
+        QJsonObject props;
+        props["track"] = trackProp();
+        props["start_beat"] = propNumber("Start position in beats (0 = bar 1 beat 1).", 0.0, 100000.0);
+        props["length_beats"] = propNumber("Clip length in beats.", 0.25, 100000.0);
+        props["name"] = prop("string", "Optional clip name.");
+        tools.append(makeTool("create_midi_clip",
+            "Create an empty MIDI clip on a track at the given beat position and length. "
+            "Returns the clip index for use with add_midi_notes. "
+            "The track will be marked as a MIDI track if it isn't already.",
+            props, QJsonArray({"track", "start_beat", "length_beats"})));
+    }
+
+    {
+        QJsonObject noteObj;
+        noteObj["type"] = "object";
+        QJsonObject noteProps;
+        noteProps["note"] = propNumber("MIDI note number (0-127). Middle C = 60.", 0, 127);
+        noteProps["start_beat"] = propNumber("Start position in beats relative to the clip start.", 0.0, 100000.0);
+        noteProps["length_beats"] = propNumber("Note duration in beats.", 0.01, 100000.0);
+        noteProps["velocity"] = propNumber("Note velocity (1-127).", 1, 127);
+        noteProps["channel"] = propNumber("MIDI channel (1-16).", 1, 16);
+        noteObj["properties"] = noteProps;
+        noteObj["required"] = QJsonArray({"note", "start_beat", "length_beats"});
+
+        QJsonObject notesArr;
+        notesArr["type"] = "array";
+        notesArr["items"] = noteObj;
+        notesArr["description"] = "Array of MIDI notes to add.";
+
+        QJsonObject props;
+        props["track"] = trackProp();
+        props["clip_index"] = propNumber("Zero-based index of the MIDI clip on the track (as returned by create_midi_clip or get_clips_on_track).", 0, 10000);
+        props["notes"] = notesArr;
+        tools.append(makeTool("add_midi_notes",
+            "Add one or more MIDI notes to an existing MIDI clip. "
+            "Note positions are relative to the clip start (beat 0 = clip start). "
+            "Default velocity is 100, default channel is 1. "
+            "You can add many notes in a single call for efficiency.",
+            props, QJsonArray({"track", "clip_index", "notes"})));
+    }
+
+    {
+        QJsonObject props;
+        props["track"] = trackProp();
+        tools.append(makeTool("get_clips_on_track",
+            "List all clips on a track with their index, name, type (audio/midi), "
+            "start beat, length in beats, and for MIDI clips the note count.",
+            props, QJsonArray({"track"})));
+    }
+
+    {
+        QJsonObject props;
+        props["track"] = trackProp();
+        props["clip_index"] = propNumber("Zero-based index of the MIDI clip on the track.", 0, 10000);
+        tools.append(makeTool("clear_midi_notes",
+            "Remove all MIDI notes from a clip. Useful before re-populating a clip.",
+            props, QJsonArray({"track", "clip_index"})));
+    }
+
     return tools;
 }
 

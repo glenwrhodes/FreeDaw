@@ -12,6 +12,7 @@ double GridSnapper::gridIntervalBeats() const
     case SnapMode::QuarterBeat:  return 0.25;
     case SnapMode::HalfBeat:     return 0.5;
     case SnapMode::Beat:         return 1.0;
+    case SnapMode::HalfNote:     return 2.0;
     case SnapMode::Bar:          return double(timeSigNum_);
     }
     return 1.0;

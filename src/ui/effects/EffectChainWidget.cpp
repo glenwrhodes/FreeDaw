@@ -219,13 +219,13 @@ EffectChainWidget::EffectChainWidget(EditManager* editMgr, QWidget* parent)
             .arg(theme.surface.name(), theme.accent.name(),
                  theme.border.name(), theme.surfaceLight.name()));
     connect(addBtn_, &QPushButton::clicked, this, [this]() {
-        if (!track_) return;
-        EffectSelectorDialog dlg(pluginList_, this);
+        if (!targetPluginList()) return;
+        EffectSelectorDialog dlg(knownPlugins_, this);
         if (dlg.exec() == QDialog::Accepted && !dlg.selectedEffect().isEmpty()) {
             if (dlg.isVstEffect())
-                addVstEffectToTrack(dlg.selectedVstPlugin());
+                addVstEffect(dlg.selectedVstPlugin());
             else
-                addEffectToTrack(dlg.selectedEffect());
+                addEffect(dlg.selectedEffect());
         }
     });
     mainLayout_->addWidget(addBtn_);
@@ -255,7 +255,7 @@ EffectChainWidget::EffectChainWidget(EditManager* editMgr, QWidget* parent)
     connect(&rebuildTimer_, &QTimer::timeout, this, &EffectChainWidget::rebuild);
 
     connect(editMgr_, &EditManager::editChanged, this, [this]() {
-        if (track_) scheduleRebuild();
+        if (track_ || masterMode_) scheduleRebuild();
     });
 
     connect(&automationPollTimer_, &QTimer::timeout, this, [this]() {
@@ -271,6 +271,7 @@ EffectChainWidget::EffectChainWidget(EditManager* editMgr, QWidget* parent)
 void EffectChainWidget::setTrack(te::AudioTrack* track)
 {
     track_ = track;
+    masterMode_ = false;
     if (track_) {
         trackLabel_->setText(
             QString("FX: %1").arg(
@@ -279,6 +280,23 @@ void EffectChainWidget::setTrack(te::AudioTrack* track)
         trackLabel_->setText("No track selected");
     }
     rebuild();
+}
+
+void EffectChainWidget::setMasterMode()
+{
+    track_ = nullptr;
+    masterMode_ = true;
+    trackLabel_->setText("FX: Master");
+    rebuild();
+}
+
+te::PluginList* EffectChainWidget::targetPluginList() const
+{
+    if (track_)
+        return &track_->pluginList;
+    if (masterMode_ && editMgr_ && editMgr_->edit())
+        return &editMgr_->edit()->getMasterPluginList();
+    return nullptr;
 }
 
 void EffectChainWidget::scheduleRebuild()
@@ -297,12 +315,13 @@ void EffectChainWidget::rebuild()
         delete item;
     }
 
-    if (!track_) {
+    auto* plist = targetPluginList();
+    if (!plist) {
         slotsLayout_->addStretch();
         return;
     }
 
-    for (auto* plugin : track_->pluginList.getPlugins()) {
+    for (auto* plugin : plist->getPlugins()) {
         if (dynamic_cast<te::VolumeAndPanPlugin*>(plugin)) continue;
         if (dynamic_cast<te::LevelMeterPlugin*>(plugin)) continue;
 
@@ -310,21 +329,22 @@ void EffectChainWidget::rebuild()
             auto* delayWidget = new DelayEffectWidget(
                 delayPlugin, editMgr_, slotsContainer_);
             connect(delayWidget, &DelayEffectWidget::removeRequested,
-                    this, &EffectChainWidget::removeEffectFromTrack);
+                    this, &EffectChainWidget::removeEffect);
             slotsLayout_->addWidget(delayWidget);
         } else {
             auto* slot = new EffectSlotWidget(plugin, editMgr_, slotsContainer_);
             connect(slot, &EffectSlotWidget::removeRequested,
-                    this, &EffectChainWidget::removeEffectFromTrack);
+                    this, &EffectChainWidget::removeEffect);
             slotsLayout_->addWidget(slot);
         }
     }
     slotsLayout_->addStretch();
 }
 
-void EffectChainWidget::addEffectToTrack(const QString& effectName)
+void EffectChainWidget::addEffect(const QString& effectName)
 {
-    if (!track_ || !editMgr_ || !editMgr_->edit()) return;
+    auto* plist = targetPluginList();
+    if (!plist || !editMgr_ || !editMgr_->edit()) return;
 
     auto& cache = editMgr_->edit()->getPluginCache();
     const char* xmlType = nullptr;
@@ -341,14 +361,14 @@ void EffectChainWidget::addEffectToTrack(const QString& effectName)
     if (xmlType) {
         auto plugin = cache.createNewPlugin(juce::String(xmlType), {});
         if (plugin) {
-            int insertIndex = track_->pluginList.size();
-            for (int i = 0; i < track_->pluginList.size(); ++i) {
-                if (dynamic_cast<te::LevelMeterPlugin*>(track_->pluginList[i])) {
+            int insertIndex = plist->size();
+            for (int i = 0; i < plist->size(); ++i) {
+                if (dynamic_cast<te::LevelMeterPlugin*>((*plist)[i])) {
                     insertIndex = i;
                     break;
                 }
             }
-            track_->pluginList.insertPlugin(plugin, insertIndex, nullptr);
+            plist->insertPlugin(plugin, insertIndex, nullptr);
         }
     }
 
@@ -356,29 +376,30 @@ void EffectChainWidget::addEffectToTrack(const QString& effectName)
     emit editMgr_->editChanged();
 }
 
-void EffectChainWidget::addVstEffectToTrack(const juce::PluginDescription& desc)
+void EffectChainWidget::addVstEffect(const juce::PluginDescription& desc)
 {
-    if (!track_ || !editMgr_ || !editMgr_->edit()) return;
+    auto* plist = targetPluginList();
+    if (!plist || !editMgr_ || !editMgr_->edit()) return;
 
     auto pluginState = te::ExternalPlugin::create(editMgr_->edit()->engine, desc);
     if (auto plugin = editMgr_->edit()->getPluginCache().createNewPlugin(pluginState)) {
-        int insertIndex = track_->pluginList.size();
-        for (int i = 0; i < track_->pluginList.size(); ++i) {
-            if (dynamic_cast<te::LevelMeterPlugin*>(track_->pluginList[i])) {
+        int insertIndex = plist->size();
+        for (int i = 0; i < plist->size(); ++i) {
+            if (dynamic_cast<te::LevelMeterPlugin*>((*plist)[i])) {
                 insertIndex = i;
                 break;
             }
         }
-        track_->pluginList.insertPlugin(plugin, insertIndex, nullptr);
+        plist->insertPlugin(plugin, insertIndex, nullptr);
     }
 
     rebuild();
     emit editMgr_->editChanged();
 }
 
-void EffectChainWidget::removeEffectFromTrack(te::Plugin* plugin)
+void EffectChainWidget::removeEffect(te::Plugin* plugin)
 {
-    if (!track_ || !plugin) return;
+    if (!targetPluginList() || !plugin) return;
     plugin->setEnabled(false);
     QTimer::singleShot(50, this, [this, plugin]() {
         plugin->deleteFromParent();

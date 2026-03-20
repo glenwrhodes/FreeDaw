@@ -3,6 +3,7 @@
 #include "utils/ThemeManager.h"
 #include "utils/IconFont.h"
 #include <QDialog>
+#include <QSettings>
 #include <QVBoxLayout>
 #include <cmath>
 
@@ -43,6 +44,25 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
     playBtn_   = makeTransportBtn(icons::fa::Play,   "Play",   theme.transportPlay, true);
     recordBtn_ = makeTransportBtn(icons::fa::Record, "Record", theme.transportRecord, true);
     loopBtn_   = makeTransportBtn(icons::fa::Loop,   "Loop",   theme.accent, true);
+    metronomeBtn_ = makeTransportBtn(icons::fa::Metronome, "Metronome", QColor(60, 180, 200), true);
+
+    countInBtn_ = new QPushButton("1-2", this);
+    countInBtn_->setAccessibleName("Count-In Before Recording");
+    countInBtn_->setToolTip("Count-in before recording");
+    countInBtn_->setCheckable(true);
+    countInBtn_->setFixedSize(transportButtonSize);
+    applyButtonStyle(countInBtn_, QColor(200, 160, 60));
+
+    countInCombo_ = new QComboBox(this);
+    countInCombo_->setAccessibleName("Count-In Length");
+    countInCombo_->setToolTip("Count-in length");
+    countInCombo_->addItem("1 Bar",  1);
+    countInCombo_->addItem("2 Bars", 2);
+    countInCombo_->addItem("1 Beat", 4);
+    countInCombo_->addItem("2 Beats", 3);
+    countInCombo_->setFixedWidth(80);
+    countInCombo_->setFixedHeight(28);
+    countInCombo_->setEnabled(false);
 
     const QFont miFont = icons::materialIcons(16);
     panicBtn_ = new QPushButton(this);
@@ -69,28 +89,35 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
     engineBtn_->setFixedSize(transportButtonSize);
     updateEngineButtonStyle();
 
-    connect(stopBtn_,   &QPushButton::clicked, this, &TransportBar::onStop);
-    connect(playBtn_,   &QPushButton::clicked, this, &TransportBar::onPlay);
-    connect(recordBtn_, &QPushButton::clicked, this, &TransportBar::onRecord);
-    connect(loopBtn_,   &QPushButton::clicked, this, &TransportBar::onLoop);
-    connect(panicBtn_,  &QPushButton::clicked, this, &TransportBar::onPanic);
-    connect(engineBtn_, &QPushButton::clicked, this, &TransportBar::onEngineToggle);
+    connect(stopBtn_,      &QPushButton::clicked, this, &TransportBar::onStop);
+    connect(playBtn_,      &QPushButton::clicked, this, &TransportBar::onPlay);
+    connect(recordBtn_,    &QPushButton::clicked, this, &TransportBar::onRecord);
+    connect(loopBtn_,      &QPushButton::clicked, this, &TransportBar::onLoop);
+    connect(metronomeBtn_, &QPushButton::clicked, this, &TransportBar::onMetronome);
+    connect(countInBtn_,   &QPushButton::clicked, this, &TransportBar::onCountIn);
+    connect(countInCombo_, qOverload<int>(&QComboBox::currentIndexChanged),
+            this, &TransportBar::onCountInModeChanged);
+    connect(panicBtn_,     &QPushButton::clicked, this, &TransportBar::onPanic);
+    connect(engineBtn_,    &QPushButton::clicked, this, &TransportBar::onEngineToggle);
 
     // Position display
-    positionLabel_ = new QLabel("00:00.000", this);
-    positionLabel_->setAccessibleName("Position Time");
-    positionLabel_->setFixedWidth(90);
-    positionLabel_->setAlignment(Qt::AlignCenter);
-    positionLabel_->setStyleSheet(
+    const QString lcdStyle =
         QString("QLabel { color: %1; background: %2; border: 1px solid %3; "
-                "border-radius: 3px; font-family: monospace; font-size: 10pt; padding: 2px; }")
-            .arg(theme.accentLight.name(), theme.background.name(), theme.border.name()));
+                "border-radius: 3px; font-family: 'Consolas', 'Courier New', monospace; "
+                "font-size: 11pt; font-weight: bold; padding: 2px 4px; letter-spacing: 1px; }")
+            .arg(theme.accentLight.name(), theme.background.name(), theme.border.name());
 
-    beatLabel_ = new QLabel("1.1.000", this);
+    positionLabel_ = new QLabel("00:00:00", this);
+    positionLabel_->setAccessibleName("Position Time");
+    positionLabel_->setFixedWidth(100);
+    positionLabel_->setAlignment(Qt::AlignCenter);
+    positionLabel_->setStyleSheet(lcdStyle);
+
+    beatLabel_ = new QLabel("001.1.00", this);
     beatLabel_->setAccessibleName("Position Bars Beats");
-    beatLabel_->setFixedWidth(80);
+    beatLabel_->setFixedWidth(100);
     beatLabel_->setAlignment(Qt::AlignCenter);
-    beatLabel_->setStyleSheet(positionLabel_->styleSheet());
+    beatLabel_->setStyleSheet(lcdStyle);
 
     layout->addWidget(positionLabel_);
     layout->addWidget(beatLabel_);
@@ -104,6 +131,9 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
     layout->addWidget(playBtn_);
     layout->addWidget(recordBtn_);
     layout->addWidget(loopBtn_);
+    layout->addWidget(metronomeBtn_);
+    layout->addWidget(countInBtn_);
+    layout->addWidget(countInCombo_);
 
     auto* sepPanic = new QFrame(this);
     sepPanic->setFrameShape(QFrame::VLine);
@@ -181,11 +211,13 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
             .arg(theme.text.name()));
     snapCombo_ = new QComboBox(this);
     snapCombo_->setAccessibleName("Grid Snap Mode");
-    snapCombo_->addItem("Off",     int(SnapMode::Off));
-    snapCombo_->addItem("1/4 Beat", int(SnapMode::QuarterBeat));
-    snapCombo_->addItem("1/2 Beat", int(SnapMode::HalfBeat));
-    snapCombo_->addItem("Beat",    int(SnapMode::Beat));
-    snapCombo_->addItem("Bar",     int(SnapMode::Bar));
+    snapCombo_->addItem("Off",  int(SnapMode::Off));
+    snapCombo_->addItem("Bar",  int(SnapMode::Bar));
+    snapCombo_->addItem("1/2",  int(SnapMode::HalfNote));
+    snapCombo_->addItem("1/4",  int(SnapMode::Beat));
+    snapCombo_->addItem("1/8",  int(SnapMode::HalfBeat));
+    snapCombo_->addItem("1/16", int(SnapMode::QuarterBeat));
+    snapCombo_->addItem("1/32", int(SnapMode::EighthBeat));
     snapCombo_->setCurrentIndex(3);
     snapCombo_->setFixedWidth(100);
     snapCombo_->setFixedHeight(28);
@@ -199,8 +231,26 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
 
     layout->addStretch();
 
+    // Restore metronome and count-in state from settings
+    {
+        QSettings settings;
+        bool metroOn = settings.value("transport/metronomeEnabled", false).toBool();
+        metronomeBtn_->setChecked(metroOn);
+        if (editMgr_ && editMgr_->edit())
+            editMgr_->edit()->clickTrackEnabled = metroOn;
+
+        bool countInOn = settings.value("transport/countInEnabled", false).toBool();
+        int countInMode = settings.value("transport/countInMode", 1).toInt();
+        int comboIdx = countInCombo_->findData(countInMode);
+        if (comboIdx >= 0)
+            countInCombo_->setCurrentIndex(comboIdx);
+        countInBtn_->setChecked(countInOn);
+        countInCombo_->setEnabled(countInOn);
+        syncCountInToEngine();
+    }
+
     connect(&positionTimer_, &QTimer::timeout, this, &TransportBar::updatePosition);
-    positionTimer_.start(50);
+    positionTimer_.start(16);
 }
 
 void TransportBar::onPlay()
@@ -209,11 +259,26 @@ void TransportBar::onPlay()
     auto& t = editMgr_->transport();
     if (t.isPlaying()) {
         t.stop(false, false);
+        if (deferredLoopActivation_) {
+            t.looping.setValue(true, nullptr);
+            deferredLoopActivation_ = false;
+        }
         if (isRecording_) {
             isRecording_ = false;
             recordBtn_->setChecked(false);
         }
     } else {
+        // If looping is on and playhead is before the loop region,
+        // temporarily disable engine looping so playback starts from
+        // the current position rather than jumping to loop start.
+        if (t.looping.get()) {
+            auto pos = t.getPosition();
+            auto loopStart = t.loopPoint1.get();
+            if (pos < loopStart) {
+                t.looping.setValue(false, nullptr);
+                deferredLoopActivation_ = true;
+            }
+        }
         t.play(false);
     }
     playBtn_->setChecked(t.isPlaying());
@@ -224,6 +289,10 @@ void TransportBar::onStop()
     if (!editMgr_ || !editMgr_->edit()) return;
     auto& t = editMgr_->transport();
     t.stop(false, false);
+    if (deferredLoopActivation_) {
+        t.looping.setValue(true, nullptr);
+        deferredLoopActivation_ = false;
+    }
     t.setPosition(tracktion::TimePosition::fromSeconds(0));
     playBtn_->setChecked(false);
     recordBtn_->setChecked(false);
@@ -249,8 +318,64 @@ void TransportBar::onLoop()
 {
     if (!editMgr_ || !editMgr_->edit()) return;
     auto& t = editMgr_->transport();
-    t.looping.setValue(!t.looping.get(), nullptr);
+    bool enabling = !t.looping.get();
+
+    // If enabling loop with no range set, create a default range of 4 bars from playhead
+    if (enabling) {
+        auto p1 = t.loopPoint1.get();
+        auto p2 = t.loopPoint2.get();
+        if (p1 == p2) {
+            auto& ts = editMgr_->edit()->tempoSequence;
+            double playBeat = ts.toBeats(t.getPosition()).inBeats();
+            double beatsPerBar = editMgr_->getTimeSigNumerator();
+            double barStart = std::floor(playBeat / beatsPerBar) * beatsPerBar;
+            double loopIn = std::max(0.0, barStart);
+            double loopOut = loopIn + beatsPerBar * 4.0;
+            t.loopPoint1 = ts.toTime(tracktion::BeatPosition::fromBeats(loopIn));
+            t.loopPoint2 = ts.toTime(tracktion::BeatPosition::fromBeats(loopOut));
+        }
+    }
+
+    t.looping.setValue(enabling, nullptr);
     loopBtn_->setChecked(t.looping.get());
+    emit loopToggled(t.looping.get());
+}
+
+void TransportBar::onMetronome()
+{
+    if (!editMgr_ || !editMgr_->edit()) return;
+    bool on = metronomeBtn_->isChecked();
+    editMgr_->edit()->clickTrackEnabled = on;
+    QSettings settings;
+    settings.setValue("transport/metronomeEnabled", on);
+}
+
+void TransportBar::onCountIn()
+{
+    bool on = countInBtn_->isChecked();
+    countInCombo_->setEnabled(on);
+    syncCountInToEngine();
+    QSettings settings;
+    settings.setValue("transport/countInEnabled", on);
+}
+
+void TransportBar::onCountInModeChanged(int /*index*/)
+{
+    syncCountInToEngine();
+    QSettings settings;
+    settings.setValue("transport/countInMode", countInCombo_->currentData().toInt());
+}
+
+void TransportBar::syncCountInToEngine()
+{
+    if (!editMgr_ || !editMgr_->edit()) return;
+    if (countInBtn_->isChecked()) {
+        int mode = countInCombo_->currentData().toInt();
+        editMgr_->edit()->setCountInMode(
+            static_cast<te::Edit::CountIn>(mode));
+    } else {
+        editMgr_->edit()->setCountInMode(te::Edit::CountIn::none);
+    }
 }
 
 void TransportBar::onPanic()
@@ -357,24 +482,39 @@ void TransportBar::updatePosition()
     double secs = std::max(0.0, pos.inSeconds());
 
     int mins = int(secs) / 60;
-    double secsRem = secs - mins * 60;
+    int wholeSecs = int(secs) % 60;
+    int centisecs = int((secs - std::floor(secs)) * 100);
     positionLabel_->setText(
-        QString("%1:%2")
+        QString("%1:%2:%3")
             .arg(mins, 2, 10, QChar('0'))
-            .arg(secsRem, 6, 'f', 3, QChar('0')));
+            .arg(wholeSecs, 2, 10, QChar('0'))
+            .arg(centisecs, 2, 10, QChar('0')));
 
     auto& ts2 = editMgr_->edit()->tempoSequence;
     double beat = std::max(0.0, ts2.toBeats(pos).inBeats());
     int beatsPerBar = editMgr_->getTimeSigNumerator();
     int bar = int(beat / beatsPerBar) + 1;
     int beatInBar = int(std::fmod(beat, beatsPerBar)) + 1;
-    int ticks = int(std::fmod(beat, 1.0) * 1000);
+    int ticks = int(std::fmod(beat, 1.0) * 100);
 
     beatLabel_->setText(
         QString("%1.%2.%3")
-            .arg(bar).arg(beatInBar).arg(ticks, 3, 10, QChar('0')));
+            .arg(bar, 3, 10, QChar('0'))
+            .arg(beatInBar)
+            .arg(ticks, 2, 10, QChar('0')));
 
     playBtn_->setChecked(editMgr_->transport().isPlaying());
+
+    // Re-enable looping once the playhead reaches the loop region
+    if (deferredLoopActivation_ && editMgr_->transport().isPlaying()) {
+        auto loopStart = editMgr_->transport().loopPoint1.get();
+        if (pos >= loopStart) {
+            editMgr_->transport().looping.setValue(true, nullptr);
+            deferredLoopActivation_ = false;
+        }
+    }
+
+    loopBtn_->setChecked(editMgr_->transport().looping.get() || deferredLoopActivation_);
 }
 
 void TransportBar::applyButtonStyle(QPushButton* btn, const QColor& activeColor)

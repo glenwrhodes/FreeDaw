@@ -925,6 +925,7 @@ void RoutingView::onSceneSelectionChanged()
 {
     te::AudioTrack* found = nullptr;
     int trackBusCount = 0;
+    bool masterNodeSelected = false;
     for (auto* item : scene_->selectedItems()) {
         if (auto* node = dynamic_cast<RoutingNode*>(item)) {
             if ((node->nodeType() == NodeType::Track ||
@@ -932,10 +933,14 @@ void RoutingView::onSceneSelectionChanged()
                 found = node->track();
                 if (++trackBusCount > 1) break;
             }
+            if (node->nodeType() == NodeType::Master)
+                masterNodeSelected = true;
         }
     }
     if (trackBusCount == 1 && found)
         emit trackSelected(found);
+    else if (trackBusCount == 0 && masterNodeSelected)
+        emit masterSelected();
 }
 
 void RoutingView::zoomBy(double factor, const QPoint& viewAnchor)
