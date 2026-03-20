@@ -68,6 +68,10 @@ set(FREEDAW_SOURCES
     src/ui/timeline/ClipItem.h      src/ui/timeline/ClipItem.cpp
     src/ui/timeline/GridSnapper.h   src/ui/timeline/GridSnapper.cpp
     src/ui/timeline/TrackHeaderWidget.h src/ui/timeline/TrackHeaderWidget.cpp
+    src/ui/timeline/EnvelopeUtils.h
+    src/ui/timeline/AutomationLaneItem.h  src/ui/timeline/AutomationLaneItem.cpp
+    src/ui/timeline/AutomationPointItem.h src/ui/timeline/AutomationPointItem.cpp
+    src/ui/timeline/AutomationLaneHeader.h src/ui/timeline/AutomationLaneHeader.cpp
     src/ui/mixer/MixerView.h        src/ui/mixer/MixerView.cpp
     src/ui/mixer/ChannelStrip.h     src/ui/mixer/ChannelStrip.cpp
     src/ui/transport/TransportBar.h src/ui/transport/TransportBar.cpp

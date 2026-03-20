@@ -1,4 +1,7 @@
 #include "TimelineView.h"
+#include "AutomationLaneItem.h"
+#include "AutomationLaneHeader.h"
+#include "AutomationPointItem.h"
 #include "utils/ThemeManager.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <QGraphicsSceneDragDropEvent>
@@ -14,6 +17,7 @@
 #include <QCoreApplication>
 #include <QMenu>
 #include <QMessageBox>
+#include <QSignalBlocker>
 #include <QDebug>
 #include <QLineF>
 #include <cmath>
@@ -82,11 +86,14 @@ void TimelineScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton) {
         auto hitItems = items(event->scenePos());
-        bool hitClip = false;
+        bool hitInteractive = false;
         for (auto* item : hitItems) {
-            if (dynamic_cast<ClipItem*>(item)) { hitClip = true; break; }
+            if (dynamic_cast<ClipItem*>(item) ||
+                dynamic_cast<AutomationPointItem*>(item) ||
+                dynamic_cast<AutomationLaneItem*>(item))
+            { hitInteractive = true; break; }
         }
-        backgroundDragCandidate_ = !hitClip;
+        backgroundDragCandidate_ = !hitInteractive;
         backgroundDragging_ = false;
         if (backgroundDragCandidate_)
             backgroundDragStartScenePos_ = event->scenePos();
@@ -130,11 +137,14 @@ void TimelineScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton) {
         auto hitItems = items(event->scenePos());
-        bool hitClip = false;
+        bool hitInteractive = false;
         for (auto* item : hitItems) {
-            if (dynamic_cast<ClipItem*>(item)) { hitClip = true; break; }
+            if (dynamic_cast<ClipItem*>(item) ||
+                dynamic_cast<AutomationPointItem*>(item) ||
+                dynamic_cast<AutomationLaneItem*>(item))
+            { hitInteractive = true; break; }
         }
-        if (!hitClip) {
+        if (!hitInteractive) {
             emit emptyAreaDoubleClicked(event->scenePos().x(), event->scenePos().y());
             event->accept();
             return;
@@ -146,11 +156,14 @@ void TimelineScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 void TimelineScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
     auto hitItems = items(event->scenePos());
-    bool hitClip = false;
+    bool hitInteractive = false;
     for (auto* item : hitItems) {
-        if (dynamic_cast<ClipItem*>(item)) { hitClip = true; break; }
+        if (dynamic_cast<ClipItem*>(item) ||
+            dynamic_cast<AutomationPointItem*>(item) ||
+            dynamic_cast<AutomationLaneItem*>(item))
+        { hitInteractive = true; break; }
     }
-    if (!hitClip) {
+    if (!hitInteractive) {
         emit backgroundRightClicked(event->scenePos(), event->screenPos());
         event->accept();
         return;
@@ -305,7 +318,7 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
                     editMgr_->addMidiTrack();
                 });
 
-                int trackIdx = static_cast<int>(scenePos.y() / trackHeight_);
+                int trackIdx = trackIndexAtSceneY(scenePos.y());
                 auto tracks = editMgr_->getAudioTracks();
                 if (trackIdx >= 0 && trackIdx < tracks.size()) {
                     auto* track = tracks[trackIdx];
@@ -371,6 +384,14 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
     connect(editMgr_, &EditManager::aboutToChangeEdit, this, [this]() {
         qDebug() << "[TimelineView] aboutToChangeEdit - clearing widgets";
         clearMidiClipDrawPreview();
+        cleanupAutomationItems();
+
+        for (auto* h : automationLaneHeaders_) {
+            headerVLayout_->removeWidget(h);
+            delete h;
+        }
+        automationLaneHeaders_.clear();
+
         for (auto* h : trackHeaders_) {
             headerVLayout_->removeWidget(h);
             delete h;
@@ -380,6 +401,8 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
         for (auto* item : clipItems_) scene_->removeItem(item);
         qDeleteAll(clipItems_);
         clipItems_.clear();
+
+        layout_.clear();
     });
 
     connect(editMgr_, &EditManager::tracksChanged,
@@ -419,6 +442,45 @@ bool TimelineView::eventFilter(QObject* watched, QEvent* event)
     if (watched == graphicsView_ || watched == graphicsView_->viewport()) {
         if (event->type() == QEvent::MouseButtonPress) {
             graphicsView_->setFocus(Qt::MouseFocusReason);
+
+            auto* mouseEvent = static_cast<QMouseEvent*>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                QPointF scenePos = graphicsView_->mapToScene(mouseEvent->pos());
+                for (auto* handle : laneResizeHandles_) {
+                    if (handle->contains(handle->mapFromScene(scenePos))) {
+                        int trackIdx = handle->data(0).toInt();
+                        if (trackIdx >= 0 && trackIdx < static_cast<int>(layout_.size())) {
+                            laneResizing_ = true;
+                            laneResizeTrackIndex_ = trackIdx;
+                            laneResizeStartHeight_ = layout_[trackIdx].automationLaneHeight;
+                            laneResizeStartY_ = scenePos.y();
+                            graphicsView_->viewport()->setCursor(Qt::SizeVerCursor);
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (event->type() == QEvent::MouseMove && laneResizing_) {
+            auto* mouseEvent = static_cast<QMouseEvent*>(event);
+            QPointF scenePos = graphicsView_->mapToScene(mouseEvent->pos());
+            double delta = scenePos.y() - laneResizeStartY_;
+            double newHeight = std::clamp(laneResizeStartHeight_ + delta, kMinLaneHeight, kMaxLaneHeight);
+            if (laneResizeTrackIndex_ >= 0 && laneResizeTrackIndex_ < static_cast<int>(layout_.size())) {
+                layout_[laneResizeTrackIndex_].automationLaneHeight = newHeight;
+                rebuildLayout();
+                rebuildClips();
+                rebuildTrackHeaders();
+            }
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease && laneResizing_) {
+            laneResizing_ = false;
+            laneResizeTrackIndex_ = -1;
+            graphicsView_->viewport()->unsetCursor();
+            return true;
         }
 
         if (event->type() == QEvent::Wheel) {
@@ -455,6 +517,19 @@ bool TimelineView::eventFilter(QObject* watched, QEvent* event)
             }
             if (keyEvent->key() == Qt::Key_Delete || keyEvent->key() == Qt::Key_Backspace) {
                 deleteSelectedClips();
+                keyEvent->accept();
+                return true;
+            }
+            if (keyEvent->key() == Qt::Key_A && selectedTrack_) {
+                int trackIdx = -1;
+                auto tracks = editMgr_->getAudioTracks();
+                for (int i = 0; i < tracks.size(); ++i) {
+                    if (tracks[i] == selectedTrack_) { trackIdx = i; break; }
+                }
+                if (trackIdx >= 0 && trackIdx < static_cast<int>(layout_.size())) {
+                    bool vis = !layout_[trackIdx].automationVisible;
+                    toggleAutomation(selectedTrack_, vis);
+                }
                 keyEvent->accept();
                 return true;
             }
@@ -517,11 +592,20 @@ void TimelineView::onTracksChanged()
 void TimelineView::rebuildTrackHeaders()
 {
     qDebug() << "[rebuildTrackHeaders] start";
+
+    // Clean up old track headers
     for (auto* h : trackHeaders_) {
         headerVLayout_->removeWidget(h);
         delete h;
     }
     trackHeaders_.clear();
+
+    // Clean up old automation lane headers (don't rely on cleanupAutomationItems)
+    for (auto* h : automationLaneHeaders_) {
+        headerVLayout_->removeWidget(h);
+        delete h;
+    }
+    automationLaneHeaders_.clear();
 
     if (!editMgr_ || !editMgr_->edit()) return;
 
@@ -535,9 +619,35 @@ void TimelineView::rebuildTrackHeaders()
                 this, &TimelineView::instrumentSelectRequested);
         connect(header, &TrackHeaderWidget::trackSelected,
                 this, &TimelineView::selectTrack);
+        connect(header, &TrackHeaderWidget::automationToggled,
+                this, &TimelineView::toggleAutomation);
         header->setSelected(track == selectedTrack_);
+
+        // Sync the automation toggle button to current layout state
+        if (i < static_cast<int>(layout_.size()))
+            header->setAutomationVisible(layout_[i].automationVisible);
+
         headerVLayout_->addWidget(header);
         trackHeaders_.push_back(header);
+
+        // Add automation lane header if visible
+        if (i < static_cast<int>(layout_.size()) && layout_[i].automationVisible) {
+            auto* laneHeader = new AutomationLaneHeader(track, editMgr_, headerContainer_);
+            int idx = i;
+            connect(laneHeader, &AutomationLaneHeader::parameterChanged,
+                    this, [this, idx](te::AutomatableParameter* p) {
+                        onAutomationParamChanged(idx, p);
+                    });
+            connect(laneHeader, &AutomationLaneHeader::closeRequested,
+                    this, [this, track]() { toggleAutomation(track, false); });
+            laneHeader->setLaneHeight(int(layout_[i].automationLaneHeight));
+
+            // Sync combo box to the currently displayed parameter
+            laneHeader->selectParam(layout_[i].shownParam);
+
+            headerVLayout_->addWidget(laneHeader);
+            automationLaneHeaders_.push_back(laneHeader);
+        }
     }
 
     int minNeeded = 0;
@@ -561,6 +671,158 @@ void TimelineView::syncHeaderScroll()
     headerScrollArea_->verticalScrollBar()->setValue(vScrollVal);
 }
 
+void TimelineView::rebuildLayout()
+{
+    if (!editMgr_ || !editMgr_->edit()) {
+        layout_.clear();
+        return;
+    }
+
+    auto tracks = editMgr_->getAudioTracks();
+    int numTracks = tracks.size();
+
+    // Preserve existing automation state
+    std::vector<TrackLayoutInfo> oldLayout = layout_;
+    layout_.resize(numTracks);
+
+    for (int i = 0; i < numTracks; ++i) {
+        layout_[i].trackIndex = i;
+        layout_[i].clipRowHeight = trackHeight_;
+
+        if (i < static_cast<int>(oldLayout.size())) {
+            layout_[i].automationVisible = oldLayout[i].automationVisible;
+            layout_[i].automationLaneHeight = oldLayout[i].automationLaneHeight;
+            layout_[i].shownParam = oldLayout[i].shownParam;
+        } else {
+            layout_[i].automationVisible = false;
+            layout_[i].automationLaneHeight = kDefaultLaneHeight;
+            layout_[i].shownParam = nullptr;
+        }
+
+        // Ensure shownParam defaults to Volume for any track with automation visible
+        if (layout_[i].automationVisible && !layout_[i].shownParam) {
+            layout_[i].shownParam = editMgr_->getVolumeParam(tracks[i]);
+        }
+    }
+
+    // Compute Y offsets
+    double y = 0.0;
+    for (int i = 0; i < numTracks; ++i) {
+        layout_[i].yOffset = y;
+        y += layout_[i].totalHeight();
+    }
+}
+
+double TimelineView::trackYOffset(int trackIndex) const
+{
+    if (trackIndex >= 0 && trackIndex < static_cast<int>(layout_.size()))
+        return layout_[trackIndex].yOffset;
+    return trackIndex * trackHeight_;
+}
+
+int TimelineView::trackIndexAtSceneY(double sceneY) const
+{
+    for (int i = 0; i < static_cast<int>(layout_.size()); ++i) {
+        double top = layout_[i].yOffset;
+        double bottom = top + layout_[i].totalHeight();
+        if (sceneY >= top && sceneY < bottom)
+            return i;
+    }
+    if (!layout_.empty() && sceneY >= layout_.back().yOffset + layout_.back().totalHeight())
+        return static_cast<int>(layout_.size()) - 1;
+    return 0;
+}
+
+void TimelineView::cleanupAutomationItems()
+{
+    for (auto* item : automationLaneItems_) {
+        if (item->scene()) scene_->removeItem(item);
+        delete item;
+    }
+    automationLaneItems_.clear();
+
+    // Note: automationLaneHeaders_ are cleaned up by rebuildTrackHeaders(),
+    // not here, to avoid double-delete.
+
+    for (auto* handle : laneResizeHandles_) {
+        if (handle->scene()) scene_->removeItem(handle);
+        delete handle;
+    }
+    laneResizeHandles_.clear();
+}
+
+void TimelineView::rebuildAutomationLanes(double sceneWidth)
+{
+    cleanupAutomationItems();
+    if (!editMgr_ || !editMgr_->edit()) return;
+
+    auto tracks = editMgr_->getAudioTracks();
+    auto& theme = ThemeManager::instance().current();
+
+    for (int i = 0; i < static_cast<int>(layout_.size()); ++i) {
+        if (!layout_[i].automationVisible || i >= tracks.size()) continue;
+
+        auto* track = tracks[i];
+        auto* param = layout_[i].shownParam;
+        if (!param) param = editMgr_->getVolumeParam(track);
+        if (!param) continue;
+
+        double laneY = layout_[i].yOffset + layout_[i].clipRowHeight;
+        double laneH = layout_[i].automationLaneHeight;
+
+        auto* laneItem = new AutomationLaneItem(param, editMgr_->edit(),
+                                                 pixelsPerBeat_, laneH,
+                                                 &snapper_);
+        laneItem->setPos(0, laneY);
+        laneItem->setSceneWidth(sceneWidth);
+        laneItem->setZValue(2);
+        scene_->addItem(laneItem);
+        automationLaneItems_.push_back(laneItem);
+
+        // Resize handle at bottom of lane
+        auto* handle = scene_->addRect(0, laneY + laneH - kResizeHandleHeight,
+                                        sceneWidth, kResizeHandleHeight,
+                                        QPen(Qt::NoPen),
+                                        QBrush(theme.border.lighter(130)));
+        handle->setZValue(3);
+        handle->setCursor(Qt::SizeVerCursor);
+        handle->setData(0, i);
+        laneResizeHandles_.push_back(handle);
+    }
+}
+
+void TimelineView::toggleAutomation(te::AudioTrack* track, bool visible)
+{
+    if (!editMgr_) return;
+    auto tracks = editMgr_->getAudioTracks();
+    for (int i = 0; i < tracks.size(); ++i) {
+        if (tracks[i] == track && i < static_cast<int>(layout_.size())) {
+            layout_[i].automationVisible = visible;
+            if (visible && !layout_[i].shownParam)
+                layout_[i].shownParam = editMgr_->getVolumeParam(track);
+
+            // Defer rebuild so the button click handler that triggered this
+            // finishes before we delete its owning TrackHeaderWidget.
+            QTimer::singleShot(0, this, [this]() {
+                rebuildLayout();
+                rebuildClips();
+                rebuildTrackHeaders();
+            });
+            return;
+        }
+    }
+}
+
+void TimelineView::onAutomationParamChanged(int trackIndex, te::AutomatableParameter* param)
+{
+    if (trackIndex < 0 || trackIndex >= static_cast<int>(layout_.size())) return;
+    layout_[trackIndex].shownParam = param;
+    QTimer::singleShot(0, this, [this]() {
+        rebuildClips();
+        rebuildTrackHeaders();
+    });
+}
+
 void TimelineView::rebuildClips()
 {
     qDebug() << "[rebuildClips] start";
@@ -571,6 +833,7 @@ void TimelineView::rebuildClips()
     for (auto* item : gridLineItems_) scene_->removeItem(item);
     for (auto* item : trackSeparatorItems_) scene_->removeItem(item);
     clearMidiClipDrawPreview();
+    cleanupAutomationItems();
 
     qDeleteAll(clipItems_);
     qDeleteAll(trackBgItems_);
@@ -582,6 +845,8 @@ void TimelineView::rebuildClips()
     trackSeparatorItems_.clear();
 
     if (!editMgr_ || !editMgr_->edit()) return;
+
+    rebuildLayout();
 
     auto tracks = editMgr_->getAudioTracks();
     int numTracks = tracks.size();
@@ -597,25 +862,45 @@ void TimelineView::rebuildClips()
         }
     }
     double sceneWidth = totalBeats * pixelsPerBeat_;
-    double sceneHeight = numTracks * trackHeight_;
+    double sceneHeight = 0.0;
+    if (!layout_.empty())
+        sceneHeight = layout_.back().yOffset + layout_.back().totalHeight();
+    else
+        sceneHeight = numTracks * trackHeight_;
     scene_->setSceneRect(0, 0, sceneWidth, std::max(sceneHeight, double(height())));
 
     playheadLine_->setLine(0, 0, 0, sceneHeight);
 
     for (int i = 0; i < numTracks; ++i) {
-        double y = i * trackHeight_;
+        double y = trackYOffset(i);
         QColor bg = (i % 2 == 0) ? theme.trackBackground
                                   : theme.trackBackground.lighter(108);
         auto* bgItem = scene_->addRect(0, y, sceneWidth, trackHeight_,
                                         QPen(Qt::NoPen), QBrush(bg));
         bgItem->setZValue(-2);
         trackBgItems_.push_back(bgItem);
+
+        // Automation lane background
+        if (i < static_cast<int>(layout_.size()) && layout_[i].automationVisible) {
+            double laneY = y + trackHeight_;
+            double laneH = layout_[i].automationLaneHeight;
+            QColor laneBg = theme.surface.darker(110);
+            auto* laneBgItem = scene_->addRect(0, laneY, sceneWidth, laneH,
+                                                QPen(Qt::NoPen), QBrush(laneBg));
+            laneBgItem->setZValue(-2);
+            trackBgItems_.push_back(laneBgItem);
+        }
     }
 
-    // Horizontal track separators so row boundaries are always clear.
     QPen separatorPen(theme.border.lighter(120), 1.0);
     for (int i = 0; i <= numTracks; ++i) {
-        const double y = i * trackHeight_;
+        double y;
+        if (i < numTracks)
+            y = trackYOffset(i);
+        else if (!layout_.empty())
+            y = layout_.back().yOffset + layout_.back().totalHeight();
+        else
+            y = numTracks * trackHeight_;
         auto* line = scene_->addLine(0, y, sceneWidth, y, separatorPen);
         line->setZValue(-0.5);
         trackSeparatorItems_.push_back(line);
@@ -635,23 +920,26 @@ void TimelineView::rebuildClips()
                                 &pixelsPerBeat_, &trackHeight_, numTracks,
                                 [this]() { rebuildClips(); });
             if (item->isMidiClip()) {
-                qDebug() << "[rebuildClips]   -> loadMidiPreview";
                 item->loadMidiPreview();
             } else {
-                qDebug() << "[rebuildClips]   -> loadWaveform";
                 const int waveformPoints = std::clamp(
                     static_cast<int>(std::max(50.0, item->rect().width() / 2.0)),
                     50, 4096);
                 item->loadWaveform(waveformPoints);
             }
-            qDebug() << "[rebuildClips]   -> loaded ok";
             item->updateGeometry(pixelsPerBeat_, trackHeight_, 0);
+            // Offset clip Y position using layout
+            double yOff = trackYOffset(ti);
+            item->setPos(item->pos().x(), yOff);
+            item->setRect(0, 0, item->rect().width(), trackHeight_ - 2);
             item->setZValue(1);
             scene_->addItem(item);
             clipItems_.push_back(item);
             ++clipIdx;
         }
     }
+
+    rebuildAutomationLanes(sceneWidth);
     qDebug() << "[rebuildClips] done";
 }
 
@@ -674,6 +962,9 @@ void TimelineView::drawGridLines()
         gridLineItems_.push_back(line);
     }
 }
+
+// ── Lane resize handling ─────────────────────────────────────────────────────
+
 
 void TimelineView::updatePlayhead()
 {
@@ -702,7 +993,7 @@ void TimelineView::handleFileDrop(const QString& path, double xPos, int yPos)
     if (!droppedFile.existsAsFile()) return;
 
     double beat = xPos / pixelsPerBeat_;
-    int trackIdx = int(yPos / trackHeight_);
+    int trackIdx = trackIndexAtSceneY(double(yPos));
 
     beat = snapper_.snapBeat(beat);
     if (beat < 0) beat = 0;
@@ -807,7 +1098,7 @@ void TimelineView::handleEmptyAreaDoubleClick(double sceneX, double sceneY)
     if (!editMgr_ || !editMgr_->edit()) return;
 
     double beat = sceneX / pixelsPerBeat_;
-    int trackIdx = static_cast<int>(sceneY / trackHeight_);
+    int trackIdx = trackIndexAtSceneY(sceneY);
 
     beat = snapper_.snapBeat(beat);
     if (beat < 0) beat = 0;
@@ -840,7 +1131,7 @@ void TimelineView::handleBackgroundDragStarted(QPointF startScenePos)
     if (tracks.isEmpty())
         return;
 
-    const int trackIdx = static_cast<int>(startScenePos.y() / trackHeight_);
+    const int trackIdx = trackIndexAtSceneY(startScenePos.y());
     if (trackIdx < 0 || trackIdx >= tracks.size())
         return;
 
@@ -862,7 +1153,7 @@ void TimelineView::handleBackgroundDragStarted(QPointF startScenePos)
     midiClipDrawPreviewItem_ = scene_->addRect(0, 0, 1.0, trackHeight_ - 2.0, pen, QBrush(fill));
     midiClipDrawPreviewItem_->setZValue(1.2);
     midiClipDrawPreviewItem_->setPos(midiClipDrawStartBeat_ * pixelsPerBeat_,
-                                     trackIdx * trackHeight_);
+                                     trackYOffset(trackIdx));
 }
 
 void TimelineView::handleBackgroundDragUpdated(QPointF, QPointF currentScenePos)
@@ -892,7 +1183,7 @@ void TimelineView::handleBackgroundDragUpdated(QPointF, QPointF currentScenePos)
     const double widthPx = std::max(1.0, (rightBeat - leftBeat) * pixelsPerBeat_);
 
     midiClipDrawPreviewItem_->setRect(0, 0, widthPx, trackHeight_ - 2.0);
-    midiClipDrawPreviewItem_->setPos(leftBeat * pixelsPerBeat_, trackIdx * trackHeight_);
+    midiClipDrawPreviewItem_->setPos(leftBeat * pixelsPerBeat_, trackYOffset(trackIdx));
 
     const double rightEdgePx = rightBeat * pixelsPerBeat_ + 120.0;
     QRectF sceneRect = scene_->sceneRect();

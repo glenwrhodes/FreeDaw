@@ -1030,6 +1030,36 @@ QMap<QString, QPointF> EditManager::loadRoutingLayout() const
     return positions;
 }
 
+// ── Automation parameter access ───────────────────────────────────────────────
+
+QVector<te::AutomatableParameter*> EditManager::getAutomatableParamsForTrack(te::AudioTrack* track) const
+{
+    QVector<te::AutomatableParameter*> result;
+    if (!track) return result;
+
+    for (auto* plugin : track->pluginList.getPlugins()) {
+        for (auto* param : plugin->getAutomatableParameters())
+            result.append(param);
+    }
+    return result;
+}
+
+te::AutomatableParameter* EditManager::getVolumeParam(te::AudioTrack* track) const
+{
+    if (!track) return nullptr;
+    if (auto* vp = track->getVolumePlugin())
+        return vp->volParam.get();
+    return nullptr;
+}
+
+te::AutomatableParameter* EditManager::getPanParam(te::AudioTrack* track) const
+{
+    if (!track) return nullptr;
+    if (auto* vp = track->getVolumePlugin())
+        return vp->panParam.get();
+    return nullptr;
+}
+
 // ── Export / Freeze / Bounce ──────────────────────────────────────────────────
 
 juce::String EditManager::sanitizeForFilename(const juce::String& name)

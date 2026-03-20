@@ -28,6 +28,7 @@ public:
     te::AudioTrack* track() const { return track_; }
     void setTrackHeight(int h);
     void setSelected(bool sel);
+    void setAutomationVisible(bool visible);
     void refresh();
     bool isSelected() const { return selected_; }
     QSize minimumSizeHint() const override;
@@ -36,6 +37,7 @@ signals:
     void trackSelected(te::AudioTrack* track);
     void effectInsertRequested(te::AudioTrack* track);
     void instrumentSelectRequested(te::AudioTrack* track);
+    void automationToggled(te::AudioTrack* track, bool visible);
 
 protected:
     void mousePressEvent(QMouseEvent* event) override;
@@ -70,8 +72,10 @@ private:
     QSlider* volumeSlider_;
     RotaryKnob* panKnob_;
     LevelMeter* meter_;
+    QPushButton* automationBtn_ = nullptr;
     QFrame* rowSeparator_ = nullptr;
     QTimer meterTimer_;
+    bool automationVisible_ = false;
 
     te::LevelMeasurer::Client meterClient_;
     te::LevelMeterPlugin* levelMeterPlugin_ = nullptr;

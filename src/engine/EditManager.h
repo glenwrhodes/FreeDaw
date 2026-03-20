@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QString>
 #include <QList>
+#include <QVector>
 #include <QTimer>
 #include <unordered_set>
 #include <map>
@@ -129,6 +130,11 @@ public:
         QString timestamp;
     };
     static QList<RecoveryInfo> findRecoveryFiles();
+
+    // Automation parameter access
+    QVector<te::AutomatableParameter*> getAutomatableParamsForTrack(te::AudioTrack* track) const;
+    te::AutomatableParameter* getVolumeParam(te::AudioTrack* track) const;
+    te::AutomatableParameter* getPanParam(te::AudioTrack* track) const;
 
     // Export / Freeze / Bounce
     bool isRenderInProgress() const { return renderInProgress_; }

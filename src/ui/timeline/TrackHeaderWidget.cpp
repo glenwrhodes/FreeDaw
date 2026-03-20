@@ -306,6 +306,29 @@ TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr
     mainLayout->addLayout(controlRow);
     mainLayout->addStretch();
 
+    automationBtn_ = new QPushButton(this);
+    automationBtn_->setAccessibleName("Toggle Automation Lane");
+    automationBtn_->setToolTip("Show/Hide Automation (A)");
+    automationBtn_->setCheckable(true);
+    automationBtn_->setFixedHeight(16);
+    automationBtn_->setText(QString::fromUtf8("\xe2\x96\xb6") + " Auto");
+    automationBtn_->setStyleSheet(
+        QString("QPushButton { background: %1; color: %2; border: 1px solid %3; "
+                "border-radius: 2px; font-size: 8px; padding: 0px 4px; text-align: left; }"
+                "QPushButton:checked { background: %4; color: #fff; }"
+                "QPushButton:hover { border: 1px solid %5; }")
+            .arg(theme.surface.name(), theme.textDim.name(),
+                 theme.border.name(), theme.accent.darker(150).name(),
+                 theme.accent.name()));
+    connect(automationBtn_, &QPushButton::toggled, this, [this](bool checked) {
+        automationVisible_ = checked;
+        automationBtn_->setText(checked
+            ? (QString::fromUtf8("\xe2\x96\xbc") + " Auto")
+            : (QString::fromUtf8("\xe2\x96\xb6") + " Auto"));
+        emit automationToggled(track_, checked);
+    });
+    mainLayout->addWidget(automationBtn_);
+
     rowSeparator_ = new QFrame(this);
     rowSeparator_->setAccessibleName("Track Row Separator");
     rowSeparator_->setFrameShape(QFrame::NoFrame);
@@ -387,6 +410,17 @@ void TrackHeaderWidget::refresh()
             break;
         }
     }
+}
+
+void TrackHeaderWidget::setAutomationVisible(bool visible)
+{
+    if (!automationBtn_) return;
+    QSignalBlocker block(automationBtn_);
+    automationBtn_->setChecked(visible);
+    automationVisible_ = visible;
+    automationBtn_->setText(visible
+        ? (QString::fromUtf8("\xe2\x96\xbc") + " Auto")
+        : (QString::fromUtf8("\xe2\x96\xb6") + " Auto"));
 }
 
 void TrackHeaderWidget::setTrackHeight(int h)

@@ -4,6 +4,8 @@
 #include "GridSnapper.h"
 #include "ClipItem.h"
 #include "TrackHeaderWidget.h"
+#include "AutomationLaneItem.h"
+#include "AutomationLaneHeader.h"
 #include "engine/EditManager.h"
 #include <QWidget>
 #include <QGraphicsView>
@@ -50,6 +52,18 @@ private:
     bool backgroundDragCandidate_ = false;
     bool backgroundDragging_ = false;
     QPointF backgroundDragStartScenePos_;
+};
+
+struct TrackLayoutInfo {
+    int trackIndex = 0;
+    double yOffset = 0.0;
+    double clipRowHeight = 120.0;
+    bool automationVisible = false;
+    double automationLaneHeight = 80.0;
+    te::AutomatableParameter* shownParam = nullptr;
+    double totalHeight() const {
+        return clipRowHeight + (automationVisible ? automationLaneHeight : 0.0);
+    }
 };
 
 class TimelineView : public QWidget {
@@ -135,7 +149,31 @@ private:
     bool isMidiClipDrawActive_ = false;
     te::AudioTrack* selectedTrack_ = nullptr;
 
+    // Automation lane state
+    std::vector<TrackLayoutInfo> layout_;
+    std::vector<AutomationLaneItem*> automationLaneItems_;
+    std::vector<AutomationLaneHeader*> automationLaneHeaders_;
+    std::vector<QGraphicsRectItem*> laneResizeHandles_;
+
+    void rebuildLayout();
+    void toggleAutomation(te::AudioTrack* track, bool visible);
+    void onAutomationParamChanged(int trackIndex, te::AutomatableParameter* param);
+    int trackIndexAtSceneY(double sceneY) const;
+    double trackYOffset(int trackIndex) const;
+    void cleanupAutomationItems();
+    void rebuildAutomationLanes(double sceneWidth);
+
+    // Lane resize
+    bool laneResizing_ = false;
+    int laneResizeTrackIndex_ = -1;
+    double laneResizeStartHeight_ = 0.0;
+    double laneResizeStartY_ = 0.0;
+
     static constexpr int HEADER_WIDTH = 140;
+    static constexpr double kMinLaneHeight = 50.0;
+    static constexpr double kMaxLaneHeight = 120.0;
+    static constexpr double kDefaultLaneHeight = 80.0;
+    static constexpr double kResizeHandleHeight = 4.0;
 };
 
 } // namespace freedaw
