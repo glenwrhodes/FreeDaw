@@ -14,6 +14,10 @@
   #define LicenseDir ".."
 #endif
 
+#ifndef OutputBaseFilename
+  #define OutputBaseFilename "OpenDaw-v" + MyAppVersion + "-setup"
+#endif
+
 #define MyAppName "OpenDaw"
 #define MyAppPublisher "OpenDaw contributors"
 #define MyAppURL "https://github.com/glenwrhodes/OpenDaw"
@@ -30,7 +34,7 @@ AppSupportURL={#MyAppURL}/issues
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 LicenseFile={#LicenseDir}\LICENSE
-OutputBaseFilename=OpenDaw-v{#MyAppVersion}-setup
+OutputBaseFilename={#OutputBaseFilename}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern

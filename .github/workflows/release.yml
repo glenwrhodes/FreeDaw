@@ -74,8 +74,14 @@ jobs:
             /DMyAppVersion="$version" `
             /DSourceDir="$PWD\build\OpenDaw_artefacts\Release" `
             /DOutputDir="$PWD" `
+            /DOutputBaseFilename="OpenDaw-v${version}-setup" `
             /DLicenseDir="$PWD" `
             "installer\opendaw.iss"
+          # Fallback: move from installer\Output if Inno Setup ignored OutputDir
+          if (-not (Test-Path "OpenDaw-v${version}-setup.exe")) {
+            $found = Get-ChildItem -Recurse -Filter "*setup*.exe" | Select-Object -First 1
+            if ($found) { Move-Item $found.FullName "OpenDaw-v${version}-setup.exe" }
+          }
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
