@@ -1,4 +1,4 @@
-#include "ChannelStrip.h"
+﻿#include "ChannelStrip.h"
 #include "utils/ThemeManager.h"
 #include "utils/IconFont.h"
 #include <QVBoxLayout>
@@ -18,7 +18,7 @@ float dbToNormalized(float db) {
 }
 }
 
-namespace freedaw {
+namespace OpenDaw {
 
 ChannelStrip::ChannelStrip(te::AudioTrack* track, EditManager* editMgr,
                            QWidget* parent)
@@ -919,4 +919,4 @@ void ChannelStrip::updateSelectionStyle()
     setPalette(pal);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

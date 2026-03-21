@@ -1,7 +1,7 @@
-#include "AudioFileUndoManager.h"
+﻿#include "AudioFileUndoManager.h"
 #include <QDateTime>
 
-namespace freedaw {
+namespace OpenDaw {
 
 AudioFileUndoManager::AudioFileUndoManager(QObject* parent)
     : QObject(parent)
@@ -16,7 +16,7 @@ AudioFileUndoManager::~AudioFileUndoManager()
 juce::File AudioFileUndoManager::backupDir(const juce::File& targetFile) const
 {
     return targetFile.getParentDirectory()
-        .getChildFile(".freedaw_undo")
+        .getChildFile(".OpenDaw_undo")
         .getChildFile(targetFile.getFileNameWithoutExtension());
 }
 
@@ -136,4 +136,4 @@ void AudioFileUndoManager::trimToMaxDepth()
     }
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

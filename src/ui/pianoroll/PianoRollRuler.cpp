@@ -1,11 +1,11 @@
-#include "PianoRollRuler.h"
+﻿#include "PianoRollRuler.h"
 #include "utils/ThemeManager.h"
 #include <QPainter>
 #include <QPainterPath>
 #include <QMouseEvent>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 PianoRollRuler::PianoRollRuler(QWidget* parent)
     : QWidget(parent)
@@ -107,4 +107,4 @@ void PianoRollRuler::mouseReleaseEvent(QMouseEvent* event)
     }
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "engine/AudioEngine.h"
 #include <QDialog>
@@ -6,7 +6,7 @@
 #include <QPushButton>
 #include <QLabel>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class AudioSettingsDialog : public QDialog {
     Q_OBJECT
@@ -32,4 +32,4 @@ private:
     QLabel*    driverNote_       = nullptr;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

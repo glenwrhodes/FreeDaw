@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "engine/EditManager.h"
 #include <QDialog>
@@ -9,7 +9,7 @@
 #include <QProgressBar>
 #include <QLabel>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class ExportDialog : public QDialog {
     Q_OBJECT
@@ -36,4 +36,4 @@ private:
     QLabel* statusLabel_ = nullptr;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

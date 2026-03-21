@@ -1,6 +1,6 @@
-#pragma once
+﻿#pragma once
 
-#include "app/FreeDawApplication.h"
+#include "app/OpenDawApplication.h"
 #include "ui/timeline/TimelineView.h"
 #include "ui/mixer/MixerView.h"
 #include "ui/transport/TransportBar.h"
@@ -19,7 +19,7 @@
 #include <QLabel>
 #include <QTimer>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class PianoRollEditor;
 class AudioClipEditor;
@@ -36,7 +36,7 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
-    explicit MainWindow(FreeDawApplication& app, QWidget* parent = nullptr);
+    explicit MainWindow(OpenDawApplication& app, QWidget* parent = nullptr);
     ~MainWindow() override;
 
     void loadFile(const QString& path);
@@ -69,7 +69,7 @@ private:
     void onMidiClipDoubleClicked(te::MidiClip* clip);
     void onAudioClipDoubleClicked(te::WaveAudioClip* clip);
 
-    FreeDawApplication& app_;
+    OpenDawApplication& app_;
     EditManager& editMgr_;
 
     TransportBar* transportBar_       = nullptr;
@@ -101,4 +101,4 @@ private:
     QTimer* statusBarTimer_           = nullptr;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

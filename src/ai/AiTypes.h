@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QString>
 #include <QJsonObject>
@@ -6,7 +6,7 @@
 #include <QVector>
 #include <QDateTime>
 
-namespace freedaw {
+namespace OpenDaw {
 
 enum class AiRole { User, Assistant, System };
 
@@ -73,4 +73,4 @@ struct AiMessage {
     }
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,4 +1,4 @@
-#include "TimelineView.h"
+﻿#include "TimelineView.h"
 #include "AutomationLaneItem.h"
 #include "AutomationLaneHeader.h"
 #include "AutomationPointItem.h"
@@ -22,7 +22,7 @@
 #include <QLineF>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 // ── TimelineScene ───────────────────────────────────────────────────────────
 
@@ -1437,4 +1437,4 @@ void TimelineView::selectClipItem(te::Clip* clip)
     }
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

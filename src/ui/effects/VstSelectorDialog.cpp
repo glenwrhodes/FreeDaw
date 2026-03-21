@@ -1,10 +1,10 @@
-#include "VstSelectorDialog.h"
+﻿#include "VstSelectorDialog.h"
 #include "utils/ThemeManager.h"
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QHeaderView>
 
-namespace freedaw {
+namespace OpenDaw {
 
 VstSelectorDialog::VstSelectorDialog(juce::KnownPluginList& pluginList,
                                      bool instrumentsOnly,
@@ -126,4 +126,4 @@ void VstSelectorDialog::filterList(const QString& text)
     }
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

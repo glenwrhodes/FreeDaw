@@ -1,10 +1,10 @@
-#pragma once
+﻿#pragma once
 
 #include <QWidget>
 #include <QColor>
 #include <vector>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class WaveformWidget : public QWidget {
     Q_OBJECT
@@ -27,4 +27,4 @@ private:
     bool selected_ = false;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

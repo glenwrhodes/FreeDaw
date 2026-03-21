@@ -1,14 +1,14 @@
-<!-- GitHub metadata: topics should be set in repo Settings > About -->
+﻿<!-- GitHub metadata: topics should be set in repo Settings > About -->
 <!-- Suggested topics: daw, digital-audio-workstation, audio, music-production, midi, piano-roll, vst, qt6, juce, tracktion-engine, cpp, windows, open-source, audio-editor, music-software -->
 
 <div align="center">
 
-# FreeDaw
+# OpenDaw
 
 **A free, open-source Digital Audio Workstation for Windows**
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg?logo=windows)](https://github.com/glenwrhodes/FreeDaw)
+[![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg?logo=windows)](https://github.com/glenwrhodes/OpenDaw)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg?logo=cplusplus)](https://en.cppreference.com/w/cpp/20)
 [![Qt 6](https://img.shields.io/badge/Qt-6.8%2B-41CD52.svg?logo=qt)](https://www.qt.io/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -18,14 +18,14 @@ Audio and MIDI tracks, a built-in piano roll, VST3 instrument support, bus routi
 
 <br>
 
-<img src="resources/splash.png" alt="FreeDaw splash screen" width="600">
+<img src="resources/splash.png" alt="OpenDaw splash screen" width="600">
 
 </div>
 
 <br>
 
 <div align="center">
-<img src="resources/routing-view.png" alt="FreeDaw routing view showing input channels, audio tracks, a bus with effects, master output, and color-coded signal cables" width="800">
+<img src="resources/routing-view.png" alt="OpenDaw routing view showing input channels, audio tracks, a bus with effects, master output, and color-coded signal cables" width="800">
 <br>
 <em>Signal routing view — drag cables between inputs, tracks, buses, and outputs</em>
 </div>
@@ -34,12 +34,12 @@ Audio and MIDI tracks, a built-in piano roll, VST3 instrument support, bus routi
 
 ## Download
 
-Grab the latest release from the **[Releases page](https://github.com/glenwrhodes/FreeDaw/releases/latest)**:
+Grab the latest release from the **[Releases page](https://github.com/glenwrhodes/OpenDaw/releases/latest)**:
 
 | Download | Description |
 |----------|-------------|
-| **FreeDaw-v*x.x.x*-setup.exe** | Windows installer with Start Menu shortcut and uninstaller |
-| **FreeDaw-v*x.x.x*-portable.zip** | Portable build — unzip and run, no installation needed |
+| **OpenDaw-v*x.x.x*-setup.exe** | Windows installer with Start Menu shortcut and uninstaller |
+| **OpenDaw-v*x.x.x*-portable.zip** | Portable build — unzip and run, no installation needed |
 
 ---
 
@@ -80,7 +80,7 @@ Grab the latest release from the **[Releases page](https://github.com/glenwrhode
 ### VST3 Instrument Support
 
 - Scan for installed VST3 plugins (Edit > Scan VST Plugins)
-- Plugin list cached to `%AppData%/FreeDaw/plugin-cache.xml`
+- Plugin list cached to `%AppData%/OpenDaw/plugin-cache.xml`
 - Assign VST3 instruments to MIDI tracks via a searchable selector dialog
 - Open native plugin editor windows for full parameter control
 - Instrument button on MIDI track headers and mixer channel strips (click to open editor, right-click to change instrument)
@@ -157,7 +157,7 @@ Add any of these to a track with one click from the Effects panel or mixer FX sl
 
 ### AI Assistant — Your Studio Co-Engineer
 
-FreeDaw ships with a built-in **AI assistant powered by Anthropic's Claude** that can control the entire DAW through natural language. This isn't a chatbot that tells you what buttons to click — it actually **executes operations directly** on your project, calling up to 30 different tools in an autonomous loop until your request is fulfilled.
+OpenDaw ships with a built-in **AI assistant powered by Anthropic's Claude** that can control the entire DAW through natural language. This isn't a chatbot that tells you what buttons to click — it actually **executes operations directly** on your project, calling up to 30 different tools in an autonomous loop until your request is fulfilled.
 
 Press **Ctrl+Space** from anywhere to open the quick prompt overlay, type what you need, and watch it happen.
 
@@ -358,7 +358,7 @@ Instead of the manual steps above, you can use the included `build.ps1` PowerShe
 .\build.ps1 -Clean
 ```
 
-The script automatically sets up the MSVC environment, configures if needed, and builds. It will also kill any running FreeDaw instance before building. Use `-Clean` after updating a git tag so the new version number gets picked up.
+The script automatically sets up the MSVC environment, configures if needed, and builds. It will also kill any running OpenDaw instance before building. Use `-Clean` after updating a git tag so the new version number gets picked up.
 
 ### 5. Run
 
@@ -367,23 +367,23 @@ The script automatically sets up the MSVC environment, configures if needed, and
 $env:PATH = "c:\qt\6.10.2\msvc2022_64\bin;" + $env:PATH
 
 # Launch
-.\build\FreeDaw_artefacts\Debug\FreeDaw.exe
+.\build\OpenDaw_artefacts\Debug\OpenDaw.exe
 ```
 
 Or deploy Qt DLLs alongside the executable:
 
 ```powershell
-c:\qt\6.10.2\msvc2022_64\bin\windeployqt.exe .\build\FreeDaw_artefacts\Debug\FreeDaw.exe
-.\build\FreeDaw_artefacts\Debug\FreeDaw.exe
+c:\qt\6.10.2\msvc2022_64\bin\windeployqt.exe .\build\OpenDaw_artefacts\Debug\OpenDaw.exe
+.\build\OpenDaw_artefacts\Debug\OpenDaw.exe
 ```
 
 ---
 
-## How to Use FreeDaw
+## How to Use OpenDaw
 
 ### Getting started
 
-1. **Launch FreeDaw.** The window opens with 4 empty audio tracks, a transport bar at the top, track headers on the left, the timeline in the center, the mixer at the bottom, and the file browser / effects panel tabbed on the right.
+1. **Launch OpenDaw.** The window opens with 4 empty audio tracks, a transport bar at the top, track headers on the left, the timeline in the center, the mixer at the bottom, and the file browser / effects panel tabbed on the right.
 
 2. **Set your tempo.** In the transport bar, adjust the BPM spinner (default 120). Change the time signature with the two spinners next to it (default 4/4).
 
@@ -531,7 +531,7 @@ AudioMixer/
     workflows/
       release.yml                         CI/CD: build + release on tag push
   installer/
-    freedaw.iss                           Inno Setup installer script
+    OpenDaw.iss                           Inno Setup installer script
   resources/
     splash.png                            Splash screen artwork
     routing-view.png                      Routing view screenshot
@@ -541,7 +541,7 @@ AudioMixer/
   src/
     main.cpp                              Entry point, JUCE-Qt bridge
     app/
-      FreeDawApplication.h/cpp            Application lifecycle
+      OpenDawApplication.h/cpp            Application lifecycle
       JuceQtBridge.h/cpp                  QTimer-based JUCE message pump
     engine/
       AudioEngine.h/cpp                   Wraps tracktion::engine::Engine, MIDI device enumeration
@@ -598,7 +598,7 @@ AudioMixer/
 
 ## Architecture
 
-FreeDaw bridges two frameworks:
+OpenDaw bridges two frameworks:
 
 - **Qt 6 Widgets** handles all GUI rendering, layout, and user interaction
 - **Tracktion Engine** (built on JUCE) handles all audio: playback, recording, effects processing, plugin hosting, and the project data model
@@ -619,7 +619,7 @@ See **[CONTRIBUTING.md](CONTRIBUTING.md)** for details on how to get started, co
 
 This project is licensed under the **GNU General Public License v3.0** — see the [LICENSE](LICENSE) file for details.
 
-FreeDaw uses [Tracktion Engine](https://github.com/Tracktion/tracktion_engine) (GPLv3) and [JUCE](https://juce.com/) (AGPLv3), both of which are compatible with this license.
+OpenDaw uses [Tracktion Engine](https://github.com/Tracktion/tracktion_engine) (GPLv3) and [JUCE](https://juce.com/) (AGPLv3), both of which are compatible with this license.
 
 ---
 
@@ -627,6 +627,6 @@ FreeDaw uses [Tracktion Engine](https://github.com/Tracktion/tracktion_engine) (
 
 Made with care for musicians and producers everywhere.
 
-If FreeDaw is useful to you, consider giving it a star on GitHub.
+If OpenDaw is useful to you, consider giving it a star on GitHub.
 
 </div>

@@ -1,8 +1,8 @@
-#include "PluginScanner.h"
+﻿#include "PluginScanner.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <QDebug>
 
-namespace freedaw {
+namespace OpenDaw {
 
 PluginScanWorker::PluginScanWorker(te::Engine& engine)
     : engine_(engine)
@@ -90,7 +90,7 @@ juce::File PluginScanner::getCacheFile() const
 {
     auto appData = juce::File::getSpecialLocation(
         juce::File::userApplicationDataDirectory);
-    return appData.getChildFile("FreeDaw").getChildFile("plugin-cache.xml");
+    return appData.getChildFile("OpenDaw").getChildFile("plugin-cache.xml");
 }
 
 void PluginScanner::loadCachedList()
@@ -124,4 +124,4 @@ void PluginScanner::saveCachedList()
     }
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,6 +1,6 @@
-#include "ThemeManager.h"
+﻿#include "ThemeManager.h"
 
-namespace freedaw {
+namespace OpenDaw {
 
 ThemeManager& ThemeManager::instance()
 {
@@ -8,4 +8,4 @@ ThemeManager& ThemeManager::instance()
     return mgr;
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "PianoKeyboard.h"
 #include "NoteGrid.h"
@@ -19,7 +19,7 @@
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class EditManager;
 
@@ -93,4 +93,4 @@ private:
     QPushButton* ccLineBtn_ = nullptr;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

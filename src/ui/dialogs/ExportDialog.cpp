@@ -1,4 +1,4 @@
-#include "ExportDialog.h"
+﻿#include "ExportDialog.h"
 #include "utils/ThemeManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -8,7 +8,7 @@
 #include <QSettings>
 #include <QFileInfo>
 
-namespace freedaw {
+namespace OpenDaw {
 
 ExportDialog::ExportDialog(QWidget* parent)
     : QDialog(parent)
@@ -182,4 +182,4 @@ void ExportDialog::onBrowse()
     pathEdit_->setText(path);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

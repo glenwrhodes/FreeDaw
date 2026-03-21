@@ -1,9 +1,9 @@
-#include "MixerView.h"
+﻿#include "MixerView.h"
 #include "utils/ThemeManager.h"
 #include <QFrame>
 #include <QMouseEvent>
 
-namespace freedaw {
+namespace OpenDaw {
 namespace {
 ChannelStrip* findParentStrip(QWidget* w)
 {
@@ -182,4 +182,4 @@ bool MixerView::eventFilter(QObject* watched, QEvent* event)
     return QWidget::eventFilter(watched, event);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

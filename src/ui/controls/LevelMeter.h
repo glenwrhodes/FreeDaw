@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include <QWidget>
 #include <QTimer>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class LevelMeter : public QWidget {
     Q_OBJECT
@@ -31,4 +31,4 @@ private:
     QTimer decayTimer_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

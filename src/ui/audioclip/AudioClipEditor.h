@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "AudioWaveformView.h"
 #include "AudioFileUndoManager.h"
@@ -15,7 +15,7 @@
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class EditManager;
 
@@ -142,4 +142,4 @@ private:
     QLabel* infoModeLabel_ = nullptr;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,4 +1,4 @@
-#include "FileBrowserPanel.h"
+﻿#include "FileBrowserPanel.h"
 #include "utils/ThemeManager.h"
 #include <QDir>
 #include <QStandardPaths>
@@ -8,7 +8,7 @@
 #include <QApplication>
 #include <QSettings>
 
-namespace freedaw {
+namespace OpenDaw {
 
 FileBrowserPanel::FileBrowserPanel(QWidget* parent)
     : QWidget(parent)
@@ -115,4 +115,4 @@ void FileBrowserPanel::setupDragSupport()
     treeView_->setDragEnabled(true);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

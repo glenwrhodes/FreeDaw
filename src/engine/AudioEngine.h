@@ -1,11 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include <tracktion_engine/tracktion_engine.h>
 #include <memory>
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class AudioEngine {
 public:
@@ -30,4 +30,4 @@ private:
     std::unique_ptr<te::Engine> engine_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

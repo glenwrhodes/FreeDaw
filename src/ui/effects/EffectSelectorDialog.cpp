@@ -1,10 +1,10 @@
-#include "EffectSelectorDialog.h"
+﻿#include "EffectSelectorDialog.h"
 #include "utils/ThemeManager.h"
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QHeaderView>
 
-namespace freedaw {
+namespace OpenDaw {
 
 const QStringList& EffectSelectorDialog::builtInEffects()
 {
@@ -119,7 +119,7 @@ void EffectSelectorDialog::populateList()
         EffectEntry e;
         e.name = fx;
         e.category = "Built-in";
-        e.manufacturer = "FreeDaw";
+        e.manufacturer = "OpenDaw";
         e.isVst = false;
         allEntries_.push_back(e);
     }
@@ -166,4 +166,4 @@ void EffectSelectorDialog::filterList(const QString& text)
     }
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

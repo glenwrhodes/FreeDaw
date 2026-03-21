@@ -1,4 +1,4 @@
-# FreeDaw v1 Implementation Guide
+﻿# OpenDaw v1 Implementation Guide
 
 > Actionable task list for contributors. Each task includes what to build, where to start in the code, which Tracktion Engine APIs to use, what new files to create, and acceptance criteria. See [V1_FEATURE_SET_ROADMAP.md](V1_FEATURE_SET_ROADMAP.md) for the full feature matrix and priority rationale.
 
@@ -6,8 +6,8 @@
 
 - Tasks are grouped by feature area and ordered by priority within each group.
 - Priority tags: **[MUST]** = required for v1 ship, **[SHOULD]** = strong v1 usability, **[STRETCH]** = post-v1.
-- When adding new source files, add the `.h`/`.cpp` pair to `FREEDAW_SOURCES` in `CMakeLists.txt` (lines 57-109) in the matching directory group.
-- All code lives in the `freedaw` namespace. JUCE types are qualified with `juce::` or the `te::` alias.
+- When adding new source files, add the `.h`/`.cpp` pair to `OpenDaw_SOURCES` in `CMakeLists.txt` (lines 57-109) in the matching directory group.
+- All code lives in the `OpenDaw` namespace. JUCE types are qualified with `juce::` or the `te::` alias.
 - After any code change, verify the build passes (see `CLAUDE.md` for build commands).
 
 ---
@@ -50,13 +50,13 @@
 
 **Implementation:**
 1. Add a `QTimer autosaveTimer_` to `EditManager`, firing every 60 seconds (configurable).
-2. On timer fire, save a copy to `%APPDATA%/FreeDaw/autosave/<project-hash>.tracktionedit`.
+2. On timer fire, save a copy to `%APPDATA%/OpenDaw/autosave/<project-hash>.tracktionedit`.
 3. Write a small `.json` sidecar with `{ "originalPath": "...", "timestamp": "..." }`.
 4. On clean exit (after successful save or discard), delete the autosave file.
 5. Start the timer after `loadEdit()` or `newEdit()`.
 
 **Acceptance criteria:**
-- An autosave file appears in `%APPDATA%/FreeDaw/autosave/` within 60 seconds of editing.
+- An autosave file appears in `%APPDATA%/OpenDaw/autosave/` within 60 seconds of editing.
 - Clean exit removes the autosave.
 - Autosave does not block the UI (use `QTimer` on the main thread; `EditFileOperations::save` is fast for XML).
 
@@ -67,14 +67,14 @@
 **What:** On launch, detect leftover autosave files and offer to restore them.
 
 **Where to start:**
-- `src/app/FreeDawApplication.cpp` -- add recovery check after engine init, before `MainWindow` is shown.
+- `src/app/OpenDawApplication.cpp` -- add recovery check after engine init, before `MainWindow` is shown.
 - Read the autosave directory created in task 1.2.
 
-**New files:** `src/ui/dialogs/RecoveryDialog.h` / `.cpp` (or inline in `FreeDawApplication`).
+**New files:** `src/ui/dialogs/RecoveryDialog.h` / `.cpp` (or inline in `OpenDawApplication`).
 
 **Implementation:**
-1. On startup, scan `%APPDATA%/FreeDaw/autosave/` for `.tracktionedit` files.
-2. If found, show a dialog: "FreeDaw found an unsaved session from [timestamp]. Restore it?"
+1. On startup, scan `%APPDATA%/OpenDaw/autosave/` for `.tracktionedit` files.
+2. If found, show a dialog: "OpenDaw found an unsaved session from [timestamp]. Restore it?"
 3. Restore: call `editMgr_.loadEdit(autosaveFile)`, then set `currentFile_` to the original path from the sidecar (or leave as untitled).
 4. Discard: delete the autosave file and proceed normally.
 
@@ -89,10 +89,10 @@
 
 **What:** Show the current project filename in the title bar, with a dirty indicator.
 
-**Where to start:** `src/ui/MainWindow.cpp` -- `setWindowTitle("FreeDaw")` is currently hardcoded.
+**Where to start:** `src/ui/MainWindow.cpp` -- `setWindowTitle("OpenDaw")` is currently hardcoded.
 
 **Implementation:**
-1. After every `loadEdit`, `saveEdit`, `newEdit`, update the title: `"FreeDaw - [filename]"` or `"FreeDaw - Untitled"`.
+1. After every `loadEdit`, `saveEdit`, `newEdit`, update the title: `"OpenDaw - [filename]"` or `"OpenDaw - Untitled"`.
 2. When `editChanged` fires and `canUndo()` is true, prepend `"* "` to indicate unsaved changes.
 
 ---
@@ -771,11 +771,11 @@
 
 ### 16.1 Plugin preset save/load **[STRETCH]**
 
-**What:** Save and load plugin presets (VST3 state blobs) from within FreeDaw.
+**What:** Save and load plugin presets (VST3 state blobs) from within OpenDaw.
 
 **Tracktion Engine API:**
 - `te::ExternalPlugin::getStateInformation()` / `setStateInformation()`.
-- Store presets as files in `%APPDATA%/FreeDaw/presets/<pluginId>/`.
+- Store presets as files in `%APPDATA%/OpenDaw/presets/<pluginId>/`.
 
 ---
 
@@ -795,7 +795,7 @@
 
 **Tracktion Engine API:**
 - `edit->tempoSequence.insertTempo(BeatPosition, bpm, curveValue)`.
-- Currently FreeDaw only modifies `getTempo(0)`.
+- Currently OpenDaw only modifies `getTempo(0)`.
 
 ---
 
@@ -812,7 +812,7 @@
 | `src/ui/pianoroll/CcLane.h/.cpp` | CC event drawing and editing lane in piano roll | DONE |
 | `src/ui/pianoroll/ChannelColors.h` | 16-color channel palette for multi-channel piano roll | DONE |
 
-All other tasks modify existing files. Remember to add new `.h`/`.cpp` pairs to `FREEDAW_SOURCES` in `CMakeLists.txt`.
+All other tasks modify existing files. Remember to add new `.h`/`.cpp` pairs to `OpenDaw_SOURCES` in `CMakeLists.txt`.
 
 ## 18. Complete Task Index
 

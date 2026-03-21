@@ -1,4 +1,4 @@
-#include "AiQuickPrompt.h"
+﻿#include "AiQuickPrompt.h"
 #include "utils/ThemeManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -7,7 +7,7 @@
 #include <QGraphicsDropShadowEffect>
 #include <QApplication>
 
-namespace freedaw {
+namespace OpenDaw {
 
 AiQuickPrompt::AiQuickPrompt(QWidget* parent)
     : QWidget(parent)
@@ -114,4 +114,4 @@ void AiQuickPrompt::changeEvent(QEvent* event)
     QWidget::changeEvent(event);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

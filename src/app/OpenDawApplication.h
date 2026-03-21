@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "engine/AudioEngine.h"
 #include "engine/EditManager.h"
@@ -8,16 +8,16 @@
 #include <QWidget>
 #include <memory>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class MainWindow;
 
-class FreeDawApplication : public QObject {
+class OpenDawApplication : public QObject {
     Q_OBJECT
 
 public:
-    explicit FreeDawApplication(QObject* parent = nullptr);
-    ~FreeDawApplication() override;
+    explicit OpenDawApplication(QObject* parent = nullptr);
+    ~OpenDawApplication() override;
 
     bool initialize();
     void checkRecovery(QWidget* splashToHide = nullptr);
@@ -36,4 +36,4 @@ private:
     std::unique_ptr<MainWindow>     mainWindow_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

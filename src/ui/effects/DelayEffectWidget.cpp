@@ -1,4 +1,4 @@
-#include "DelayEffectWidget.h"
+﻿#include "DelayEffectWidget.h"
 #include "utils/ThemeManager.h"
 #include <algorithm>
 #include <cmath>
@@ -8,7 +8,7 @@ namespace {
     const juce::Identifier syncDivisionId("delaySyncDivision");
 }
 
-namespace freedaw {
+namespace OpenDaw {
 
 // Musical divisions sorted longest to shortest.
 // Beats are expressed as quarter-note durations so the conversion to
@@ -283,4 +283,4 @@ void DelayEffectWidget::updateSyncDisplay()
     syncMsLabel_->setText(QString("= %1 ms").arg(ms));
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

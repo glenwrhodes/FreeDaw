@@ -1,4 +1,4 @@
-#include "MainWindow.h"
+﻿#include "MainWindow.h"
 #include "ui/effects/VstSelectorDialog.h"
 #include "ui/effects/PluginEditorWindow.h"
 #include "ui/pianoroll/PianoRollEditor.h"
@@ -26,7 +26,7 @@
 #include <QTimer>
 #include <QtConcurrent/QtConcurrent>
 
-namespace freedaw {
+namespace OpenDaw {
 
 bool ShortcutFilter::eventFilter(QObject* /*obj*/, QEvent* event)
 {
@@ -51,14 +51,14 @@ bool ShortcutFilter::eventFilter(QObject* /*obj*/, QEvent* event)
     return false;
 }
 
-MainWindow::MainWindow(FreeDawApplication& app, QWidget* parent)
+MainWindow::MainWindow(OpenDawApplication& app, QWidget* parent)
     : QMainWindow(parent), app_(app), editMgr_(app.editManager())
 {
     auto* shortcutFilter = new ShortcutFilter(this);
     QApplication::instance()->installEventFilter(shortcutFilter);
 
-    setWindowTitle("FreeDaw");
-    setAccessibleName("FreeDaw Main Window");
+    setWindowTitle("OpenDaw");
+    setAccessibleName("OpenDaw Main Window");
     resize(1280, 800);
     setMinimumSize(900, 600);
 
@@ -162,13 +162,13 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
 void MainWindow::updateWindowTitle()
 {
-    QString title = "FreeDaw";
+    QString title = "OpenDaw";
     auto currentFile = editMgr_.currentFile();
     if (currentFile != juce::File()) {
         auto name = QString::fromStdString(currentFile.getFileNameWithoutExtension().toStdString());
-        title = QString("FreeDaw - %1").arg(name);
+        title = QString("OpenDaw - %1").arg(name);
     } else {
-        title = "FreeDaw - Untitled";
+        title = "OpenDaw - Untitled";
     }
 
     if (editMgr_.hasUnsavedChanges())
@@ -392,7 +392,7 @@ void MainWindow::createMenus()
 
     // Help menu
     auto* helpMenu = menuBar->addMenu("&Help");
-    helpMenu->addAction("&About FreeDaw", this, [this]() {
+    helpMenu->addAction("&About OpenDaw", this, [this]() {
         auto* about = new SplashScreen(false, this);
         about->setAttribute(Qt::WA_DeleteOnClose);
         about->finish();
@@ -981,4 +981,4 @@ void MainWindow::onAudioClipDoubleClicked(te::WaveAudioClip* clip)
         audioClipEditor_->setClip(clip, &editMgr_);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

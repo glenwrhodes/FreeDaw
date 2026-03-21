@@ -1,11 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include <QPainterPath>
 #include <QPointF>
 #include <QVector>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 struct EnvelopePoint {
     double beat;
@@ -111,4 +111,4 @@ inline bool hitTestCurve(const QPainterPath& path, QPointF localPos, double tole
 }
 
 } // namespace EnvelopeUtils
-} // namespace freedaw
+} // namespace OpenDaw

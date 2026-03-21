@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "EnvelopeUtils.h"
 #include <QGraphicsItem>
@@ -7,7 +7,7 @@
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class GridSnapper;
 class AutomationPointItem;
@@ -76,4 +76,4 @@ private:
     QPointF curveDragStartPos_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "ChannelStrip.h"
 #include "engine/EditManager.h"
@@ -8,7 +8,7 @@
 #include <QEvent>
 #include <vector>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class MixerView : public QWidget {
     Q_OBJECT
@@ -42,4 +42,4 @@ private:
     te::AudioTrack* selectedTrack_ = nullptr;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,10 +1,10 @@
-#pragma once
+﻿#pragma once
 
 #include <QWidget>
 #include <QPixmap>
 #include <QString>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class SplashScreen : public QWidget {
     Q_OBJECT
@@ -26,4 +26,4 @@ private:
     bool    ready_ = false;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

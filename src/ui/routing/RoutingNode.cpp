@@ -1,4 +1,4 @@
-#include "RoutingNode.h"
+﻿#include "RoutingNode.h"
 #include "utils/ThemeManager.h"
 #include <QPainter>
 #include <QFont>
@@ -9,7 +9,7 @@
 #include <QLineEdit>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 bool RoutingNode::groupMoveGuard_ = false;
 
@@ -377,4 +377,4 @@ void RoutingNode::rebuildJacks()
     }
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

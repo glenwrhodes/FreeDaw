@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <tracktion_engine/tracktion_engine.h>
 #include <QObject>
@@ -7,7 +7,7 @@
 #include <vector>
 #include <memory>
 
-namespace freedaw {
+namespace OpenDaw {
 
 struct WaveformData {
     std::vector<float> minValues;
@@ -40,4 +40,4 @@ private:
     QHash<QString, CacheEntry> cache_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

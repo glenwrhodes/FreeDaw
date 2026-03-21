@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <QWidget>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class PianoKeyboard : public QWidget {
     Q_OBJECT
@@ -40,4 +40,4 @@ private:
     static constexpr int KEY_WIDTH = 60;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "engine/EditManager.h"
 #include "ui/controls/RotaryKnob.h"
@@ -13,7 +13,7 @@
 #include <tracktion_engine/tracktion_engine.h>
 #include <vector>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class DelayEffectWidget : public QWidget {
     Q_OBJECT
@@ -50,4 +50,4 @@ private:
     QStackedWidget* timeStack_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,4 +1,4 @@
-#include "AutomationLaneItem.h"
+﻿#include "AutomationLaneItem.h"
 #include "AutomationPointItem.h"
 #include "GridSnapper.h"
 #include "utils/ThemeManager.h"
@@ -9,7 +9,7 @@
 #include <QCursor>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 AutomationLaneItem::AutomationLaneItem(te::AutomatableParameter* param, te::Edit* edit,
                                        double pixelsPerBeat, double laneHeight,
@@ -488,4 +488,4 @@ void AutomationLaneItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
     }
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

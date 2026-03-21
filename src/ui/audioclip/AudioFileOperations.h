@@ -1,10 +1,10 @@
-#pragma once
+﻿#pragma once
 
 #include "WaveformSelection.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_audio_basics/juce_audio_basics.h>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class AudioFileOperations {
 public:
@@ -40,4 +40,4 @@ private:
                                 const juce::AudioBuffer<float>& buffer, const FileInfo& info);
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

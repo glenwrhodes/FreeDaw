@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "ui/timeline/EnvelopeUtils.h"
 #include <QWidget>
@@ -8,7 +8,7 @@
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class CcLane : public QWidget {
     Q_OBJECT
@@ -90,4 +90,4 @@ private:
     static constexpr double kPointHoverSize = 10.0;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

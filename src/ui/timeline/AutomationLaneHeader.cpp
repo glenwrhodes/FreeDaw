@@ -1,11 +1,11 @@
-#include "AutomationLaneHeader.h"
+﻿#include "AutomationLaneHeader.h"
 #include "utils/ThemeManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFrame>
 #include <QSignalBlocker>
 
-namespace freedaw {
+namespace OpenDaw {
 
 AutomationLaneHeader::AutomationLaneHeader(te::AudioTrack* track, EditManager* editMgr,
                                            QWidget* parent)
@@ -170,4 +170,4 @@ void AutomationLaneHeader::refresh()
     populateParamCombo();
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

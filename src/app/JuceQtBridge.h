@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include <QObject>
 #include <QTimer>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class JuceQtBridge : public QObject {
     Q_OBJECT
@@ -19,4 +19,4 @@ private:
     QTimer pumpTimer_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

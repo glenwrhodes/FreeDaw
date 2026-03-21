@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <juce_core/juce_core.h>
 
-namespace freedaw {
+namespace OpenDaw {
 
 struct WaveformSelection {
     juce::int64 startSample = 0;
@@ -17,4 +17,4 @@ struct WaveformSelection {
     }
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

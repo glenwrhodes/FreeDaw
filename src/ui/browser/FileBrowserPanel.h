@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QWidget>
 #include <QTreeView>
@@ -8,7 +8,7 @@
 #include <QVBoxLayout>
 #include <QComboBox>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class FileBrowserPanel : public QWidget {
     Q_OBJECT
@@ -33,4 +33,4 @@ private:
     QPushButton* previewBtn_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.22)
-project(FreeDaw VERSION 0.0.0 LANGUAGES C CXX)
+﻿cmake_minimum_required(VERSION 3.22)
+project(OpenDaw VERSION 0.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,33 +12,33 @@ if(GIT_FOUND)
     execute_process(
         COMMAND ${GIT_EXECUTABLE} describe --tags --abbrev=0 --always
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        OUTPUT_VARIABLE FREEDAW_GIT_RAW
+        OUTPUT_VARIABLE OpenDaw_GIT_RAW
         OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET
         RESULT_VARIABLE GIT_DESCRIBE_RESULT)
     if(NOT GIT_DESCRIBE_RESULT EQUAL 0)
-        set(FREEDAW_GIT_RAW "dev")
+        set(OpenDaw_GIT_RAW "dev")
     endif()
 else()
-    set(FREEDAW_GIT_RAW "dev")
+    set(OpenDaw_GIT_RAW "dev")
 endif()
 
 # Strip leading "v" for display (v1.0.003 -> 1.0.003)
-string(REGEX REPLACE "^v" "" FREEDAW_DISPLAY_VERSION "${FREEDAW_GIT_RAW}")
+string(REGEX REPLACE "^v" "" OpenDaw_DISPLAY_VERSION "${OpenDaw_GIT_RAW}")
 
 # Extract numeric major.minor.patch for Windows exe metadata
-string(REGEX MATCH "^v?([0-9]+)\\.([0-9]+)\\.([0-9]+)" _ver_match "${FREEDAW_GIT_RAW}")
+string(REGEX MATCH "^v?([0-9]+)\\.([0-9]+)\\.([0-9]+)" _ver_match "${OpenDaw_GIT_RAW}")
 if(_ver_match)
     math(EXPR _major "${CMAKE_MATCH_1}")
     math(EXPR _minor "${CMAKE_MATCH_2}")
     math(EXPR _patch "${CMAKE_MATCH_3}")
-    set(FREEDAW_NUMERIC_VERSION "${_major}.${_minor}.${_patch}")
+    set(OpenDaw_NUMERIC_VERSION "${_major}.${_minor}.${_patch}")
 else()
-    set(FREEDAW_NUMERIC_VERSION "0.0.0")
+    set(OpenDaw_NUMERIC_VERSION "0.0.0")
 endif()
 
-message(STATUS "FreeDaw display version : ${FREEDAW_DISPLAY_VERSION}")
-message(STATUS "FreeDaw numeric version : ${FREEDAW_NUMERIC_VERSION}")
+message(STATUS "OpenDaw display version : ${OpenDaw_DISPLAY_VERSION}")
+message(STATUS "OpenDaw numeric version : ${OpenDaw_NUMERIC_VERSION}")
 
 # ── Qt6 ──────────────────────────────────────────────────────────────────────
 set(CMAKE_PREFIX_PATH "c:/qt/6.10.2/msvc2022_64" CACHE STRING "Qt prefix path")
@@ -54,9 +54,9 @@ set(TE_ADD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(libs/tracktion_engine)
 
 # ── Source files ─────────────────────────────────────────────────────────────
-set(FREEDAW_SOURCES
+set(OpenDaw_SOURCES
     src/main.cpp
-    src/app/FreeDawApplication.h    src/app/FreeDawApplication.cpp
+    src/app/OpenDawApplication.h    src/app/OpenDawApplication.cpp
     src/app/JuceQtBridge.h          src/app/JuceQtBridge.cpp
     src/engine/AudioEngine.h        src/engine/AudioEngine.cpp
     src/engine/EditManager.h        src/engine/EditManager.cpp
@@ -117,38 +117,38 @@ set(FREEDAW_SOURCES
     src/ai/AiQuickPrompt.h         src/ai/AiQuickPrompt.cpp
 )
 
-# ── Create the FreeDaw JUCE GUI App target ───────────────────────────────────
-juce_add_gui_app(FreeDaw
-    VERSION "${FREEDAW_NUMERIC_VERSION}"
-    PRODUCT_NAME "FreeDaw"
-    COMPANY_NAME "FreeDaw"
-    BUNDLE_ID "com.freedaw.app"
+# ── Create the OpenDaw JUCE GUI App target ───────────────────────────────────
+juce_add_gui_app(OpenDaw
+    VERSION "${OpenDaw_NUMERIC_VERSION}"
+    PRODUCT_NAME "OpenDaw"
+    COMPANY_NAME "OpenDaw"
+    BUNDLE_ID "com.OpenDaw.app"
     ICON_BIG "${CMAKE_SOURCE_DIR}/resources/icon.png"
     ICON_SMALL "${CMAKE_SOURCE_DIR}/resources/icon.png"
     MICROPHONE_PERMISSION_ENABLED TRUE
-    MICROPHONE_PERMISSION_TEXT "FreeDaw needs microphone access for audio recording")
+    MICROPHONE_PERMISSION_TEXT "OpenDaw needs microphone access for audio recording")
 
-juce_generate_juce_header(FreeDaw)
+juce_generate_juce_header(OpenDaw)
 
-target_sources(FreeDaw PRIVATE ${FREEDAW_SOURCES})
+target_sources(OpenDaw PRIVATE ${OpenDaw_SOURCES})
 
 # ── Windows application icon ─────────────────────────────────────────────────
-# JUCE's generated RC expects icon.ico next to FreeDaw_resources.rc
+# JUCE's generated RC expects icon.ico next to OpenDaw_resources.rc
 if(WIN32)
-    file(COPY "${CMAKE_SOURCE_DIR}/resources/freedaw.ico"
-         DESTINATION "${CMAKE_BINARY_DIR}/FreeDaw_artefacts/JuceLibraryCode")
+    file(COPY "${CMAKE_SOURCE_DIR}/resources/OpenDaw.ico"
+         DESTINATION "${CMAKE_BINARY_DIR}/OpenDaw_artefacts/JuceLibraryCode")
     file(RENAME
-         "${CMAKE_BINARY_DIR}/FreeDaw_artefacts/JuceLibraryCode/freedaw.ico"
-         "${CMAKE_BINARY_DIR}/FreeDaw_artefacts/JuceLibraryCode/icon.ico")
+         "${CMAKE_BINARY_DIR}/OpenDaw_artefacts/JuceLibraryCode/OpenDaw.ico"
+         "${CMAKE_BINARY_DIR}/OpenDaw_artefacts/JuceLibraryCode/icon.ico")
 endif()
-qt_add_resources(FreeDaw "freedaw_resources" PREFIX "/" BASE resources FILES
+qt_add_resources(OpenDaw "OpenDaw_resources" PREFIX "/" BASE resources FILES
     resources/splash.png
     resources/icon.png
     resources/fontaudio.ttf
     resources/MaterialSymbolsOutlined.ttf)
-target_include_directories(FreeDaw PRIVATE src)
+target_include_directories(OpenDaw PRIVATE src)
 
-target_compile_definitions(FreeDaw PRIVATE
+target_compile_definitions(OpenDaw PRIVATE
     JUCE_PLUGINHOST_VST3=1
     JUCE_PLUGINHOST_LADSPA=0
     JUCE_USE_CURL=0
@@ -158,7 +158,7 @@ target_compile_definitions(FreeDaw PRIVATE
     DONT_SET_USING_JUCE_NAMESPACE=1
     TRACKTION_ENABLE_TIMESTRETCH_SOUNDTOUCH=1)
 
-target_link_libraries(FreeDaw PRIVATE
+target_link_libraries(OpenDaw PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::Concurrent
@@ -175,16 +175,16 @@ target_link_libraries(FreeDaw PRIVATE
     juce::juce_recommended_warning_flags)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    target_compile_options(FreeDaw PRIVATE -Wno-unknown-pragmas)
+    target_compile_options(OpenDaw PRIVATE -Wno-unknown-pragmas)
 endif()
 
 if(MSVC)
-    target_compile_options(FreeDaw PRIVATE /EHsc /bigobj)
+    target_compile_options(OpenDaw PRIVATE /EHsc /bigobj)
 endif()
 
-target_compile_definitions(FreeDaw PRIVATE
-    FREEDAW_VERSION="${FREEDAW_DISPLAY_VERSION}")
+target_compile_definitions(OpenDaw PRIVATE
+    OpenDaw_VERSION="${OpenDaw_DISPLAY_VERSION}")
 
 if(WIN32)
-    target_link_libraries(FreeDaw PRIVATE winmm)
+    target_link_libraries(OpenDaw PRIVATE winmm)
 endif()

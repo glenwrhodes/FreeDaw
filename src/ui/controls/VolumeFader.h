@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <QWidget>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class VolumeFader : public QWidget {
     Q_OBJECT
@@ -43,4 +43,4 @@ private:
     int    dragOffsetY_ = 0;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

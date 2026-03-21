@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "engine/EditManager.h"
 #include <QWidget>
@@ -9,7 +9,7 @@
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class AutomationLaneHeader : public QWidget {
     Q_OBJECT
@@ -43,4 +43,4 @@ private:
     QVector<te::AutomatableParameter*> params_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

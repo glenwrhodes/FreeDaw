@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "engine/EditManager.h"
 #include <QGraphicsObject>
@@ -10,7 +10,7 @@
 #include <QString>
 #include <vector>
 
-namespace freedaw {
+namespace OpenDaw {
 
 enum class NodeType { InputSource, Track, Bus, Master, OutputDevice };
 
@@ -109,4 +109,4 @@ private:
     bool warning_ = false;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

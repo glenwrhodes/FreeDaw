@@ -1,4 +1,4 @@
-#include "AutomationPointItem.h"
+﻿#include "AutomationPointItem.h"
 #include "AutomationLaneItem.h"
 #include "EnvelopeUtils.h"
 #include "GridSnapper.h"
@@ -12,7 +12,7 @@
 #include <QTimer>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 AutomationPointItem::AutomationPointItem(int pointIndex, te::AutomatableParameter* param,
                                          AutomationLaneItem* lane, QGraphicsItem* parent)
@@ -226,4 +226,4 @@ void AutomationPointItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event
     event->accept();
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

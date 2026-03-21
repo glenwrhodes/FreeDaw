@@ -1,4 +1,4 @@
-#include "NoteItem.h"
+﻿#include "NoteItem.h"
 #include "NoteGrid.h"
 #include "ChannelColors.h"
 #include "ui/timeline/GridSnapper.h"
@@ -19,7 +19,7 @@
 #include <QRegularExpression>
 #include <algorithm>
 
-namespace freedaw {
+namespace OpenDaw {
 
 NoteItem::NoteItem(te::MidiNote* note, te::MidiClip* clip,
                    double pixelsPerBeat, double noteRowHeight,
@@ -501,4 +501,4 @@ void NoteItem::showEditDialog()
     dlg->exec();
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,6 +1,6 @@
-#pragma once
+﻿#pragma once
 
-namespace freedaw {
+namespace OpenDaw {
 
 enum class SnapMode {
     Off,
@@ -30,4 +30,4 @@ private:
     int      timeSigDen_ = 4;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

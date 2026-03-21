@@ -1,7 +1,7 @@
-#include "TrackLane.h"
+﻿#include "TrackLane.h"
 #include "engine/EditManager.h"
 
-namespace freedaw {
+namespace OpenDaw {
 
 TrackLane::TrackLane(te::AudioTrack* track, EditManager* editMgr, QWidget* parent)
     : QWidget(parent), track_(track), editMgr_(editMgr)
@@ -54,4 +54,4 @@ void TrackLane::setArmed(bool a)
     emit armChanged(a);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

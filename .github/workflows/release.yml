@@ -1,4 +1,4 @@
-name: Build & Release
+﻿name: Build & Release
 
 on:
   push:
@@ -57,14 +57,14 @@ jobs:
       - name: Deploy Qt runtime
         shell: pwsh
         run: |
-          $exe = "build/FreeDaw_artefacts/Release/FreeDaw.exe"
+          $exe = "build/OpenDaw_artefacts/Release/OpenDaw.exe"
           windeployqt --release --no-translations --no-opengl-sw $exe
 
       - name: Package portable ZIP
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.VERSION }}"
-          Compress-Archive -Path "build/FreeDaw_artefacts/Release/*" -DestinationPath "FreeDaw-v${version}-portable.zip"
+          Compress-Archive -Path "build/OpenDaw_artefacts/Release/*" -DestinationPath "OpenDaw-v${version}-portable.zip"
 
       - name: Build installer
         shell: pwsh
@@ -72,18 +72,18 @@ jobs:
           $version = "${{ steps.version.outputs.VERSION }}"
           & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' `
             /DMyAppVersion="$version" `
-            /DSourceDir="$PWD\build\FreeDaw_artefacts\Release" `
+            /DSourceDir="$PWD\build\OpenDaw_artefacts\Release" `
             /DOutputDir="$PWD" `
             /DLicenseDir="$PWD" `
-            "installer\freedaw.iss"
+            "installer\opendaw.iss"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-artifacts
           path: |
-            FreeDaw-v*-portable.zip
-            FreeDaw-v*-setup.exe
+            OpenDaw-v*-portable.zip
+            OpenDaw-v*-setup.exe
 
   build-macos:
     runs-on: macos-latest
@@ -124,21 +124,21 @@ jobs:
 
       - name: Deploy Qt into app bundle
         run: |
-          "${{ env.QT_ROOT_DIR }}/bin/macdeployqt" "build/FreeDaw_artefacts/Release/FreeDaw.app"
+          "${{ env.QT_ROOT_DIR }}/bin/macdeployqt" "build/OpenDaw_artefacts/Release/OpenDaw.app"
 
       - name: Package DMG
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
-          hdiutil create -volname "FreeDaw" \
-            -srcfolder "build/FreeDaw_artefacts/Release/FreeDaw.app" \
+          hdiutil create -volname "OpenDaw" \
+            -srcfolder "build/OpenDaw_artefacts/Release/OpenDaw.app" \
             -ov -format UDZO \
-            "FreeDaw-v${VERSION}-mac.dmg"
+            "OpenDaw-v${VERSION}-mac.dmg"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-artifacts
-          path: FreeDaw-v*-mac.dmg
+          path: OpenDaw-v*-mac.dmg
 
   release:
     needs: [build-windows, build-macos]
@@ -156,11 +156,11 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: FreeDaw v${{ steps.version.outputs.VERSION }}
+          name: OpenDaw v${{ steps.version.outputs.VERSION }}
           draft: false
           prerelease: false
           generate_release_notes: true
           files: |
-            FreeDaw-v${{ steps.version.outputs.VERSION }}-portable.zip
-            FreeDaw-v${{ steps.version.outputs.VERSION }}-setup.exe
-            FreeDaw-v${{ steps.version.outputs.VERSION }}-mac.dmg
+            OpenDaw-v${{ steps.version.outputs.VERSION }}-portable.zip
+            OpenDaw-v${{ steps.version.outputs.VERSION }}-setup.exe
+            OpenDaw-v${{ steps.version.outputs.VERSION }}-mac.dmg

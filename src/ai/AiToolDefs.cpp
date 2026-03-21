@@ -1,7 +1,7 @@
-#include "AiToolDefs.h"
+﻿#include "AiToolDefs.h"
 #include <QJsonObject>
 
-namespace freedaw {
+namespace OpenDaw {
 
 static QJsonObject makeTool(const QString& name, const QString& description,
                             const QJsonObject& properties,
@@ -626,4 +626,4 @@ QJsonArray AiToolDefs::allTools()
     return tools;
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

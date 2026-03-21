@@ -1,4 +1,4 @@
-#include "SplashScreen.h"
+﻿#include "SplashScreen.h"
 #include <QPainter>
 #include <QScreen>
 #include <QGuiApplication>
@@ -6,11 +6,11 @@
 #include <QFont>
 #include <QDebug>
 
-#ifndef FREEDAW_VERSION
-#define FREEDAW_VERSION "dev"
+#ifndef OpenDaw_VERSION
+#define OpenDaw_VERSION "dev"
 #endif
 
-namespace freedaw {
+namespace OpenDaw {
 
 static constexpr int kSplashWidth  = 800;
 static constexpr int kSplashHeight = 450;
@@ -67,12 +67,12 @@ void SplashScreen::paintEvent(QPaintEvent*)
     QFont titleFont("Segoe UI", 26, QFont::Bold);
     p.setFont(titleFont);
     p.setPen(QColor(230, 230, 230));
-    p.drawText(QRect(0, textAreaTop, width(), 36), Qt::AlignCenter, "FreeDaw");
+    p.drawText(QRect(0, textAreaTop, width(), 36), Qt::AlignCenter, "OpenDaw");
 
     QFont versionFont("Segoe UI", 11);
     p.setFont(versionFont);
     p.setPen(QColor(100, 210, 210));
-    QString versionStr = QString("Version %1").arg(FREEDAW_VERSION);
+    QString versionStr = QString("Version %1").arg(OpenDaw_VERSION);
     p.drawText(QRect(0, textAreaTop + 36, width(), 20), Qt::AlignCenter, versionStr);
 
     QFont devFont("Segoe UI", 9);
@@ -85,7 +85,7 @@ void SplashScreen::paintEvent(QPaintEvent*)
     p.setFont(smallFont);
     p.setPen(QColor(140, 140, 140));
     QString copyright = QString::fromUtf8(
-        "\u00A9 2025\u20132026 FreeDaw  \u2022  Licensed under GPLv3");
+        "\u00A9 2025\u20132026 OpenDaw  \u2022  Licensed under GPLv3");
     p.drawText(QRect(0, textAreaTop + 78, width(), 16), Qt::AlignCenter, copyright);
 
     if (!ready_) {
@@ -111,4 +111,4 @@ void SplashScreen::mousePressEvent(QMouseEvent* event)
     QWidget::mousePressEvent(event);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

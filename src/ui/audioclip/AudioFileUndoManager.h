@@ -1,11 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include <juce_core/juce_core.h>
 #include <QString>
 #include <QObject>
 #include <vector>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class AudioFileUndoManager : public QObject {
     Q_OBJECT
@@ -46,4 +46,4 @@ private:
     int maxDepth_ = 20;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

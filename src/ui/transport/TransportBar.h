@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "engine/EditManager.h"
 #include <QWidget>
@@ -10,7 +10,7 @@
 #include <QTimer>
 #include <QComboBox>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class TransportBar : public QWidget {
     Q_OBJECT
@@ -66,4 +66,4 @@ private:
     bool deferredLoopActivation_ = false;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

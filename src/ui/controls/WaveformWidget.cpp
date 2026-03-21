@@ -1,9 +1,9 @@
-#include "WaveformWidget.h"
+﻿#include "WaveformWidget.h"
 #include "utils/ThemeManager.h"
 #include <QPainter>
 #include <QPainterPath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 WaveformWidget::WaveformWidget(QWidget* parent)
     : QWidget(parent)
@@ -56,4 +56,4 @@ void WaveformWidget::paintEvent(QPaintEvent*)
     p.drawPath(path);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <QColor>
 
-namespace freedaw {
+namespace OpenDaw {
 
 inline const QColor kChannelColors[16] = {
     {100, 180, 255},  // Ch1  Blue
@@ -29,4 +29,4 @@ inline QColor channelColor(int ch)
     return kChannelColors[ch - 1];
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

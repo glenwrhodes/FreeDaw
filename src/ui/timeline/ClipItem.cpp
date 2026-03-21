@@ -1,4 +1,4 @@
-#include "ClipItem.h"
+﻿#include "ClipItem.h"
 #include "GridSnapper.h"
 #include "engine/EditManager.h"
 #include "utils/ThemeManager.h"
@@ -11,7 +11,7 @@
 #include <QMenu>
 #include <algorithm>
 
-namespace freedaw {
+namespace OpenDaw {
 
 ClipItem::ClipItem(te::Clip* clip, int trackIndex, double pixelsPerBeat,
                    double trackHeight, QGraphicsItem* parent)
@@ -676,4 +676,4 @@ void ClipItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
     QGraphicsRectItem::mouseDoubleClickEvent(event);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

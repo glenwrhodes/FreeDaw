@@ -1,10 +1,10 @@
-# CLAUDE.md
+﻿# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project
 
-**FreeDaw** — a free, open-source DAW for Windows. Qt 6 handles all GUI; Tracktion Engine (built on JUCE) handles all audio. The binary is produced at `build\FreeDaw_artefacts\Debug\FreeDaw.exe`.
+**OpenDaw** — a free, open-source DAW for Windows. Qt 6 handles all GUI; Tracktion Engine (built on JUCE) handles all audio. The binary is produced at `build\OpenDaw_artefacts\Debug\OpenDaw.exe`.
 
 ## Build Commands
 
@@ -23,7 +23,7 @@ cmd /c "`"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\B
 **Run:**
 ```powershell
 $env:PATH = "c:\qt\6.10.2\msvc2022_64\bin;" + $env:PATH
-.\build\FreeDaw_artefacts\Debug\FreeDaw.exe
+.\build\OpenDaw_artefacts\Debug\OpenDaw.exe
 ```
 
 First build takes 2-4 minutes (compiling JUCE/Tracktion). Incremental rebuilds take ~10-15 seconds. There is no test suite.
@@ -38,7 +38,7 @@ Two frameworks coexist via `JuceQtBridge` (`src/app/JuceQtBridge.h`): a `QTimer`
 
 ```
 main.cpp
-  └─ FreeDawApplication          owns all singletons
+  └─ OpenDawApplication          owns all singletons
        ├─ JuceQtBridge           JUCE message pump
        ├─ AudioEngine            wraps te::Engine
        ├─ EditManager            wraps te::Edit (the project document)
@@ -46,7 +46,7 @@ main.cpp
        └─ MainWindow             QMainWindow with dock layout
 ```
 
-`FreeDawApplication` is the single place to access engine/edit globals — never create additional `te::Engine` instances.
+`OpenDawApplication` is the single place to access engine/edit globals — never create additional `te::Engine` instances.
 
 ### Tracktion Engine Integration
 
@@ -71,13 +71,13 @@ main.cpp
 
 ### Naming & Namespace
 
-All project code lives in the `freedaw` namespace. The `DONT_SET_USING_JUCE_NAMESPACE=1` compile definition prevents JUCE from polluting the global namespace — always qualify JUCE types with `juce::` or use the `te::` alias.
+All project code lives in the `OpenDaw` namespace. The `DONT_SET_USING_JUCE_NAMESPACE=1` compile definition prevents JUCE from polluting the global namespace — always qualify JUCE types with `juce::` or use the `te::` alias.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `src/app/FreeDawApplication.h` | Top-level app object; entry point for accessing engine/edit |
+| `src/app/OpenDawApplication.h` | Top-level app object; entry point for accessing engine/edit |
 | `src/engine/EditManager.h` | Project document API; Qt signals for track/transport changes |
 | `src/engine/AudioEngine.h` | Wraps `te::Engine`; device management |
 | `src/app/JuceQtBridge.h` | QTimer-based JUCE message pump |

@@ -1,9 +1,9 @@
-#include "RecoveryDialog.h"
+﻿#include "RecoveryDialog.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QDateTime>
 
-namespace freedaw {
+namespace OpenDaw {
 
 RecoveryDialog::RecoveryDialog(const QList<EditManager::RecoveryInfo>& files,
                                QWidget* parent)
@@ -16,7 +16,7 @@ RecoveryDialog::RecoveryDialog(const QList<EditManager::RecoveryInfo>& files,
     auto* layout = new QVBoxLayout(this);
 
     auto* messageLabel = new QLabel(
-        "FreeDaw found unsaved session data from a previous run.\n"
+        "OpenDaw found unsaved session data from a previous run.\n"
         "Would you like to restore it?", this);
     messageLabel->setAccessibleName("Recovery message");
     messageLabel->setWordWrap(true);
@@ -67,4 +67,4 @@ EditManager::RecoveryInfo RecoveryDialog::selectedRecovery() const
     return {};
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

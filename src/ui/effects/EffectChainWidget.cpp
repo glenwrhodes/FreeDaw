@@ -1,4 +1,4 @@
-#include "EffectChainWidget.h"
+﻿#include "EffectChainWidget.h"
 #include "DelayEffectWidget.h"
 #include "EffectSelectorDialog.h"
 #include "PluginEditorWindow.h"
@@ -7,7 +7,7 @@
 #include <QGridLayout>
 #include <QSignalBlocker>
 
-namespace freedaw {
+namespace OpenDaw {
 
 // ── EffectSlotWidget ────────────────────────────────────────────────────────
 
@@ -408,4 +408,4 @@ void EffectChainWidget::removeEffect(te::Plugin* plugin)
     });
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

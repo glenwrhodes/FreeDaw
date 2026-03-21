@@ -1,7 +1,7 @@
-#include "WaveformCache.h"
+﻿#include "WaveformCache.h"
 #include <algorithm>
 
-namespace freedaw {
+namespace OpenDaw {
 
 WaveformCache& WaveformCache::instance()
 {
@@ -89,4 +89,4 @@ void WaveformCache::clear()
     cache_.clear();
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

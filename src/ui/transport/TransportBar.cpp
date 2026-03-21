@@ -1,4 +1,4 @@
-#include "TransportBar.h"
+﻿#include "TransportBar.h"
 #include "ui/timeline/GridSnapper.h"
 #include "utils/ThemeManager.h"
 #include "utils/IconFont.h"
@@ -7,7 +7,7 @@
 #include <QVBoxLayout>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
     : QWidget(parent), editMgr_(editMgr)
@@ -530,4 +530,4 @@ void TransportBar::applyButtonStyle(QPushButton* btn, const QColor& activeColor)
                  theme.surfaceLight.name(), activeColor.name()));
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

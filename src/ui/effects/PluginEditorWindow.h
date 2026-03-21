@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <tracktion_engine/tracktion_engine.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -6,7 +6,7 @@
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class PluginEditorWindow : public juce::DocumentWindow {
 public:
@@ -27,4 +27,4 @@ private:
     static std::vector<std::unique_ptr<PluginEditorWindow>> openWindows_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

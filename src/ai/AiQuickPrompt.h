@@ -1,10 +1,10 @@
-#pragma once
+﻿#pragma once
 
 #include <QWidget>
 #include <QLineEdit>
 #include <QKeyEvent>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class AiQuickPrompt : public QWidget {
     Q_OBJECT
@@ -26,4 +26,4 @@ private:
     QLineEdit* lineEdit_ = nullptr;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

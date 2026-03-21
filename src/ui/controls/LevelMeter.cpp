@@ -1,9 +1,9 @@
-#include "LevelMeter.h"
+﻿#include "LevelMeter.h"
 #include "utils/ThemeManager.h"
 #include <QPainter>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 LevelMeter::LevelMeter(QWidget* parent)
     : QWidget(parent)
@@ -73,4 +73,4 @@ void LevelMeter::paintEvent(QPaintEvent*)
     }
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

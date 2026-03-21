@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "AiTypes.h"
 #include "AiService.h"
@@ -14,7 +14,7 @@
 #include <QTimer>
 #include <QTextBrowser>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class EditManager;
 class AudioEngine;
@@ -85,4 +85,4 @@ private:
     void updateToolBubbleVisibility();
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

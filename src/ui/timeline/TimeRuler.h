@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include <QWidget>
 #include <functional>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class TimeRuler : public QWidget {
     Q_OBJECT
@@ -63,4 +63,4 @@ private:
     std::function<double(double)> snapFn_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

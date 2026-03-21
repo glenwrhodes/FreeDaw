@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "TimeRuler.h"
 #include "GridSnapper.h"
@@ -20,7 +20,7 @@
 #include <vector>
 #include <memory>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class TimelineScene : public QGraphicsScene {
     Q_OBJECT
@@ -187,4 +187,4 @@ private:
     static constexpr double kResizeHandleHeight = 4.0;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

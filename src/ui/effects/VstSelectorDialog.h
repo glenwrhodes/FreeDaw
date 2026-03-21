@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QDialog>
 #include <QTreeWidget>
@@ -6,7 +6,7 @@
 #include <QDialogButtonBox>
 #include <juce_audio_processors/juce_audio_processors.h>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class VstSelectorDialog : public QDialog {
     Q_OBJECT
@@ -36,4 +36,4 @@ private:
     std::vector<juce::PluginDescription> allDescs_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

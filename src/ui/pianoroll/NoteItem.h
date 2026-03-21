@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QGraphicsRectItem>
 #include <tracktion_engine/tracktion_engine.h>
@@ -6,7 +6,7 @@
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class GridSnapper;
 
@@ -81,4 +81,4 @@ private:
     int previewingNote_ = -1;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

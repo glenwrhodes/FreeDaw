@@ -1,11 +1,11 @@
-#include <QApplication>
+﻿#include <QApplication>
 #include <QFile>
 #include <QFileInfo>
 #include <QDateTime>
 #include <QTimer>
 #include <QIcon>
 #include <juce_events/juce_events.h>
-#include "app/FreeDawApplication.h"
+#include "app/OpenDawApplication.h"
 #include "ui/MainWindow.h"
 #include "ui/SplashScreen.h"
 #include "utils/IconFont.h"
@@ -14,8 +14,8 @@
 #include <windows.h>
 #endif
 
-#ifndef FREEDAW_VERSION
-#define FREEDAW_VERSION "dev"
+#ifndef OpenDaw_VERSION
+#define OpenDaw_VERSION "dev"
 #endif
 
 static QFile* logFile = nullptr;
@@ -81,9 +81,9 @@ static LONG WINAPI crashHandler(EXCEPTION_POINTERS* ep)
 int main(int argc, char* argv[])
 {
     QApplication qtApp(argc, argv);
-    qtApp.setApplicationName("FreeDaw");
-    qtApp.setApplicationVersion(FREEDAW_VERSION);
-    qtApp.setOrganizationName("FreeDaw");
+    qtApp.setApplicationName("OpenDaw");
+    qtApp.setApplicationVersion(OpenDaw_VERSION);
+    qtApp.setOrganizationName("OpenDaw");
 
     qtApp.setWindowIcon(QIcon(":/icon.png"));
 
@@ -91,7 +91,7 @@ int main(int argc, char* argv[])
         "QToolTip { background: #3a3a3a; color: #dcdcdc; border: 1px solid #666; "
         "padding: 3px; font-size: 11px; }");
 
-    QFile lf(QApplication::applicationDirPath() + "/freedaw.log");
+    QFile lf(QApplication::applicationDirPath() + "/OpenDaw.log");
     if (lf.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
         logFile = &lf;
         qInstallMessageHandler(logMessageHandler);
@@ -101,15 +101,15 @@ int main(int argc, char* argv[])
     SetUnhandledExceptionFilter(crashHandler);
 #endif
 
-    freedaw::icons::registerFonts();
+    OpenDaw::icons::registerFonts();
 
-    auto* splash = new freedaw::SplashScreen();
+    auto* splash = new OpenDaw::SplashScreen();
     splash->show();
     qtApp.processEvents();
 
     juce::ScopedJuceInitialiser_GUI juceInit;
 
-    freedaw::FreeDawApplication app;
+    OpenDaw::OpenDawApplication app;
     if (!app.initialize())
         return 1;
 
@@ -135,7 +135,7 @@ int main(int argc, char* argv[])
     splash->finish();
     splash->update();
 
-    QObject::connect(splash, &freedaw::SplashScreen::dismissed, splash, [&]() {
+    QObject::connect(splash, &OpenDaw::SplashScreen::dismissed, splash, [&]() {
         app.mainWindow()->raise();
         app.mainWindow()->activateWindow();
     });

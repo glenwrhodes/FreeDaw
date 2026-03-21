@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "WaveformSelection.h"
 #include "ui/timeline/GridSnapper.h"
@@ -14,7 +14,7 @@
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class EditManager;
 
@@ -146,4 +146,4 @@ private:
     ContextMenuCallback contextMenuCb_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

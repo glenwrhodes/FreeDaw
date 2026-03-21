@@ -1,4 +1,4 @@
-#include "TimeRuler.h"
+﻿#include "TimeRuler.h"
 #include "utils/ThemeManager.h"
 #include <QPainter>
 #include <QPainterPath>
@@ -7,7 +7,7 @@
 #include <QMenu>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 TimeRuler::TimeRuler(QWidget* parent)
     : QWidget(parent)
@@ -234,4 +234,4 @@ void TimeRuler::contextMenuEvent(QContextMenuEvent* event)
     }
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

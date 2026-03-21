@@ -1,7 +1,7 @@
-#include "JuceQtBridge.h"
+﻿#include "JuceQtBridge.h"
 #include <juce_events/juce_events.h>
 
-namespace freedaw {
+namespace OpenDaw {
 
 JuceQtBridge::JuceQtBridge(QObject* parent)
     : QObject(parent)
@@ -27,4 +27,4 @@ void JuceQtBridge::stop()
     pumpTimer_.stop();
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

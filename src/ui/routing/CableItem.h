@@ -1,10 +1,10 @@
-#pragma once
+﻿#pragma once
 
 #include "RoutingNode.h"
 #include <QGraphicsPathItem>
 #include <QColor>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class CableItem : public QGraphicsPathItem {
 public:
@@ -50,4 +50,4 @@ private:
     bool physicsInitialized_ = false;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

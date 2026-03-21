@@ -1,18 +1,18 @@
-#include "FreeDawApplication.h"
+﻿#include "OpenDawApplication.h"
 #include "ui/MainWindow.h"
 #include "ui/dialogs/RecoveryDialog.h"
 #include <QFile>
 
-namespace freedaw {
+namespace OpenDaw {
 
-FreeDawApplication::FreeDawApplication(QObject* parent)
+OpenDawApplication::OpenDawApplication(QObject* parent)
     : QObject(parent)
 {
 }
 
-FreeDawApplication::~FreeDawApplication() = default;
+OpenDawApplication::~OpenDawApplication() = default;
 
-bool FreeDawApplication::initialize()
+bool OpenDawApplication::initialize()
 {
     bridge_ = std::make_unique<JuceQtBridge>(this);
     bridge_->start();
@@ -27,7 +27,7 @@ bool FreeDawApplication::initialize()
     return true;
 }
 
-void FreeDawApplication::checkRecovery(QWidget* splashToHide)
+void OpenDawApplication::checkRecovery(QWidget* splashToHide)
 {
     auto recoveryFiles = EditManager::findRecoveryFiles();
     if (recoveryFiles.isEmpty())
@@ -57,10 +57,10 @@ void FreeDawApplication::checkRecovery(QWidget* splashToHide)
         splashToHide->show();
 }
 
-void FreeDawApplication::showMainWindow()
+void OpenDawApplication::showMainWindow()
 {
     mainWindow_ = std::make_unique<MainWindow>(*this);
     mainWindow_->show();
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

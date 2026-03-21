@@ -1,4 +1,4 @@
-#include "NoteGrid.h"
+﻿#include "NoteGrid.h"
 #include "utils/ThemeManager.h"
 #include <QScrollBar>
 #include <QWheelEvent>
@@ -25,7 +25,7 @@
 #include <map>
 #include <unordered_set>
 
-namespace freedaw {
+namespace OpenDaw {
 
 std::vector<ClipboardNote> NoteGrid::clipboard_;
 
@@ -1443,4 +1443,4 @@ void NoteGrid::updateDrawPreviewAppearance()
                              drawPreviewItem_->pos().y() - 16.0);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,11 +1,11 @@
-#include "AudioEngine.h"
+﻿#include "AudioEngine.h"
 #include <QSettings>
 
-namespace freedaw {
+namespace OpenDaw {
 
 AudioEngine::AudioEngine()
 {
-    engine_ = std::make_unique<te::Engine>("FreeDaw");
+    engine_ = std::make_unique<te::Engine>("OpenDaw");
 }
 
 AudioEngine::~AudioEngine() = default;
@@ -115,4 +115,4 @@ void AudioEngine::enableAllMidiInputDevices()
     }
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

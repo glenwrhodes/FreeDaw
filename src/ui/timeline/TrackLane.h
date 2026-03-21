@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QWidget>
 #include <QColor>
@@ -6,7 +6,7 @@
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class EditManager;
 
@@ -42,4 +42,4 @@ private:
     QColor color_{60, 120, 110};
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

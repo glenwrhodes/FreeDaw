@@ -1,9 +1,9 @@
-#include "AiToolExecutor.h"
+﻿#include "AiToolExecutor.h"
 #include <tracktion_engine/tracktion_engine.h>
 #include <cmath>
 #include <algorithm>
 
-namespace freedaw {
+namespace OpenDaw {
 
 AiToolExecutor::AiToolExecutor(EditManager* editMgr, AudioEngine* audioEngine,
                                PluginScanner* pluginScanner, QObject* parent)
@@ -1257,4 +1257,4 @@ bool AiToolExecutor::isDestructive(const QString& toolName) const
     return destructive.contains(toolName);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

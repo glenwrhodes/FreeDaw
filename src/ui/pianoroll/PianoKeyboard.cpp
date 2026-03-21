@@ -1,9 +1,9 @@
-#include "PianoKeyboard.h"
+﻿#include "PianoKeyboard.h"
 #include "utils/ThemeManager.h"
 #include <QPainter>
 #include <QMouseEvent>
 
-namespace freedaw {
+namespace OpenDaw {
 
 PianoKeyboard::PianoKeyboard(QWidget* parent)
     : QWidget(parent)
@@ -134,4 +134,4 @@ void PianoKeyboard::leaveEvent(QEvent* event)
     QWidget::leaveEvent(event);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

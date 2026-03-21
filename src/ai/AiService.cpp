@@ -1,10 +1,10 @@
-#include "AiService.h"
+﻿#include "AiService.h"
 #include "engine/EditManager.h"
 #include "engine/AudioEngine.h"
 #include <QNetworkRequest>
 #include <QUrl>
 
-namespace freedaw {
+namespace OpenDaw {
 
 static const QString kApiUrl = "https://api.anthropic.com/v1/messages";
 static const QString kDefaultModel = "claude-sonnet-4-20250514";
@@ -81,7 +81,7 @@ void AiService::setBusy(bool b)
 QString AiService::buildSystemPrompt() const
 {
     QString prompt =
-        "You are an AI assistant integrated into FreeDaw, a digital audio workstation. "
+        "You are an AI assistant integrated into OpenDaw, a digital audio workstation. "
         "You help users manage their music projects by manipulating tracks, effects, "
         "routing, and transport controls.\n\n";
 
@@ -481,4 +481,4 @@ void AiService::continueAfterToolResults(const QVector<AiToolResult>& results,
     sendToApi();
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

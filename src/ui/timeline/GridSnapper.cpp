@@ -1,8 +1,8 @@
-#include "GridSnapper.h"
+﻿#include "GridSnapper.h"
 #include <algorithm>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 double GridSnapper::gridIntervalBeats() const
 {
@@ -26,4 +26,4 @@ double GridSnapper::snapBeat(double beat) const
     return std::max(0.0, std::round(beat / interval) * interval);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

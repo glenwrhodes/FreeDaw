@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "engine/EditManager.h"
 #include <QDialog>
@@ -6,7 +6,7 @@
 #include <QPushButton>
 #include <QListWidget>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class RecoveryDialog : public QDialog {
     Q_OBJECT
@@ -22,4 +22,4 @@ private:
     QList<EditManager::RecoveryInfo> recoveryFiles_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

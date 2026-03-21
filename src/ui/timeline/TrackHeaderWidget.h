@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "engine/EditManager.h"
 #include "ui/controls/LevelMeter.h"
@@ -15,7 +15,7 @@
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class TrackHeaderWidget : public QWidget {
     Q_OBJECT
@@ -82,4 +82,4 @@ private:
     double lastTrackedPlayheadSecs_ = -1.0;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

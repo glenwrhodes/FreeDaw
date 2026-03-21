@@ -1,10 +1,10 @@
-#pragma once
+﻿#pragma once
 
 #include "AudioEngine.h"
 #include <QObject>
 #include <QThread>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class PluginScanWorker : public QObject {
     Q_OBJECT
@@ -48,4 +48,4 @@ private:
     bool scanning_ = false;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

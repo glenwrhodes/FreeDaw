@@ -1,11 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include "engine/EditManager.h"
 #include <QJsonObject>
 #include <memory>
 #include <unordered_map>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class AiAudioAnalysis {
 public:
@@ -38,5 +38,5 @@ private:
     std::unordered_map<qulonglong, MeterClientEntry> meterClients_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw
 

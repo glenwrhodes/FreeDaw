@@ -1,11 +1,11 @@
-#include "VolumeFader.h"
+﻿#include "VolumeFader.h"
 #include "utils/ThemeManager.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 VolumeFader::VolumeFader(QWidget* parent)
     : QWidget(parent)
@@ -153,4 +153,4 @@ void VolumeFader::wheelEvent(QWheelEvent* event)
     event->accept();
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

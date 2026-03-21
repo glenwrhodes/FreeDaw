@@ -1,6 +1,6 @@
-# FreeDaw Version 1 Feature Set (Hobbyist Complete)
+﻿# OpenDaw Version 1 Feature Set (Hobbyist Complete)
 
-This document defines the feature set needed for a completed FreeDaw v1, based on current code in `src/`.
+This document defines the feature set needed for a completed OpenDaw v1, based on current code in `src/`.
 
 ## 1) Feature Matrix: Implemented vs Missing
 
@@ -67,7 +67,7 @@ This document defines the feature set needed for a completed FreeDaw v1, based o
 
 ## 3) Version 1 Exit Criteria (Ship Checklist)
 
-FreeDaw v1 is complete when all items below are true:
+OpenDaw v1 is complete when all items below are true:
 
 ### Recording and transport
 

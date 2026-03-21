@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "AiTypes.h"
 #include "AiToolDefs.h"
@@ -11,7 +11,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class EditManager;
 class AudioEngine;
@@ -89,4 +89,4 @@ private:
     void pruneHistory();
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

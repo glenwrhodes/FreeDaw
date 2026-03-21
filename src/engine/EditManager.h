@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "AudioEngine.h"
 #include <tracktion_engine/tracktion_engine.h>
@@ -13,7 +13,7 @@
 #include <memory>
 #include <functional>
 
-namespace freedaw {
+namespace OpenDaw {
 
 struct InputSource {
     juce::String deviceName;
@@ -206,4 +206,4 @@ private:
     std::map<uint64_t, FreezeState> frozenTracks_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

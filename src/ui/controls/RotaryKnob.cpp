@@ -1,11 +1,11 @@
-#include "RotaryKnob.h"
+﻿#include "RotaryKnob.h"
 #include "utils/ThemeManager.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 RotaryKnob::RotaryKnob(QWidget* parent)
     : QWidget(parent)
@@ -132,4 +132,4 @@ void RotaryKnob::wheelEvent(QWheelEvent* event)
     event->accept();
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

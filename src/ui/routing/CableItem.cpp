@@ -1,10 +1,10 @@
-#include "CableItem.h"
+﻿#include "CableItem.h"
 #include <QPainter>
 #include <QPainterPathStroker>
 #include <QGraphicsSceneHoverEvent>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 namespace {
 constexpr qreal CABLE_THICKNESS = 3.5;
@@ -180,4 +180,4 @@ void CableItem::hoverLeaveEvent(QGraphicsSceneHoverEvent*)
     update();
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

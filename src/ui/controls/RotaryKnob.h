@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <QWidget>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class RotaryKnob : public QWidget {
     Q_OBJECT
@@ -48,4 +48,4 @@ private:
     double dragStartVal_ = 0.0;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

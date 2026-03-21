@@ -1,4 +1,4 @@
-#include "AudioSettingsDialog.h"
+﻿#include "AudioSettingsDialog.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -6,7 +6,7 @@
 #include <QSettings>
 #include <QMessageBox>
 
-namespace freedaw {
+namespace OpenDaw {
 
 AudioSettingsDialog::AudioSettingsDialog(AudioEngine& engine, QWidget* parent)
     : QDialog(parent), engine_(engine)
@@ -271,4 +271,4 @@ void AudioSettingsDialog::applySettings()
     settings.setValue("audio/bufferSize", bufferSizeCombo_->currentData().toInt());
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

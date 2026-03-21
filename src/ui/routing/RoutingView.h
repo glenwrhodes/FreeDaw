@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "RoutingNode.h"
 #include "CableItem.h"
@@ -12,7 +12,7 @@
 #include <QMap>
 #include <vector>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class RoutingView : public QWidget {
     Q_OBJECT
@@ -103,4 +103,4 @@ private:
     static constexpr qreal ROW_SPACING = 20.0;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

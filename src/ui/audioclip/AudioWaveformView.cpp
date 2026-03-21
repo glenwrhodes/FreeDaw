@@ -1,4 +1,4 @@
-#include "AudioWaveformView.h"
+﻿#include "AudioWaveformView.h"
 #include "engine/EditManager.h"
 #include "utils/ThemeManager.h"
 #include "utils/WaveformCache.h"
@@ -11,7 +11,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace freedaw {
+namespace OpenDaw {
 
 static constexpr double kHandleWidth = 8.0;
 static constexpr double kFadeHandleSize = 10.0;
@@ -857,4 +857,4 @@ void AudioWaveformView::drawBackground(QPainter* painter, const QRectF& rect)
     }
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

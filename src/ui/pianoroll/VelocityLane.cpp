@@ -1,11 +1,11 @@
-#include "VelocityLane.h"
+﻿#include "VelocityLane.h"
 #include "ChannelColors.h"
 #include "utils/ThemeManager.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <algorithm>
 
-namespace freedaw {
+namespace OpenDaw {
 
 VelocityLane::VelocityLane(QWidget* parent)
     : QWidget(parent)
@@ -136,4 +136,4 @@ void VelocityLane::mouseReleaseEvent(QMouseEvent* /*event*/)
     draggingNotes_.clear();
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

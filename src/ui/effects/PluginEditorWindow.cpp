@@ -1,10 +1,10 @@
-#include "PluginEditorWindow.h"
+﻿#include "PluginEditorWindow.h"
 
 #if JUCE_WINDOWS
  #include <windows.h>
 #endif
 
-namespace freedaw {
+namespace OpenDaw {
 
 std::vector<std::unique_ptr<PluginEditorWindow>> PluginEditorWindow::openWindows_;
 
@@ -82,4 +82,4 @@ void PluginEditorWindow::closeAll()
     openWindows_.clear();
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

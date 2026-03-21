@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "engine/EditManager.h"
 #include "ui/controls/RotaryKnob.h"
@@ -12,7 +12,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <tracktion_engine/tracktion_engine.h>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class EffectSlotWidget : public QWidget {
     Q_OBJECT
@@ -86,4 +86,4 @@ private:
     QTimer automationPollTimer_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

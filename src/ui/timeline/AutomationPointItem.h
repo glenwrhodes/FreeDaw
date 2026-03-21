@@ -1,11 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include <QGraphicsItem>
 #include <tracktion_engine/tracktion_engine.h>
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class GridSnapper;
 class AutomationLaneItem;
@@ -47,4 +47,4 @@ private:
     static constexpr double kHoverSize = 10.0;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

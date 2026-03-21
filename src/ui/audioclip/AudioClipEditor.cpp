@@ -1,4 +1,4 @@
-#include "AudioClipEditor.h"
+﻿#include "AudioClipEditor.h"
 #include "engine/EditManager.h"
 #include "utils/ThemeManager.h"
 #include "utils/WaveformCache.h"
@@ -12,7 +12,7 @@
 #include <QKeySequence>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 AudioClipEditor::AudioClipEditor(QWidget* parent)
     : QWidget(parent)
@@ -1146,4 +1146,4 @@ void AudioClipEditor::updateInfoBar()
     infoModeLabel_->setText(QString("Mode: %1").arg(mode));
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

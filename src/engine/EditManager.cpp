@@ -1,4 +1,4 @@
-#include "EditManager.h"
+﻿#include "EditManager.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <tracktion_engine/tracktion_engine.h>
 #include <QDebug>
@@ -11,7 +11,7 @@
 #include <QCryptographicHash>
 #include <QDateTime>
 
-namespace freedaw {
+namespace OpenDaw {
 
 namespace {
 constexpr const char* kMonoUtilityPluginType = "airwindows_monoam";
@@ -1083,7 +1083,7 @@ QString EditManager::getInputDisplayName(const juce::String& deviceName) const
 void EditManager::saveInputDisplayNames()
 {
     if (!edit_) return;
-    static const juce::Identifier kInputNamesId("FREEDAW_INPUT_NAMES");
+    static const juce::Identifier kInputNamesId("OpenDaw_INPUT_NAMES");
     static const juce::Identifier kEntryId("INPUT");
     static const juce::Identifier kDeviceId("device");
     static const juce::Identifier kDisplayId("display");
@@ -1107,7 +1107,7 @@ void EditManager::loadInputDisplayNames()
 {
     inputDisplayNames_.clear();
     if (!edit_) return;
-    static const juce::Identifier kInputNamesId("FREEDAW_INPUT_NAMES");
+    static const juce::Identifier kInputNamesId("OpenDaw_INPUT_NAMES");
     static const juce::Identifier kDeviceId("device");
     static const juce::Identifier kDisplayId("display");
 
@@ -1127,7 +1127,7 @@ void EditManager::loadInputDisplayNames()
 void EditManager::saveRoutingLayout(const QMap<QString, QPointF>& positions)
 {
     if (!edit_) return;
-    static const juce::Identifier kLayoutId("FREEDAW_ROUTING_LAYOUT");
+    static const juce::Identifier kLayoutId("OpenDaw_ROUTING_LAYOUT");
     static const juce::Identifier kNodeId("NODE");
     static const juce::Identifier kKeyId("key");
     static const juce::Identifier kXId("x");
@@ -1152,7 +1152,7 @@ QMap<QString, QPointF> EditManager::loadRoutingLayout() const
 {
     QMap<QString, QPointF> positions;
     if (!edit_) return positions;
-    static const juce::Identifier kLayoutId("FREEDAW_ROUTING_LAYOUT");
+    static const juce::Identifier kLayoutId("OpenDaw_ROUTING_LAYOUT");
     static const juce::Identifier kKeyId("key");
     static const juce::Identifier kXId("x");
     static const juce::Identifier kYId("y");
@@ -1721,4 +1721,4 @@ void EditManager::ensureLevelMetersOnAllTracks()
     }
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

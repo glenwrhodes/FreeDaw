@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "AiTypes.h"
 #include "AiAudioAnalysis.h"
@@ -11,7 +11,7 @@
 #include <QJsonDocument>
 #include <functional>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class AiToolExecutor : public QObject {
     Q_OBJECT
@@ -44,4 +44,4 @@ private:
     AiAudioAnalysis audioAnalysis_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "NoteItem.h"
 #include "ui/timeline/GridSnapper.h"
@@ -15,7 +15,7 @@ class QShowEvent;
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class NoteGridScene : public QGraphicsScene {
     Q_OBJECT
@@ -200,4 +200,4 @@ private:
     std::function<te::MidiClip*()> ensureClipCb_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

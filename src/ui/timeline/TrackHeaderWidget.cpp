@@ -1,4 +1,4 @@
-#include "TrackHeaderWidget.h"
+﻿#include "TrackHeaderWidget.h"
 #include "ui/effects/PluginEditorWindow.h"
 #include "utils/IconFont.h"
 #include "utils/ThemeManager.h"
@@ -20,7 +20,7 @@ float dbToNormalized(float db) {
 }
 }
 
-namespace freedaw {
+namespace OpenDaw {
 
 TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr,
                                      QWidget* parent)
@@ -725,4 +725,4 @@ void TrackHeaderWidget::onArmToggled(bool armed)
     editMgr_->setTrackRecordEnabled(*track_, armed);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

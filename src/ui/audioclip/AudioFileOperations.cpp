@@ -1,8 +1,8 @@
-#include "AudioFileOperations.h"
+﻿#include "AudioFileOperations.h"
 #include <cmath>
 #include <algorithm>
 
-namespace freedaw {
+namespace OpenDaw {
 
 bool AudioFileOperations::readEntireFile(const juce::File& file,
                                           juce::AudioBuffer<float>& buffer,
@@ -379,4 +379,4 @@ bool AudioFileOperations::crossfadeAtPoint(const juce::File& file, juce::int64 s
     return writeEntireFile(file, buf, info);
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

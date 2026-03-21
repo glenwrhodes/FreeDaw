@@ -1,10 +1,10 @@
-#pragma once
+﻿#pragma once
 
 #include <QColor>
 #include <QString>
 #include <QFont>
 
-namespace freedaw {
+namespace OpenDaw {
 
 struct Theme {
     QColor background         {30, 30, 30};
@@ -59,4 +59,4 @@ private:
     Theme theme_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

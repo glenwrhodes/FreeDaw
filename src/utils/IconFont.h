@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QChar>
 #include <QFont>
@@ -8,7 +8,7 @@
 #include <QPainter>
 #include <QString>
 
-namespace freedaw {
+namespace OpenDaw {
 namespace icons {
 
 // ── Registration (call once at startup) ─────────────────────────────────────
@@ -149,4 +149,4 @@ namespace mi {
 }
 
 } // namespace icons
-} // namespace freedaw
+} // namespace OpenDaw

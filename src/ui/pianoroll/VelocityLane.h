@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QWidget>
 #include <tracktion_engine/tracktion_engine.h>
@@ -7,7 +7,7 @@
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class VelocityLane : public QWidget {
     Q_OBJECT
@@ -41,4 +41,4 @@ private:
     std::vector<te::MidiNote*> draggingNotes_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

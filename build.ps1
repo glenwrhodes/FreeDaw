@@ -1,4 +1,4 @@
-# FreeDaw Build Script
+﻿# OpenDaw Build Script
 # Usage:
 #   .\build.ps1           - incremental build
 #   .\build.ps1 -Clean    - full reconfigure + build
@@ -15,10 +15,10 @@ $qtPath = "c:/qt/6.10.2/msvc2022_64"
 $ninja  = "c:/qt/Tools/Ninja/ninja.exe"
 
 # Kill running instance if needed
-$proc = Get-Process -Name FreeDaw -ErrorAction SilentlyContinue
+$proc = Get-Process -Name OpenDaw -ErrorAction SilentlyContinue
 if ($proc) {
-    Write-Host "Stopping running FreeDaw..." -ForegroundColor Yellow
-    taskkill /IM FreeDaw.exe /F 2>$null
+    Write-Host "Stopping running OpenDaw..." -ForegroundColor Yellow
+    taskkill /IM OpenDaw.exe /F 2>$null
     Start-Sleep -Milliseconds 500
 }
 
@@ -40,4 +40,4 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "`nBuild OK  ->  build\FreeDaw_artefacts\Debug\FreeDaw.exe" -ForegroundColor Green
+Write-Host "`nBuild OK  ->  build\OpenDaw_artefacts\Debug\OpenDaw.exe" -ForegroundColor Green

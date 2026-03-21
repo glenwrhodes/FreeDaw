@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "engine/EditManager.h"
 #include "ui/controls/VolumeFader.h"
@@ -13,7 +13,7 @@
 #include <QTimer>
 #include <tracktion_engine/tracktion_engine.h>
 
-namespace freedaw {
+namespace OpenDaw {
 
 class ChannelStrip : public QWidget {
     Q_OBJECT
@@ -86,4 +86,4 @@ private:
     double lastTrackedPlayheadSecs_ = -1.0;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

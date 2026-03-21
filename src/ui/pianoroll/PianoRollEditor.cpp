@@ -1,4 +1,4 @@
-#include "PianoRollEditor.h"
+﻿#include "PianoRollEditor.h"
 #include "ChannelColors.h"
 #include "engine/EditManager.h"
 #include "utils/IconFont.h"
@@ -15,7 +15,7 @@
 #include <QSignalBlocker>
 #include <algorithm>
 
-namespace freedaw {
+namespace OpenDaw {
 
 QPushButton* PianoRollEditor::makeIconButton(QWidget* parent, const QFont& font,
                                               const QChar& glyph, const QString& tooltip,
@@ -982,4 +982,4 @@ void PianoRollEditor::rebuildChannelPanel()
     channelPanelLayout_->addStretch();
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

@@ -1,8 +1,8 @@
-#include "AiAudioAnalysis.h"
+﻿#include "AiAudioAnalysis.h"
 #include <QJsonArray>
 #include <cmath>
 
-namespace freedaw {
+namespace OpenDaw {
 
 AiAudioAnalysis::AiAudioAnalysis(EditManager* editMgr)
     : editMgr_(editMgr)
@@ -370,4 +370,4 @@ QJsonObject AiAudioAnalysis::analyzeMasking(te::AudioTrack* trackA, te::AudioTra
     return out;
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

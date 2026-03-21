@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QGraphicsRectItem>
 #include <QGraphicsScene>
@@ -9,7 +9,7 @@
 
 namespace te = tracktion::engine;
 
-namespace freedaw {
+namespace OpenDaw {
 
 class GridSnapper;
 class EditManager;
@@ -89,4 +89,4 @@ private:
     std::function<void()> requestRefresh_;
 };
 
-} // namespace freedaw
+} // namespace OpenDaw

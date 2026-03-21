@@ -1,4 +1,4 @@
-#include "AiChatWidget.h"
+﻿#include "AiChatWidget.h"
 #include "engine/EditManager.h"
 #include "engine/AudioEngine.h"
 #include "engine/PluginScanner.h"
@@ -16,7 +16,7 @@
 #include <QAbstractTextDocumentLayout>
 #include <QSettings>
 
-namespace freedaw {
+namespace OpenDaw {
 
 AiChatWidget::AiChatWidget(EditManager* editMgr, AudioEngine* audioEngine,
                            PluginScanner* pluginScanner, QWidget* parent)
@@ -655,4 +655,4 @@ QTextBrowser* AiChatWidget::createMessageBrowser(QWidget* parent) const
     return browser;
 }
 
-} // namespace freedaw
+} // namespace OpenDaw

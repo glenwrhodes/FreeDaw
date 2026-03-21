@@ -1,6 +1,6 @@
-# Contributing to FreeDaw
+﻿# Contributing to OpenDaw
 
-Thank you for your interest in contributing to FreeDaw! This document explains how to get involved.
+Thank you for your interest in contributing to OpenDaw! This document explains how to get involved.
 
 ## Ways to Contribute
 
@@ -57,7 +57,7 @@ git checkout -b my-feature
 ## Coding Conventions
 
 - **C++20** standard
-- **Namespace**: all project code lives in the `freedaw` namespace
+- **Namespace**: all project code lives in the `OpenDaw` namespace
 - **JUCE namespace**: JUCE types must be qualified with `juce::` (the global using directive is disabled via `DONT_SET_USING_JUCE_NAMESPACE=1`)
 - **Tracktion Engine alias**: use `te::` (defined as `namespace te = tracktion::engine;`)
 - **Qt for GUI, Tracktion for audio** — do not use JUCE GUI classes; do not use Qt for audio processing
@@ -80,4 +80,4 @@ Be respectful and constructive. We're all here to make a great free DAW.
 
 ## License
 
-By contributing to FreeDaw, you agree that your contributions will be licensed under the [GNU General Public License v3.0](LICENSE).
+By contributing to OpenDaw, you agree that your contributions will be licensed under the [GNU General Public License v3.0](LICENSE).
