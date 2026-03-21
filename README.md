@@ -217,6 +217,36 @@ Building complex routing by dragging cables is powerful but slow. The AI handles
 
 > *"What are my available input devices? Assign the first one to Track 1."*
 
+
+#### MIDI composition and arrangement
+
+This is where OpenDaw's AI goes far beyond any traditional DAW assistant. You can describe musical ideas in plain English and the AI will **compose and write actual MIDI notes** directly into your project — chord voicings, melodies, full arrangements, and more.
+
+> *"Create a string arrangement for the chord progression C, Am, F, G. Four bars, lush and cinematic."*
+
+The AI creates MIDI tracks for Violins, Violas, and Cellos, writes out the chord voicings across four bars with appropriate inversions, adds passing tones and movement to make it breathe, and places all the notes in the piano roll — ready to play back with your VST strings.
+
+> *"Write a bass line that follows the root notes of C, Am, F, G over two bars. Eighth note feel, punchy."*
+
+> *"Harmonize that melody with thirds above it on a new MIDI track."*
+
+> *"Add a simple arpeggiated piano part over the C Am F G progression — broken chords, gentle, three beats per chord."*
+
+> *"Double the violin melody an octave lower on a cello track."*
+
+The AI understands music theory: it knows which notes belong to each chord, how to voice them across multiple octaves, and how to make the arrangement feel natural — not just mechanically correct. It reads your existing MIDI content, so it can build on what you already have rather than working in a vacuum.
+
+**Real composition scenarios:**
+
+> *"I have a 4-bar loop with drums and bass. Add a Rhodes piano comping the chords Em, D, C, G in a syncopated style."*
+
+> *"Generate a simple melody over the C major scale, 8 bars, that has a clear arc — start low, build to a peak at bar 5, then resolve."*
+
+> *"Take my existing chord MIDI clip and create a lead line that weaves between the chord tones."*
+
+> *"Write a countermelody that responds to the main melody on Track 2."*
+
+This makes OpenDaw the only DAW where you can go from a chord chart to a full arrangement in a single sentence.
 #### Project housekeeping
 
 Keep your session organized without breaking flow:
@@ -630,3 +660,4 @@ Made with care for musicians and producers everywhere.
 If OpenDaw is useful to you, consider giving it a star on GitHub.
 
 </div>
+
