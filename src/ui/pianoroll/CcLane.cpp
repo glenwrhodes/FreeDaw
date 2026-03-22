@@ -1,4 +1,4 @@
-﻿#include "CcLane.h"
+#include "CcLane.h"
 #include "utils/ThemeManager.h"
 #include <QPainter>
 #include <QPainterPath>
@@ -326,6 +326,31 @@ void CcLane::mousePressEvent(QMouseEvent* event)
                 dragStartPositions_.append({pt.beat, pt.value});
         }
 
+        // Constrain beat drag between nearest unselected neighbors
+        {
+            constexpr double kBeatEpsilon = 0.001;
+            dragMinBeatDelta_ = -1e9;
+            dragMaxBeatDelta_ = 1e9;
+            for (int i = 0; i < points_.size(); ++i) {
+                if (!points_[i].selected) continue;
+                double origBeat = points_[i].beat;
+                for (int j = i - 1; j >= 0; --j) {
+                    if (!points_[j].selected) {
+                        dragMinBeatDelta_ = std::max(dragMinBeatDelta_,
+                                                     points_[j].beat - origBeat + kBeatEpsilon);
+                        break;
+                    }
+                }
+                for (int j = i + 1; j < points_.size(); ++j) {
+                    if (!points_[j].selected) {
+                        dragMaxBeatDelta_ = std::min(dragMaxBeatDelta_,
+                                                     points_[j].beat - origBeat - kBeatEpsilon);
+                        break;
+                    }
+                }
+            }
+        }
+
         update();
         return;
     }
@@ -433,6 +458,8 @@ void CcLane::mouseMoveEvent(QMouseEvent* event)
             else
                 beatDelta = 0.0;
         }
+
+        beatDelta = std::clamp(beatDelta, dragMinBeatDelta_, dragMaxBeatDelta_);
 
         auto* um = &clip_->edit.getUndoManager();
 

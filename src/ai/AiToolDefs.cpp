@@ -1,4 +1,4 @@
-﻿#include "AiToolDefs.h"
+#include "AiToolDefs.h"
 #include <QJsonObject>
 
 namespace OpenDaw {
@@ -568,11 +568,17 @@ QJsonArray AiToolDefs::allTools()
         props["track"] = trackProp();
         props["start_beat"] = propNumber("Start position in beats (0 = bar 1 beat 1).", 0.0, 100000.0);
         props["length_beats"] = propNumber("Clip length in beats.", 0.25, 100000.0);
+        props["channel"] = propNumber("MIDI channel for the clip (1-16). Default is 1. "
+            "IMPORTANT: this determines which channel lane the clip appears on. "
+            "For GM drums, use channel 10.", 1, 16);
         props["name"] = prop("string", "Optional clip name.");
         tools.append(makeTool("create_midi_clip",
             "Create an empty MIDI clip on a track at the given beat position and length. "
             "Returns the clip index for use with add_midi_notes. "
-            "The track will be marked as a MIDI track if it isn't already.",
+            "The track will be marked as a MIDI track if it isn't already. "
+            "Set 'channel' to control which MIDI channel lane the clip belongs to "
+            "(e.g. channel 10 for GM drums). The clip channel determines the lane/color; "
+            "note-level channels in add_midi_notes set the colour index within the clip.",
             props, QJsonArray({"track", "start_beat", "length_beats"})));
     }
 
@@ -620,6 +626,53 @@ QJsonArray AiToolDefs::allTools()
         props["clip_index"] = propNumber("Zero-based index of the MIDI clip on the track.", 0, 10000);
         tools.append(makeTool("clear_midi_notes",
             "Remove all MIDI notes from a clip. Useful before re-populating a clip.",
+            props, QJsonArray({"track", "clip_index"})));
+    }
+
+    {
+        QJsonObject props;
+        props["track"] = trackProp();
+        props["clip_index"] = propNumber("Zero-based index of the MIDI clip on the track.", 0, 10000);
+        props["channel"] = propNumber("New MIDI channel for the clip (1-16).", 1, 16);
+        tools.append(makeTool("set_clip_channel",
+            "Change the MIDI channel assignment of a clip. This controls which channel lane "
+            "the clip appears on and its display color. For example, use channel 10 for GM drums. "
+            "This does NOT change per-note data inside the clip — only the clip-level channel.",
+            props, QJsonArray({"track", "clip_index", "channel"})));
+    }
+
+    // ── MIDI Note Reading & Surgical Editing ─────────────────────────────────
+
+    {
+        QJsonObject props;
+        props["track"] = trackProp();
+        props["clip_index"] = propNumber("Zero-based index of the MIDI clip on the track.", 0, 10000);
+        props["channel"] = propNumber("Optional: only return notes on this MIDI channel (1-16).", 1, 16);
+        props["note_min"] = propNumber("Optional: minimum MIDI note number (0-127) to include.", 0, 127);
+        props["note_max"] = propNumber("Optional: maximum MIDI note number (0-127) to include.", 0, 127);
+        props["start_beat_min"] = propNumber("Optional: only include notes starting at or after this beat.", 0.0, 100000.0);
+        props["start_beat_max"] = propNumber("Optional: only include notes starting before this beat.", 0.0, 100000.0);
+        tools.append(makeTool("get_midi_notes",
+            "Read all MIDI notes from a clip. Returns an array of notes with note number, "
+            "start_beat (relative to clip start), length_beats, velocity, and channel. "
+            "Use optional filters to narrow results by channel, note range, or beat range. "
+            "Essential for inspecting existing MIDI data before modifying it.",
+            props, QJsonArray({"track", "clip_index"})));
+    }
+
+    {
+        QJsonObject props;
+        props["track"] = trackProp();
+        props["clip_index"] = propNumber("Zero-based index of the MIDI clip on the track.", 0, 10000);
+        props["channel"] = propNumber("Optional: only remove notes on this MIDI channel (1-16).", 1, 16);
+        props["note_min"] = propNumber("Optional: minimum MIDI note number (0-127) to match.", 0, 127);
+        props["note_max"] = propNumber("Optional: maximum MIDI note number (0-127) to match.", 0, 127);
+        props["start_beat_min"] = propNumber("Optional: only match notes starting at or after this beat.", 0.0, 100000.0);
+        props["start_beat_max"] = propNumber("Optional: only match notes starting before this beat.", 0.0, 100000.0);
+        tools.append(makeTool("remove_midi_notes",
+            "Remove MIDI notes from a clip that match the given filter criteria. "
+            "At least one filter (channel, note range, or beat range) must be provided "
+            "to prevent accidental deletion of all notes. Use clear_midi_notes to remove everything.",
             props, QJsonArray({"track", "clip_index"})));
     }
 

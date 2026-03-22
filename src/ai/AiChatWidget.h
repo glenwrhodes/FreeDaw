@@ -1,9 +1,11 @@
-﻿#pragma once
+#pragma once
 
 #include "AiTypes.h"
 #include "AiService.h"
+#include "AiChatStore.h"
 #include <QWidget>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QScrollArea>
 #include <QTextEdit>
 #include <QPushButton>
@@ -13,6 +15,7 @@
 #include <QKeyEvent>
 #include <QTimer>
 #include <QTextBrowser>
+#include <QListWidget>
 
 namespace OpenDaw {
 
@@ -29,6 +32,9 @@ public:
     void submitPrompt(const QString& text);
     void focusInput();
     void openSettings();
+
+    void saveChatSessions();
+    void loadChatSessions();
 
 protected:
     bool eventFilter(QObject* obj, QEvent* event) override;
@@ -57,11 +63,19 @@ private:
     void scrollToBottom();
 
     void showSettingsDialog();
-    void clearChat();
+    void clearChatUi();
+
+    void startNewChat();
+    void switchToSession(const QString& sessionId);
+    void rebuildUiFromHistory(const QVector<AiMessage>& messages);
+    void refreshSessionList();
+    void onSessionTitleGenerated(const QString& title);
+    QString chatFilePath() const;
 
     QTextBrowser* createMessageBrowser(QWidget* parent) const;
 
     AiService* aiService_;
+    AiChatStore* chatStore_;
     EditManager* editMgr_;
 
     QVBoxLayout* mainLayout_ = nullptr;
@@ -72,6 +86,11 @@ private:
     QTextEdit* inputEdit_ = nullptr;
     QPushButton* sendBtn_ = nullptr;
     QLabel* statusLabel_ = nullptr;
+
+    QWidget* historyPanel_ = nullptr;
+    QListWidget* sessionList_ = nullptr;
+    QPushButton* historyToggleBtn_ = nullptr;
+    QPushButton* newChatBtn_ = nullptr;
 
     QTextBrowser* streamingLabel_ = nullptr;
     QString streamingText_;

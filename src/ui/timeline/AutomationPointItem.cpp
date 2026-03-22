@@ -1,4 +1,4 @@
-﻿#include "AutomationPointItem.h"
+#include "AutomationPointItem.h"
 #include "AutomationLaneItem.h"
 #include "EnvelopeUtils.h"
 #include "GridSnapper.h"
@@ -83,16 +83,19 @@ void AutomationPointItem::hoverLeaveEvent(QGraphicsSceneHoverEvent*)
 void AutomationPointItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton && param_ && lane_) {
-        dragging_ = true;
-        shiftHeld_ = (event->modifiers() & Qt::ShiftModifier);
-        dragStartScene_ = event->scenePos();
+        bool ctrlHeld = (event->modifiers() & Qt::ControlModifier);
+        bool shiftHeld = (event->modifiers() & Qt::ShiftModifier);
 
-        auto& curve = param_->getCurve();
-        if (pointIndex_ >= 0 && pointIndex_ < curve.getNumPoints()) {
-            auto pt = curve.getPoint(pointIndex_);
-            dragStartBeat_ = te::toBeats(pt.time, lane_->edit()->tempoSequence).inBeats();
-            dragStartValue_ = pt.value;
+        if (ctrlHeld) {
+            setSelected(!isSelected());
+            event->accept();
+            return;
         }
+
+        if (!isSelected())
+            lane_->selectPoint(pointIndex_, true);
+
+        lane_->beginPointDrag(pointIndex_, event->scenePos(), shiftHeld);
         event->accept();
     } else {
         QGraphicsItem::mousePressEvent(event);
@@ -101,83 +104,20 @@ void AutomationPointItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
 
 void AutomationPointItem::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 {
-    if (!dragging_ || !param_ || !lane_) return;
-
-    auto* snapper = lane_->snapper();
-    double ppb = lane_->pixelsPerBeat();
-    double laneHeight = lane_->laneHeight();
-    float minVal = param_->getValueRange().getStart();
-    float maxVal = param_->getValueRange().getEnd();
-
-    QPointF delta = event->scenePos() - dragStartScene_;
-
-    double newBeat = dragStartBeat_;
-    float newValue = dragStartValue_;
-
-    if (!shiftHeld_ || std::abs(delta.x()) > std::abs(delta.y())) {
-        newBeat = dragStartBeat_ + EnvelopeUtils::xToBeat(delta.x(), ppb);
-        if (newBeat < 0) newBeat = 0;
-        if (snapper) newBeat = snapper->snapBeat(newBeat);
+    if (lane_ && lane_->isPointDragging()) {
+        lane_->updatePointDrag(event->scenePos(), event->modifiers());
+        event->accept();
     }
-
-    if (!shiftHeld_ || std::abs(delta.y()) >= std::abs(delta.x())) {
-        double yInLane = EnvelopeUtils::valueToY(dragStartValue_, minVal, maxVal, laneHeight) + delta.y();
-        newValue = EnvelopeUtils::yToValue(yInLane, minVal, maxVal, laneHeight);
-
-        if (param_->isDiscrete())
-            newValue = param_->snapToState(newValue);
-    }
-
-    if (shiftHeld_) {
-        if (std::abs(delta.x()) > std::abs(delta.y()))
-            newValue = dragStartValue_;
-        else
-            newBeat = dragStartBeat_;
-    }
-
-    newValue = std::clamp(newValue, minVal, maxVal);
-
-    auto& curve = param_->getCurve();
-    auto* edit = lane_->edit();
-    auto* um = edit ? &edit->getUndoManager() : nullptr;
-
-    auto timePos = te::EditPosition(tracktion::BeatPosition::fromBeats(newBeat));
-    auto valRange = juce::Range<float>(minVal, maxVal);
-    pointIndex_ = curve.movePoint(pointIndex_, timePos, newValue,
-                                  valRange, false, um);
-
-    // Update only this point's visual position (don't rebuild, as that deletes us)
-    double newX = EnvelopeUtils::beatToX(newBeat, ppb);
-    double newY = EnvelopeUtils::valueToY(newValue, minVal, maxVal, laneHeight);
-    setPos(newX, newY);
-
-    // Redraw the curve path on the lane without recreating point items
-    lane_->updateCurvePathOnly();
-
-    if (scene() && !scene()->views().isEmpty()) {
-        auto* view = scene()->views().first();
-        auto juceLabel = param_->getLabelForValue(newValue);
-        QString label = juceLabel.isEmpty()
-            ? QString::number(double(newValue), 'f', 2)
-            : QString::fromStdString(juceLabel.toStdString());
-        QPoint screenPos = view->mapToGlobal(view->mapFromScene(event->scenePos()));
-        QToolTip::showText(screenPos, label);
-    }
-
-    event->accept();
 }
 
 void AutomationPointItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
-    if (dragging_) {
-        dragging_ = false;
-        QToolTip::hideText();
-        // rebuildFromCurve() destroys and recreates all point items including
-        // this one, so we must not access any members after the call.
+    if (lane_ && lane_->isPointDragging()) {
+        // endPointDrag() calls rebuildFromCurve() which destroys this item,
+        // so capture lane_ and don't access members after the call.
         auto* lane = lane_;
         event->accept();
-        if (lane)
-            lane->rebuildFromCurve();
+        lane->endPointDrag();
         return;
     }
     QGraphicsItem::mouseReleaseEvent(event);

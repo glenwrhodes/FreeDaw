@@ -253,6 +253,26 @@ TransportBar::TransportBar(EditManager* editMgr, QWidget* parent)
         syncCountInToEngine();
     }
 
+    connect(editMgr_, &EditManager::editChanged, this, [this]() {
+        if (!editMgr_ || !editMgr_->edit()) return;
+        double bpm = editMgr_->getBpm();
+        if (bpmSpin_->value() != bpm) {
+            QSignalBlocker blocker(bpmSpin_);
+            bpmSpin_->setValue(bpm);
+        }
+        int num = editMgr_->getTimeSigNumerator();
+        if (timeSigNumSpin_->value() != num) {
+            QSignalBlocker blocker(timeSigNumSpin_);
+            timeSigNumSpin_->setValue(num);
+        }
+        int den = editMgr_->getTimeSigDenominator();
+        int denIdx = timeSigDenCombo_->findText(QString::number(den));
+        if (denIdx >= 0 && timeSigDenCombo_->currentIndex() != denIdx) {
+            QSignalBlocker blocker(timeSigDenCombo_);
+            timeSigDenCombo_->setCurrentIndex(denIdx);
+        }
+    });
+
     connect(&positionTimer_, &QTimer::timeout, this, &TransportBar::updatePosition);
     positionTimer_.start(16);
 }

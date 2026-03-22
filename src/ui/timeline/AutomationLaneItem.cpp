@@ -1,4 +1,4 @@
-﻿#include "AutomationLaneItem.h"
+#include "AutomationLaneItem.h"
 #include "AutomationPointItem.h"
 #include "GridSnapper.h"
 #include "utils/ThemeManager.h"
@@ -7,6 +7,8 @@
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsSceneHoverEvent>
 #include <QCursor>
+#include <QToolTip>
+#include <QGraphicsView>
 #include <cmath>
 
 namespace OpenDaw {
@@ -170,6 +172,196 @@ void AutomationLaneItem::updateCurvePathOnly()
     update();
 }
 
+void AutomationLaneItem::clearPointSelection()
+{
+    for (auto* pt : pointItems_)
+        pt->setSelected(false);
+}
+
+int AutomationLaneItem::selectedPointCount() const
+{
+    int n = 0;
+    for (auto* pt : pointItems_)
+        if (pt->isSelected()) ++n;
+    return n;
+}
+
+void AutomationLaneItem::togglePointSelection(int index)
+{
+    if (index >= 0 && index < pointItems_.size())
+        pointItems_[index]->setSelected(!pointItems_[index]->isSelected());
+}
+
+void AutomationLaneItem::selectPoint(int index, bool clearOthers)
+{
+    if (clearOthers) clearPointSelection();
+    if (index >= 0 && index < pointItems_.size())
+        pointItems_[index]->setSelected(true);
+}
+
+void AutomationLaneItem::beginPointDrag(int anchorIndex, QPointF startScene, bool shiftHeld)
+{
+    if (!param_ || !edit_) return;
+
+    pointDragging_ = true;
+    pointDragAnchorIdx_ = anchorIndex;
+    pointDragStartScene_ = startScene;
+    pointDragShiftHeld_ = shiftHeld;
+
+    auto& curve = param_->getCurve();
+    auto& ts = edit_->tempoSequence;
+
+    if (anchorIndex >= 0 && anchorIndex < curve.getNumPoints()) {
+        auto pt = curve.getPoint(anchorIndex);
+        pointDragStartBeat_ = te::toBeats(pt.time, ts).inBeats();
+        pointDragStartValue_ = pt.value;
+    }
+
+    pointDragStartPositions_.clear();
+    pointDragSelectedIndices_.clear();
+    for (int i = 0; i < pointItems_.size(); ++i) {
+        if (pointItems_[i]->isSelected() && i < curve.getNumPoints()) {
+            auto p = curve.getPoint(i);
+            double beat = te::toBeats(p.time, ts).inBeats();
+            pointDragStartPositions_.append({beat, p.value});
+            pointDragSelectedIndices_.append(i);
+        }
+    }
+
+    constexpr double kEpsilon = 0.001;
+    pointDragMinBeatDelta_ = -1e9;
+    pointDragMaxBeatDelta_ = 1e9;
+
+    int numCurvePoints = curve.getNumPoints();
+    auto isSelectedIdx = [&](int idx) -> bool {
+        for (int si : pointDragSelectedIndices_)
+            if (si == idx) return true;
+        return false;
+    };
+
+    for (int si = 0; si < pointDragSelectedIndices_.size(); ++si) {
+        int idx = pointDragSelectedIndices_[si];
+        double origBeat = pointDragStartPositions_[si].first;
+
+        for (int j = idx - 1; j >= 0; --j) {
+            if (!isSelectedIdx(j)) {
+                double neighborBeat = te::toBeats(curve.getPoint(j).time, ts).inBeats();
+                pointDragMinBeatDelta_ = std::max(pointDragMinBeatDelta_,
+                                                  neighborBeat - origBeat + kEpsilon);
+                break;
+            }
+        }
+
+        for (int j = idx + 1; j < numCurvePoints; ++j) {
+            if (!isSelectedIdx(j)) {
+                double neighborBeat = te::toBeats(curve.getPoint(j).time, ts).inBeats();
+                pointDragMaxBeatDelta_ = std::min(pointDragMaxBeatDelta_,
+                                                  neighborBeat - origBeat - kEpsilon);
+                break;
+            }
+        }
+    }
+}
+
+void AutomationLaneItem::updatePointDrag(QPointF currentScene, Qt::KeyboardModifiers modifiers)
+{
+    if (!pointDragging_ || !param_ || !edit_) return;
+
+    float minVal = param_->getValueRange().getStart();
+    float maxVal = param_->getValueRange().getEnd();
+
+    QPointF delta = currentScene - pointDragStartScene_;
+    bool shiftNow = (modifiers & Qt::ShiftModifier);
+
+    double beatDelta = 0.0;
+    float valueDelta = 0.0f;
+
+    if (!shiftNow || std::abs(delta.x()) > std::abs(delta.y()))
+        beatDelta = EnvelopeUtils::xToBeat(delta.x(), pixelsPerBeat_);
+
+    if (!shiftNow || std::abs(delta.y()) >= std::abs(delta.x())) {
+        double yAtStart = EnvelopeUtils::valueToY(pointDragStartValue_, minVal, maxVal, laneHeight_);
+        float newVal = EnvelopeUtils::yToValue(yAtStart + delta.y(), minVal, maxVal, laneHeight_);
+        valueDelta = newVal - pointDragStartValue_;
+    }
+
+    if (shiftNow) {
+        if (std::abs(delta.x()) > std::abs(delta.y()))
+            valueDelta = 0.0f;
+        else
+            beatDelta = 0.0;
+    }
+
+    beatDelta = std::clamp(beatDelta, pointDragMinBeatDelta_, pointDragMaxBeatDelta_);
+
+    double anchorNewBeat = pointDragStartBeat_ + beatDelta;
+    if (anchorNewBeat < 0) anchorNewBeat = 0;
+    if (snapper_) anchorNewBeat = snapper_->snapBeat(anchorNewBeat);
+    beatDelta = anchorNewBeat - pointDragStartBeat_;
+    beatDelta = std::clamp(beatDelta, pointDragMinBeatDelta_, pointDragMaxBeatDelta_);
+
+    auto& curve = param_->getCurve();
+    auto* um = &edit_->getUndoManager();
+    auto valRange = juce::Range<float>(minVal, maxVal);
+
+    for (int i = 0; i < pointDragSelectedIndices_.size(); ++i) {
+        int idx = pointDragSelectedIndices_[i];
+        double origBeat = pointDragStartPositions_[i].first;
+        float origValue = pointDragStartPositions_[i].second;
+
+        double newBeat = std::max(0.0, origBeat + beatDelta);
+        float newValue = std::clamp(origValue + valueDelta, minVal, maxVal);
+
+        if (param_->isDiscrete())
+            newValue = param_->snapToState(newValue);
+
+        auto timePos = te::EditPosition(tracktion::BeatPosition::fromBeats(newBeat));
+        int newIdx = curve.movePoint(idx, timePos, newValue, valRange, false, um);
+        pointDragSelectedIndices_[i] = newIdx;
+
+        if (newIdx >= 0 && newIdx < pointItems_.size()) {
+            double px = EnvelopeUtils::beatToX(newBeat, pixelsPerBeat_);
+            double py = EnvelopeUtils::valueToY(newValue, minVal, maxVal, laneHeight_);
+            pointItems_[newIdx]->setPos(px, py);
+            pointItems_[newIdx]->setPointIndex(newIdx);
+        }
+    }
+
+    updateCurvePathOnly();
+
+    float anchorNewValue = std::clamp(pointDragStartValue_ + valueDelta, minVal, maxVal);
+    if (param_->isDiscrete())
+        anchorNewValue = param_->snapToState(anchorNewValue);
+
+    if (scene() && !scene()->views().isEmpty()) {
+        auto* view = scene()->views().first();
+        auto juceLabel = param_->getLabelForValue(anchorNewValue);
+        QString label = juceLabel.isEmpty()
+            ? QString::number(double(anchorNewValue), 'f', 2)
+            : QString::fromStdString(juceLabel.toStdString());
+        QPoint screenPos = view->mapToGlobal(view->mapFromScene(currentScene));
+        QToolTip::showText(screenPos, label);
+    }
+}
+
+void AutomationLaneItem::endPointDrag()
+{
+    if (!pointDragging_) return;
+    pointDragging_ = false;
+    QToolTip::hideText();
+
+    QVector<int> selectedIndices = pointDragSelectedIndices_;
+    pointDragSelectedIndices_.clear();
+    pointDragStartPositions_.clear();
+
+    rebuildFromCurve();
+
+    for (int idx : selectedIndices) {
+        if (idx >= 0 && idx < pointItems_.size())
+            pointItems_[idx]->setSelected(true);
+    }
+}
+
 void AutomationLaneItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*)
 {
     auto& theme = ThemeManager::instance().current();
@@ -297,6 +489,16 @@ void AutomationLaneItem::paint(QPainter* painter, const QStyleOptionGraphicsItem
             painter->drawEllipse(QPointF(dotX, dotY), kDotRadius, kDotRadius);
         }
     }
+
+    // Rubber band selection rectangle
+    if (rubberBanding_ && !rubberBandRect_.isNull()) {
+        QColor rbFill = theme.accent;
+        rbFill.setAlpha(40);
+        painter->fillRect(rubberBandRect_, rbFill);
+        painter->setPen(QPen(theme.accent, 1.0));
+        painter->setBrush(Qt::NoBrush);
+        painter->drawRect(rubberBandRect_);
+    }
 }
 
 void AutomationLaneItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
@@ -352,11 +554,20 @@ void AutomationLaneItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
     }
 
     QPointF local = event->pos();
+    bool ctrlHeld = (event->modifiers() & Qt::ControlModifier);
 
-    // Check if we hit the curve line for segment bending
-    if (!param_->isDiscrete() && (event->modifiers() & Qt::ControlModifier)) {
+    // Ctrl + click on lane background = rubber band selection
+    if (ctrlHeld) {
+        rubberBanding_ = true;
+        rubberBandStart_ = local;
+        rubberBandRect_ = QRectF();
+        event->accept();
+        return;
+    }
+
+    // Click on curve line (no Ctrl) = segment bending
+    if (!param_->isDiscrete() && EnvelopeUtils::hitTestCurve(curvePath_, local, 5.0)) {
         int segIdx = -1;
-
         for (int i = 0; i < cachedPoints_.size() - 1; ++i) {
             double x0 = EnvelopeUtils::beatToX(cachedPoints_[i].beat, pixelsPerBeat_);
             double x1 = EnvelopeUtils::beatToX(cachedPoints_[i + 1].beat, pixelsPerBeat_);
@@ -365,7 +576,6 @@ void AutomationLaneItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
                 break;
             }
         }
-
         if (segIdx >= 0) {
             curveDragging_ = true;
             curveDragSegmentIndex_ = segIdx;
@@ -377,7 +587,8 @@ void AutomationLaneItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
         }
     }
 
-    // Start freehand draw (on curve or empty space)
+    // Click on empty space = clear selection, start freehand draw
+    clearPointSelection();
     freehandDrawing_ = true;
     freehandPath_.clear();
     freehandPath_.append(local);
@@ -388,6 +599,15 @@ void AutomationLaneItem::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 {
     if (curveDragging_ && param_ && edit_) {
         double deltaY = event->scenePos().y() - curveDragStartPos_.y();
+
+        // Flip drag direction for ascending segments so the visual curve
+        // always follows the mouse direction regardless of segment slope
+        if (curveDragSegmentIndex_ + 1 < cachedPoints_.size() &&
+            cachedPoints_[curveDragSegmentIndex_ + 1].value >
+            cachedPoints_[curveDragSegmentIndex_].value) {
+            deltaY = -deltaY;
+        }
+
         float newCurve = curveDragStartValue_ - float(deltaY / 100.0);
         newCurve = std::clamp(newCurve, -1.0f, 1.0f);
 
@@ -395,6 +615,16 @@ void AutomationLaneItem::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
         auto* um = &edit_->getUndoManager();
         curve.setCurveValue(curveDragSegmentIndex_, newCurve, um);
         rebuildFromCurve();
+        event->accept();
+        return;
+    }
+
+    if (rubberBanding_) {
+        QPointF local = event->pos();
+        rubberBandRect_ = QRectF(rubberBandStart_, local).normalized();
+        for (auto* ptItem : pointItems_)
+            ptItem->setSelected(rubberBandRect_.contains(ptItem->pos()));
+        update();
         event->accept();
         return;
     }
@@ -413,6 +643,14 @@ void AutomationLaneItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
         curveDragging_ = false;
         curveDragSegmentIndex_ = -1;
         unsetCursor();
+        event->accept();
+        return;
+    }
+
+    if (rubberBanding_) {
+        rubberBanding_ = false;
+        rubberBandRect_ = QRectF();
+        update();
         event->accept();
         return;
     }
@@ -479,10 +717,7 @@ void AutomationLaneItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
     QPointF local = event->pos();
 
     if (!param_->isDiscrete() && EnvelopeUtils::hitTestCurve(curvePath_, local, 5.0)) {
-        if (event->modifiers() & Qt::ControlModifier)
-            setCursor(Qt::SizeVerCursor);
-        else
-            setCursor(Qt::PointingHandCursor);
+        setCursor(Qt::SizeVerCursor);
     } else {
         setCursor(Qt::CrossCursor);
     }

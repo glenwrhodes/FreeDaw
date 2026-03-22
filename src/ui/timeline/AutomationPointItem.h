@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <QGraphicsItem>
 #include <tracktion_engine/tracktion_engine.h>
@@ -38,11 +38,6 @@ private:
     te::AutomatableParameter* param_ = nullptr;
     AutomationLaneItem* lane_ = nullptr;
     bool hovered_ = false;
-    bool dragging_ = false;
-    bool shiftHeld_ = false;
-    QPointF dragStartScene_;
-    double dragStartBeat_ = 0.0;
-    float dragStartValue_ = 0.0f;
     static constexpr double kSize = 8.0;
     static constexpr double kHoverSize = 10.0;
 };

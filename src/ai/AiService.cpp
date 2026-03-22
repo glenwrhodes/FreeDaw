@@ -1,4 +1,4 @@
-﻿#include "AiService.h"
+#include "AiService.h"
 #include "engine/EditManager.h"
 #include "engine/AudioEngine.h"
 #include <QNetworkRequest>
@@ -86,7 +86,7 @@ QString AiService::buildSystemPrompt() const
         "routing, and transport controls.\n\n";
 
     if (editMgr_ && editMgr_->edit()) {
-        prompt += "Current project state:\n";
+        prompt += "Current project state (live snapshot — includes any changes you have already made in this conversation):\n";
         prompt += QString("- Tempo: %1 BPM\n").arg(editMgr_->getBpm(), 0, 'f', 1);
         prompt += QString("- Time signature: %1/%2\n")
                       .arg(editMgr_->getTimeSigNumerator())
@@ -116,6 +116,10 @@ QString AiService::buildSystemPrompt() const
     prompt += "\nRules:\n"
               "- Use the provided tools to manipulate the DAW. Call tools as needed.\n"
               "- For bulk operations, call multiple tools in sequence.\n"
+              "- The project state shown above is a LIVE snapshot that updates after each tool call. "
+              "If you just created tracks or clips, they will appear in the snapshot — do NOT treat "
+              "them as pre-existing or comment on them as if seeing them for the first time. "
+              "Only reference things the USER mentioned or that existed BEFORE your first action.\n"
               "- After completing actions, briefly confirm what you did.\n"
               "- You can create MIDI clips and write notes into them. Use create_midi_clip to make a clip, "
               "then add_midi_notes to populate it. Note positions are in beats relative to clip start. "
@@ -126,7 +130,28 @@ QString AiService::buildSystemPrompt() const
               "- Parameter values are normalized 0.0 to 1.0.\n"
               "- For mix/master requests, use staged workflow: analyze -> apply -> verify.\n"
               "- Before major processing, call analysis tools first.\n"
-              "- Stop when targets are met or no meaningful improvement remains.\n";
+              "- Stop when targets are met or no meaningful improvement remains.\n"
+              "\nMIDI & Music Theory (CRITICAL — follow strictly):\n"
+              "- ALWAYS establish the key and scale BEFORE writing any notes. If the user specifies "
+              "a key, use it. If not, ask or assume C major. State the key in your response.\n"
+              "- Every note you write MUST belong to the scale of the stated key unless it is an "
+              "intentional chromatic passing tone, approach note, or borrowed chord tone. "
+              "Random out-of-key notes like Db in C major are WRONG.\n"
+              "- Scale reference (use these and their relative modes):\n"
+              "  Major (Ionian): W-W-H-W-W-W-H  (C major = C D E F G A B)\n"
+              "  Natural minor (Aeolian): W-H-W-W-H-W-W  (A minor = A B C D E F G)\n"
+              "  Harmonic minor: raise 7th  (A harm. minor = A B C D E F G#)\n"
+              "  Melodic minor (ascending): raise 6th and 7th\n"
+              "- Chromatic notes are ONLY acceptable when:\n"
+              "  (a) They are passing tones connecting two diatonic notes stepwise (e.g. F-F#-G in C major).\n"
+              "  (b) They are part of a secondary dominant or borrowed chord (e.g. E/G# resolving to Am in C major).\n"
+              "  (c) The user explicitly requests chromatic or atonal writing.\n"
+              "  (d) They are approach notes (half-step below a chord tone, on a weak beat, resolving immediately).\n"
+              "- For chords, use diatonic triads/sevenths of the key unless a chromatic chord is musically justified:\n"
+              "  C major diatonic triads: C Dm Em F G Am Bdim\n"
+              "  A minor diatonic triads: Am Bdim C Dm Em F G\n"
+              "- Double-check every note number against the key before submitting. If in doubt, stay diatonic.\n"
+              "- When writing drums (channel 10 / GM percussion), key constraints do not apply.\n";
 
     if (previewMixPlanMode()) {
         prompt += "- Preview mode is ON: call preview_mix_plan before mutating tools and wait for user confirmation intent.\n";
@@ -148,6 +173,62 @@ void AiService::clearConversation()
     toolRoundCount_ = 0;
     executedToolIds_.clear();
     setBusy(false);
+}
+
+void AiService::loadConversation(const QVector<AiMessage>& messages)
+{
+    clearConversation();
+    conversationHistory_ = messages;
+}
+
+void AiService::requestSessionTitle(const QString& userMessage)
+{
+    QString key = apiKey();
+    if (key.isEmpty()) return;
+
+    QJsonObject body;
+    body["model"] = model();
+    body["max_tokens"] = 30;
+    body["system"] = QString("Generate a concise 3-6 word title for this chat. "
+                             "Reply with ONLY the title, no quotes or punctuation.");
+    QJsonArray messages;
+    QJsonObject userMsg;
+    userMsg["role"] = "user";
+    QJsonArray contentArr;
+    QJsonObject textBlock;
+    textBlock["type"] = "text";
+    textBlock["text"] = userMessage;
+    contentArr.append(textBlock);
+    userMsg["content"] = contentArr;
+    messages.append(userMsg);
+    body["messages"] = messages;
+
+    QUrl apiUrl("https://api.anthropic.com/v1/messages");
+    QNetworkRequest request{apiUrl};
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setRawHeader("x-api-key", key.toUtf8());
+    request.setRawHeader("anthropic-version", "2023-06-01");
+    request.setTransferTimeout(15000);
+
+    auto* reply = nam_->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) return;
+
+        auto doc = QJsonDocument::fromJson(reply->readAll());
+        if (doc.isNull()) return;
+        auto obj = doc.object();
+        auto contentArr = obj["content"].toArray();
+        if (contentArr.isEmpty()) return;
+
+        QString title = contentArr[0].toObject()["text"].toString().trimmed();
+        if (title.isEmpty()) return;
+
+        if (title.length() > 60)
+            title = title.left(57) + "...";
+
+        emit sessionTitleGenerated(title);
+    });
 }
 
 void AiService::pruneHistory()
@@ -389,8 +470,11 @@ void AiService::executeToolCalls(const QVector<AiToolCall>& calls)
     executedToolIds_.clear();
     QVector<AiToolResult> results;
 
+    toolExecutor_->beginBatch();
+
     for (auto& call : calls) {
         if (confirmDestructive() && toolExecutor_->isDestructive(call.name)) {
+            toolExecutor_->endBatch();
             emit confirmDestructiveAction(call.name, call);
             return;
         }
@@ -401,6 +485,8 @@ void AiService::executeToolCalls(const QVector<AiToolCall>& calls)
 
         emit toolCallFinished(call.name, call.id, result.content, result.isError);
     }
+
+    toolExecutor_->endBatch();
 
     AiMessage assistantMsg = conversationHistory_.last();
     continueAfterToolResults(results, assistantMsg);

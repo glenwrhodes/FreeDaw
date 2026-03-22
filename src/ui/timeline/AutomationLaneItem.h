@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "EnvelopeUtils.h"
 #include <QGraphicsItem>
@@ -32,6 +32,16 @@ public:
     void setPlayheadBeat(double beat);
     void rebuildFromCurve();
     void updateCurvePathOnly();
+
+    // Point selection and group drag (called by AutomationPointItem)
+    void clearPointSelection();
+    int selectedPointCount() const;
+    void togglePointSelection(int index);
+    void selectPoint(int index, bool clearOthers);
+    void beginPointDrag(int anchorIndex, QPointF startScene, bool shiftHeld);
+    void updatePointDrag(QPointF currentScene, Qt::KeyboardModifiers mods);
+    void endPointDrag();
+    bool isPointDragging() const { return pointDragging_; }
 
     QRectF boundingRect() const override;
     void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
@@ -74,6 +84,23 @@ private:
     int curveDragSegmentIndex_ = -1;
     float curveDragStartValue_ = 0.0f;
     QPointF curveDragStartPos_;
+
+    // Point drag state (single or group)
+    bool pointDragging_ = false;
+    int pointDragAnchorIdx_ = -1;
+    QPointF pointDragStartScene_;
+    double pointDragStartBeat_ = 0.0;
+    float pointDragStartValue_ = 0.0f;
+    bool pointDragShiftHeld_ = false;
+    QVector<QPair<double, float>> pointDragStartPositions_;
+    QVector<int> pointDragSelectedIndices_;
+    double pointDragMinBeatDelta_ = -1e9;
+    double pointDragMaxBeatDelta_ = 1e9;
+
+    // Rubber band selection state
+    bool rubberBanding_ = false;
+    QPointF rubberBandStart_;
+    QRectF rubberBandRect_;
 };
 
 } // namespace OpenDaw

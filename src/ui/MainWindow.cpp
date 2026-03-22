@@ -152,6 +152,7 @@ bool MainWindow::maybeSaveBeforeAction()
 void MainWindow::closeEvent(QCloseEvent* event)
 {
     if (maybeSaveBeforeAction()) {
+        if (aiChatWidget_) aiChatWidget_->saveChatSessions();
         PluginEditorWindow::closeAll();
         editMgr_.stopAutosave();
         editMgr_.clearAutosave();
@@ -812,7 +813,9 @@ void MainWindow::createStatusBar()
 void MainWindow::onNewProject()
 {
     if (!maybeSaveBeforeAction()) return;
+    if (aiChatWidget_) aiChatWidget_->saveChatSessions();
     editMgr_.newEdit();
+    if (aiChatWidget_) aiChatWidget_->loadChatSessions();
     updateWindowTitle();
 }
 
@@ -834,6 +837,7 @@ void MainWindow::onOpenProject()
 
     juce::File file(juce::String(path.toUtf8().constData()));
     editMgr_.loadEdit(file);
+    if (aiChatWidget_) aiChatWidget_->loadChatSessions();
     updateWindowTitle();
 }
 
@@ -845,6 +849,7 @@ void MainWindow::loadFile(const QString& path)
 
     juce::File file(juce::String(fi.absoluteFilePath().toUtf8().constData()));
     editMgr_.loadEdit(file);
+    if (aiChatWidget_) aiChatWidget_->loadChatSessions();
     updateWindowTitle();
 
     QSettings settings;
@@ -859,6 +864,7 @@ void MainWindow::onSaveProject()
     }
     if (routingView_) routingView_->flushNodePositions();
     editMgr_.saveEdit();
+    if (aiChatWidget_) aiChatWidget_->saveChatSessions();
     updateWindowTitle();
 }
 
@@ -879,6 +885,7 @@ void MainWindow::onSaveProjectAs()
     if (routingView_) routingView_->flushNodePositions();
     juce::File file(juce::String(path.toUtf8().constData()));
     editMgr_.saveEditAs(file);
+    if (aiChatWidget_) aiChatWidget_->saveChatSessions();
     updateWindowTitle();
 }
 

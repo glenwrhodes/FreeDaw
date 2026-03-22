@@ -1,4 +1,4 @@
-﻿<!-- GitHub metadata: topics should be set in repo Settings > About -->
+<!-- GitHub metadata: topics should be set in repo Settings > About -->
 <!-- Suggested topics: daw, digital-audio-workstation, audio, music-production, midi, piano-roll, vst, qt6, juce, tracktion-engine, cpp, windows, open-source, audio-editor, music-software -->
 
 <div align="center">
@@ -159,7 +159,7 @@ Add any of these to a track with one click from the Effects panel or mixer FX sl
 
 OpenDaw ships with a built-in **AI assistant powered by Anthropic's Claude** that can control the entire DAW through natural language. This isn't a chatbot that tells you what buttons to click — it actually **executes operations directly** on your project, calling up to 30 different tools in an autonomous loop until your request is fulfilled.
 
-Press **Ctrl+Space** from anywhere to open the quick prompt overlay, type what you need, and watch it happen.
+Press **Ctrl+Shift+Space** from anywhere to open the quick prompt overlay, type what you need, and watch it happen.
 
 #### Why it matters
 
@@ -501,7 +501,7 @@ Each track has controls in two places:
 
 1. **Set your API key.** Click the **AI** tab in the right panel, then click **Settings**. Enter your Anthropic API key (`sk-ant-...`) and click OK. The key is stored locally and only sent to Anthropic's API.
 
-2. **Quick prompt (Ctrl+Space).** Press Ctrl+Space from anywhere in the app. A floating text input appears — type your request and press Enter. The AI panel opens and the assistant begins working.
+2. **Quick prompt (Ctrl+Shift+Space).** Press Ctrl+Shift+Space from anywhere in the app. A floating text input appears — type your request and press Enter. The AI panel opens and the assistant begins working.
 
 3. **Chat panel.** Click the **AI** tab on the right panel to open the full chat interface. Type in the input box at the bottom and press Enter (or click Send). Shift+Enter adds a new line.
 
@@ -539,7 +539,7 @@ Each track has controls in two places:
 | Ctrl+Q | Quit |
 | Ctrl+= | Zoom in (timeline) |
 | Ctrl+- | Zoom out (timeline) |
-| Ctrl+Space | Open AI quick prompt |
+| Ctrl+Shift+Space | Open AI quick prompt |
 
 **Piano Roll**
 
@@ -622,7 +622,7 @@ AudioMixer/
       AiToolExecutor.h/cpp                Dispatches tool calls to engine APIs
       AiService.h/cpp                     Anthropic API client with SSE streaming
       AiChatWidget.h/cpp                  Chat panel UI with streaming & markdown
-      AiQuickPrompt.h/cpp                 Ctrl+Space overlay prompt
+      AiQuickPrompt.h/cpp                 Ctrl+Shift+Space overlay prompt
     utils/
       WaveformCache.h/cpp                 Audio file waveform thumbnail cache
       ThemeManager.h/cpp                  Dark theme color management

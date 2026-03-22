@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "ui/timeline/EnvelopeUtils.h"
 #include <QWidget>
@@ -79,6 +79,8 @@ private:
     double dragStartBeat_ = 0.0;
     int dragStartValue_ = 0;
     bool shiftHeld_ = false;
+    double dragMinBeatDelta_ = -1e9;
+    double dragMaxBeatDelta_ = 1e9;
 
     QVector<QPair<double, int>> dragStartPositions_;
 

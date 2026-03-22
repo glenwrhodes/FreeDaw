@@ -1,4 +1,4 @@
-﻿#include "AiChatWidget.h"
+#include "AiChatWidget.h"
 #include "engine/EditManager.h"
 #include "engine/AudioEngine.h"
 #include "engine/PluginScanner.h"
@@ -24,6 +24,7 @@ AiChatWidget::AiChatWidget(EditManager* editMgr, AudioEngine* audioEngine,
 {
     setAccessibleName("AI Assistant Panel");
     aiService_ = new AiService(editMgr, audioEngine, pluginScanner, this);
+    chatStore_ = new AiChatStore();
 
     connect(aiService_, &AiService::tokenReceived, this, &AiChatWidget::onTokenReceived);
     connect(aiService_, &AiService::responseComplete, this, &AiChatWidget::onResponseComplete);
@@ -32,6 +33,7 @@ AiChatWidget::AiChatWidget(EditManager* editMgr, AudioEngine* audioEngine,
     connect(aiService_, &AiService::errorOccurred, this, &AiChatWidget::onError);
     connect(aiService_, &AiService::confirmDestructiveAction, this, &AiChatWidget::onConfirmDestructive);
     connect(aiService_, &AiService::busyChanged, this, &AiChatWidget::onBusyChanged);
+    connect(aiService_, &AiService::sessionTitleGenerated, this, &AiChatWidget::onSessionTitleGenerated);
 
     streamThrottle_ = new QTimer(this);
     streamThrottle_->setInterval(50);
@@ -83,6 +85,42 @@ void AiChatWidget::setupUi()
     }
 
     const auto miFont = icons::materialIcons(14);
+    const QString smallBtnStyle =
+        QString("QPushButton { font-size: 14px; background: %1; color: %2; "
+                "border: 1px solid %3; border-radius: 3px; }"
+                "QPushButton:hover { background: %4; }"
+                "QPushButton:checked { background: %5; color: #fff; }")
+            .arg(theme.surface.name(), theme.textDim.name(),
+                 theme.border.name(), theme.surfaceLight.name(),
+                 theme.accent.darker(130).name());
+
+    historyToggleBtn_ = new QPushButton(headerBar_);
+    historyToggleBtn_->setAccessibleName("Toggle Chat History Sidebar");
+    historyToggleBtn_->setFont(miFont);
+    historyToggleBtn_->setText(QString(icons::mi::Chat));
+    historyToggleBtn_->setToolTip("Show chat history");
+    historyToggleBtn_->setFixedSize(28, 24);
+    historyToggleBtn_->setCheckable(true);
+    historyToggleBtn_->setStyleSheet(smallBtnStyle);
+    connect(historyToggleBtn_, &QPushButton::toggled, this, [this](bool on) {
+        if (historyPanel_) {
+            historyPanel_->setVisible(on);
+            if (on) refreshSessionList();
+        }
+        historyToggleBtn_->setToolTip(on ? "Hide chat history" : "Show chat history");
+    });
+    headerLayout->addWidget(historyToggleBtn_);
+
+    newChatBtn_ = new QPushButton(headerBar_);
+    newChatBtn_->setAccessibleName("New Chat");
+    newChatBtn_->setFont(miFont);
+    newChatBtn_->setText(QString(icons::mi::Add));
+    newChatBtn_->setToolTip("Start new chat");
+    newChatBtn_->setFixedSize(28, 24);
+    newChatBtn_->setStyleSheet(smallBtnStyle);
+    connect(newChatBtn_, &QPushButton::clicked, this, &AiChatWidget::startNewChat);
+    headerLayout->addWidget(newChatBtn_);
+
     toolToggleBtn_ = new QPushButton(headerBar_);
     toolToggleBtn_->setAccessibleName("Toggle Tool Output Display");
     toolToggleBtn_->setFont(miFont);
@@ -93,14 +131,7 @@ void AiChatWidget::setupUi()
     toolToggleBtn_->setFixedSize(28, 24);
     toolToggleBtn_->setCheckable(true);
     toolToggleBtn_->setChecked(showToolOutput_);
-    toolToggleBtn_->setStyleSheet(
-        QString("QPushButton { font-size: 14px; background: %1; color: %2; "
-                "border: 1px solid %3; border-radius: 3px; }"
-                "QPushButton:hover { background: %4; }"
-                "QPushButton:checked { background: %5; color: #fff; }")
-            .arg(theme.surface.name(), theme.textDim.name(),
-                 theme.border.name(), theme.surfaceLight.name(),
-                 theme.accent.darker(130).name()));
+    toolToggleBtn_->setStyleSheet(smallBtnStyle);
     connect(toolToggleBtn_, &QPushButton::toggled, this, [this](bool on) {
         showToolOutput_ = on;
         toolToggleBtn_->setText(on ? QString(icons::mi::Visibility)
@@ -113,29 +144,69 @@ void AiChatWidget::setupUi()
     });
     headerLayout->addWidget(toolToggleBtn_);
 
-    auto* clearBtn = new QPushButton("Clear", headerBar_);
-    clearBtn->setAccessibleName("Clear Chat");
-    clearBtn->setFixedSize(48, 24);
-    clearBtn->setStyleSheet(
+    const QString textBtnStyle =
         QString("QPushButton { font-size: 10px; background: %1; color: %2; "
                 "border: 1px solid %3; border-radius: 3px; }"
                 "QPushButton:hover { background: %4; }")
             .arg(theme.surface.name(), theme.textDim.name(),
-                 theme.border.name(), theme.surfaceLight.name()));
-    connect(clearBtn, &QPushButton::clicked, this, &AiChatWidget::clearChat);
-    headerLayout->addWidget(clearBtn);
+                 theme.border.name(), theme.surfaceLight.name());
 
     auto* settingsBtn = new QPushButton("Settings", headerBar_);
     settingsBtn->setAccessibleName("AI Settings");
     settingsBtn->setFixedSize(60, 24);
-    settingsBtn->setStyleSheet(clearBtn->styleSheet());
+    settingsBtn->setStyleSheet(textBtnStyle);
     connect(settingsBtn, &QPushButton::clicked, this, &AiChatWidget::showSettingsDialog);
     headerLayout->addWidget(settingsBtn);
 
     mainLayout_->addWidget(headerBar_);
 
+    // ── Content area: sidebar + messages ─────────────────────────────────────
+
+    auto* contentWidget = new QWidget(this);
+    auto* contentLayout = new QHBoxLayout(contentWidget);
+    contentLayout->setContentsMargins(0, 0, 0, 0);
+    contentLayout->setSpacing(0);
+
+    // History sidebar (hidden by default)
+    historyPanel_ = new QWidget(contentWidget);
+    historyPanel_->setFixedWidth(200);
+    historyPanel_->setAutoFillBackground(true);
+    QPalette sidePal;
+    sidePal.setColor(QPalette::Window, theme.surface);
+    historyPanel_->setPalette(sidePal);
+    historyPanel_->setVisible(false);
+
+    auto* sideLayout = new QVBoxLayout(historyPanel_);
+    sideLayout->setContentsMargins(4, 4, 4, 4);
+    sideLayout->setSpacing(4);
+
+    auto* sideTitle = new QLabel("Chat Sessions", historyPanel_);
+    sideTitle->setAccessibleName("Chat Sessions List");
+    sideTitle->setStyleSheet(
+        QString("font-weight: bold; font-size: 11px; color: %1; padding: 4px;").arg(theme.text.name()));
+    sideLayout->addWidget(sideTitle);
+
+    sessionList_ = new QListWidget(historyPanel_);
+    sessionList_->setAccessibleName("Chat Session List");
+    sessionList_->setStyleSheet(
+        QString("QListWidget { background: %1; border: none; font-size: 11px; color: %2; }"
+                "QListWidget::item { padding: 6px 8px; border-bottom: 1px solid %3; }"
+                "QListWidget::item:selected { background: %4; color: #fff; }"
+                "QListWidget::item:hover { background: %5; }")
+            .arg(theme.surface.name(), theme.text.name(),
+                 theme.border.name(), theme.accent.darker(130).name(),
+                 theme.surfaceLight.name()));
+    connect(sessionList_, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
+        QString sessionId = item->data(Qt::UserRole).toString();
+        if (sessionId != chatStore_->activeSessionId())
+            switchToSession(sessionId);
+    });
+    sideLayout->addWidget(sessionList_, 1);
+
+    contentLayout->addWidget(historyPanel_);
+
     // Messages area
-    scrollArea_ = new QScrollArea(this);
+    scrollArea_ = new QScrollArea(contentWidget);
     scrollArea_->setWidgetResizable(true);
     scrollArea_->setFrameStyle(QFrame::NoFrame);
     scrollArea_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -158,7 +229,9 @@ void AiChatWidget::setupUi()
     messagesLayout_->addStretch();
 
     scrollArea_->setWidget(messagesContainer_);
-    mainLayout_->addWidget(scrollArea_, 1);
+    contentLayout->addWidget(scrollArea_, 1);
+
+    mainLayout_->addWidget(contentWidget, 1);
 
     // Status label
     statusLabel_ = new QLabel("", this);
@@ -234,9 +307,16 @@ void AiChatWidget::submitPrompt(const QString& text)
         appendAssistantBubble("I'm still processing the previous request. Please wait.");
         return;
     }
+
+    auto* session = chatStore_->activeSession();
+    bool needsTitle = session && session->title == "New Chat" && session->messages.isEmpty();
+
     inputEdit_->clear();
     appendUserBubble(text);
     aiService_->sendMessage(text);
+
+    if (needsTitle)
+        aiService_->requestSessionTitle(text);
 }
 
 void AiChatWidget::focusInput()
@@ -256,9 +336,8 @@ void AiChatWidget::openSettings()
     showSettingsDialog();
 }
 
-void AiChatWidget::clearChat()
+void AiChatWidget::clearChatUi()
 {
-    aiService_->clearConversation();
     QLayoutItem* item;
     while ((item = messagesLayout_->takeAt(0)) != nullptr) {
         if (item->widget())
@@ -543,6 +622,129 @@ void AiChatWidget::onBusyChanged(bool busy)
         statusLabel_->setText("Thinking...");
     else
         statusLabel_->clear();
+}
+
+// ── Session management ──────────────────────────────────────────────────────
+
+void AiChatWidget::startNewChat()
+{
+    chatStore_->updateActiveMessages(aiService_->conversationHistory());
+    chatStore_->createSession();
+    aiService_->clearConversation();
+    clearChatUi();
+    refreshSessionList();
+}
+
+void AiChatWidget::switchToSession(const QString& sessionId)
+{
+    if (aiService_->isBusy()) return;
+
+    chatStore_->updateActiveMessages(aiService_->conversationHistory());
+    chatStore_->setActiveSession(sessionId);
+
+    auto* session = chatStore_->activeSession();
+    if (!session) return;
+
+    aiService_->loadConversation(session->messages);
+    clearChatUi();
+    rebuildUiFromHistory(session->messages);
+    refreshSessionList();
+}
+
+void AiChatWidget::rebuildUiFromHistory(const QVector<AiMessage>& messages)
+{
+    for (auto& msg : messages) {
+        if (msg.role == AiRole::User) {
+            QString text = msg.plainText();
+            if (!text.isEmpty())
+                appendUserBubble(text);
+        } else if (msg.role == AiRole::Assistant) {
+            QString text = msg.plainText();
+            if (!text.isEmpty())
+                appendAssistantBubble(text);
+            for (auto& block : msg.content) {
+                if (block.type == "tool_use") {
+                    appendToolBubble(block.toolCall.name, "", false);
+                }
+            }
+        }
+    }
+}
+
+void AiChatWidget::refreshSessionList()
+{
+    if (!sessionList_) return;
+    sessionList_->clear();
+
+    QDateTime now = QDateTime::currentDateTime();
+    for (auto& session : chatStore_->sessions()) {
+        QString dateStr;
+        auto sessionDate = session.updatedAt.date();
+        if (sessionDate == now.date())
+            dateStr = session.updatedAt.toString("h:mm ap");
+        else if (sessionDate == now.date().addDays(-1))
+            dateStr = "Yesterday";
+        else
+            dateStr = session.updatedAt.toString("MMM d");
+
+        auto* item = new QListWidgetItem();
+        item->setData(Qt::UserRole, session.id);
+        item->setText(session.title + "\n" + dateStr);
+        item->setToolTip(session.title);
+
+        if (session.id == chatStore_->activeSessionId()) {
+            auto font = item->font();
+            font.setBold(true);
+            item->setFont(font);
+        }
+
+        sessionList_->addItem(item);
+    }
+}
+
+void AiChatWidget::onSessionTitleGenerated(const QString& title)
+{
+    chatStore_->setSessionTitle(chatStore_->activeSessionId(), title);
+    refreshSessionList();
+}
+
+QString AiChatWidget::chatFilePath() const
+{
+    if (!editMgr_) return {};
+    return AiChatStore::chatFilePath(editMgr_->currentFile());
+}
+
+void AiChatWidget::saveChatSessions()
+{
+    chatStore_->updateActiveMessages(aiService_->conversationHistory());
+    QString path = chatFilePath();
+    if (!path.isEmpty())
+        chatStore_->saveTo(path);
+}
+
+void AiChatWidget::loadChatSessions()
+{
+    QString path = chatFilePath();
+    if (path.isEmpty()) {
+        chatStore_->reset();
+        aiService_->clearConversation();
+        clearChatUi();
+        return;
+    }
+
+    chatStore_->loadFrom(path);
+
+    auto* session = chatStore_->activeSession();
+    if (session && !session->messages.isEmpty()) {
+        aiService_->loadConversation(session->messages);
+        clearChatUi();
+        rebuildUiFromHistory(session->messages);
+    } else {
+        aiService_->clearConversation();
+        clearChatUi();
+    }
+
+    refreshSessionList();
 }
 
 // ── Settings dialog ─────────────────────────────────────────────────────────

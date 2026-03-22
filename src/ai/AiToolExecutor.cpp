@@ -1,4 +1,4 @@
-﻿#include "AiToolExecutor.h"
+#include "AiToolExecutor.h"
 #include <tracktion_engine/tracktion_engine.h>
 #include <cmath>
 #include <algorithm>
@@ -328,7 +328,7 @@ void AiToolExecutor::registerHandlers()
         if (!track) return err(id, "Failed to create audio track.");
         if (input.contains("name"))
             track->setName(juce::String(input["name"].toString().toStdString()));
-        emit editMgr_->tracksChanged();
+        emitTracksChanged();
         return ok(id, QString("Created audio track '%1'.")
                       .arg(QString::fromStdString(track->getName().toStdString())));
     };
@@ -338,7 +338,7 @@ void AiToolExecutor::registerHandlers()
         if (!track) return err(id, "Failed to create MIDI track.");
         if (input.contains("name"))
             track->setName(juce::String(input["name"].toString().toStdString()));
-        emit editMgr_->tracksChanged();
+        emitTracksChanged();
         return ok(id, QString("Created MIDI track '%1'.")
                       .arg(QString::fromStdString(track->getName().toStdString())));
     };
@@ -348,7 +348,7 @@ void AiToolExecutor::registerHandlers()
         if (!track) return err(id, "Failed to create bus track.");
         if (input.contains("name"))
             track->setName(juce::String(input["name"].toString().toStdString()));
-        emit editMgr_->tracksChanged();
+        emitTracksChanged();
         return ok(id, QString("Created bus track '%1'.")
                       .arg(QString::fromStdString(track->getName().toStdString())));
     };
@@ -358,7 +358,7 @@ void AiToolExecutor::registerHandlers()
         if (!track) return err(id, "Track not found.");
         QString name = QString::fromStdString(track->getName().toStdString());
         editMgr_->removeTrack(track);
-        emit editMgr_->tracksChanged();
+        emitTracksChanged();
         return ok(id, QString("Deleted track '%1'.").arg(name));
     };
 
@@ -368,7 +368,7 @@ void AiToolExecutor::registerHandlers()
         QString oldName = QString::fromStdString(track->getName().toStdString());
         QString newName = input["new_name"].toString();
         track->setName(juce::String(newName.toStdString()));
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Renamed '%1' to '%2'.").arg(oldName, newName));
     };
 
@@ -377,7 +377,7 @@ void AiToolExecutor::registerHandlers()
         if (!track) return err(id, "Track not found.");
         bool muted = input["muted"].toBool();
         track->setMute(muted);
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Track '%1' %2.")
                       .arg(QString::fromStdString(track->getName().toStdString()),
                            muted ? "muted" : "unmuted"));
@@ -388,7 +388,7 @@ void AiToolExecutor::registerHandlers()
         if (!track) return err(id, "Track not found.");
         bool solo = input["solo"].toBool();
         track->setSolo(solo);
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Track '%1' solo %2.")
                       .arg(QString::fromStdString(track->getName().toStdString()),
                            solo ? "on" : "off"));
@@ -402,7 +402,7 @@ void AiToolExecutor::registerHandlers()
             if (auto* vp = dynamic_cast<te::VolumeAndPanPlugin*>(p)) {
                 float pos = te::decibelsToVolumeFaderPosition(static_cast<float>(db));
                 vp->volParam->setParameter(pos, juce::sendNotification);
-                emit editMgr_->editChanged();
+                emitEditChanged();
                 return ok(id, QString("Track '%1' volume set to %2 dB.")
                               .arg(QString::fromStdString(track->getName().toStdString()))
                               .arg(db, 0, 'f', 1));
@@ -418,7 +418,7 @@ void AiToolExecutor::registerHandlers()
         for (auto* p : track->pluginList.getPlugins()) {
             if (auto* vp = dynamic_cast<te::VolumeAndPanPlugin*>(p)) {
                 vp->pan.setValue(static_cast<float>(pan), nullptr);
-                emit editMgr_->editChanged();
+                emitEditChanged();
                 return ok(id, QString("Track '%1' pan set to %2.")
                               .arg(QString::fromStdString(track->getName().toStdString()))
                               .arg(pan, 0, 'f', 2));
@@ -432,7 +432,7 @@ void AiToolExecutor::registerHandlers()
         if (!track) return err(id, "Track not found.");
         bool mono = input["mono"].toBool();
         editMgr_->setTrackMono(*track, mono);
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Track '%1' set to %2.")
                       .arg(QString::fromStdString(track->getName().toStdString()),
                            mono ? "mono" : "stereo"));
@@ -443,7 +443,7 @@ void AiToolExecutor::registerHandlers()
         if (!track) return err(id, "Track not found.");
         bool enabled = input["enabled"].toBool();
         editMgr_->setTrackRecordEnabled(*track, enabled);
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Track '%1' record %2.")
                       .arg(QString::fromStdString(track->getName().toStdString()),
                            enabled ? "armed" : "disarmed"));
@@ -468,7 +468,7 @@ void AiToolExecutor::registerHandlers()
         if (!track) return err(id, "Track not found.");
         QString inputName = input["input_name"].toString();
         editMgr_->assignInputToTrack(*track, juce::String(inputName.toStdString()));
-        emit editMgr_->routingChanged();
+        emitRoutingChanged();
         return ok(id, QString("Assigned input '%1' to track '%2'.")
                       .arg(inputName, QString::fromStdString(track->getName().toStdString())));
     };
@@ -477,7 +477,7 @@ void AiToolExecutor::registerHandlers()
         auto* track = resolveTrack(input["track"]);
         if (!track) return err(id, "Track not found.");
         editMgr_->clearTrackInput(*track);
-        emit editMgr_->routingChanged();
+        emitRoutingChanged();
         return ok(id, QString("Cleared input on track '%1'.")
                       .arg(QString::fromStdString(track->getName().toStdString())));
     };
@@ -493,7 +493,7 @@ void AiToolExecutor::registerHandlers()
             if (!destTrack) return err(id, "Destination track not found.");
             editMgr_->setTrackOutputToTrack(*track, *destTrack);
         }
-        emit editMgr_->routingChanged();
+        emitRoutingChanged();
         return ok(id, QString("Set output of '%1' to '%2'.")
                       .arg(QString::fromStdString(track->getName().toStdString()),
                            dest.isString() ? dest.toString() : QString::number(dest.toInt())));
@@ -503,7 +503,7 @@ void AiToolExecutor::registerHandlers()
         auto* track = resolveTrack(input["track"]);
         if (!track) return err(id, "Track not found.");
         editMgr_->clearTrackOutput(*track);
-        emit editMgr_->routingChanged();
+        emitRoutingChanged();
         return ok(id, QString("Disconnected output on track '%1'.")
                       .arg(QString::fromStdString(track->getName().toStdString())));
     };
@@ -574,7 +574,7 @@ void AiToolExecutor::registerHandlers()
         if (!plugin) return err(id, "Failed to create effect plugin.");
 
         track->pluginList.insertPlugin(plugin, -1, nullptr);
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Added '%1' to track '%2'.")
                       .arg(effectName, QString::fromStdString(track->getName().toStdString())));
     };
@@ -588,7 +588,7 @@ void AiToolExecutor::registerHandlers()
 
         QString name = QString::fromStdString(plugin->getName().toStdString());
         plugin->deleteFromParent();
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Removed '%1' from track '%2'.")
                       .arg(name, QString::fromStdString(track->getName().toStdString())));
     };
@@ -603,7 +603,7 @@ void AiToolExecutor::registerHandlers()
 
         double value = input["value"].toDouble();
         param->setParameter(static_cast<float>(value), juce::sendNotification);
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Set '%1' on '%2' to %3.")
                       .arg(QString::fromStdString(param->getParameterName().toStdString()),
                            QString::fromStdString(plugin->getName().toStdString()))
@@ -618,7 +618,7 @@ void AiToolExecutor::registerHandlers()
 
         bool bypassed = input["bypassed"].toBool();
         plugin->setEnabled(!bypassed);
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("'%1' %2.")
                       .arg(QString::fromStdString(plugin->getName().toStdString()),
                            bypassed ? "bypassed" : "enabled"));
@@ -709,7 +709,7 @@ void AiToolExecutor::registerHandlers()
             return err(id, QString("Unknown preset '%1'.").arg(preset));
         }
 
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Applied mix preset '%1' to '%2'.")
                       .arg(preset, QString::fromStdString(track->getName().toStdString())));
     };
@@ -731,7 +731,7 @@ void AiToolExecutor::registerHandlers()
         const double nextDb = std::clamp(currentVolDb + delta, -60.0, 6.0);
         vp->volParam->setParameter(te::decibelsToVolumeFaderPosition(static_cast<float>(nextDb)),
                                    juce::sendNotification);
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Adjusted '%1' toward target peak %2 dBFS (current %3 dBFS, new volume %4 dB).")
                       .arg(QString::fromStdString(track->getName().toStdString()))
                       .arg(targetDb, 0, 'f', 1).arg(currentPeak, 0, 'f', 1).arg(nextDb, 0, 'f', 1));
@@ -758,7 +758,7 @@ void AiToolExecutor::registerHandlers()
             return err(id, QString("Unknown dynamic goal '%1'.").arg(goal));
         }
 
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Applied dynamic goal '%1' to '%2'.")
                       .arg(goal, QString::fromStdString(track->getName().toStdString())));
     };
@@ -785,7 +785,7 @@ void AiToolExecutor::registerHandlers()
             return err(id, QString("Unknown reverb style '%1'.").arg(style));
         }
 
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Set reverb on '%1' to style '%2' (amount %3).")
                       .arg(QString::fromStdString(track->getName().toStdString()), style)
                       .arg(amount, 0, 'f', 2));
@@ -802,7 +802,7 @@ void AiToolExecutor::registerHandlers()
         auto params = comp->getAutomatableParameters();
         if (params.size() > 0) params[0]->setParameter(static_cast<float>(0.40 + intensity * 0.30), juce::sendNotification);
         if (params.size() > 1) params[1]->setParameter(static_cast<float>(0.35 + intensity * 0.25), juce::sendNotification);
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Applied bus glue on '%1' with intensity %2.")
                       .arg(QString::fromStdString(bus->getName().toStdString()))
                       .arg(intensity, 0, 'f', 2));
@@ -820,7 +820,7 @@ void AiToolExecutor::registerHandlers()
         } else {
             return err(id, QString("Unknown master profile '%1'.").arg(profile));
         }
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Set master target profile to '%1'.").arg(profile));
     };
 
@@ -869,7 +869,7 @@ void AiToolExecutor::registerHandlers()
                 }
             }
         }
-        emit editMgr_->tracksChanged();
+        emitTracksChanged();
         return ok(id, created);
     };
 
@@ -896,7 +896,7 @@ void AiToolExecutor::registerHandlers()
                 routed.append(row);
             }
         }
-        emit editMgr_->routingChanged();
+        emitRoutingChanged();
         return ok(id, routed);
     };
 
@@ -975,7 +975,7 @@ void AiToolExecutor::registerHandlers()
         if (bpm < 20.0 || bpm > 999.0)
             return err(id, "BPM must be between 20 and 999.");
         editMgr_->setBpm(bpm);
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Tempo set to %1 BPM.").arg(bpm, 0, 'f', 1));
     };
 
@@ -987,7 +987,7 @@ void AiToolExecutor::registerHandlers()
         if (den < 1 || den > 32 || (den & (den - 1)) != 0)
             return err(id, "Denominator must be a power of 2 (1, 2, 4, 8, 16, 32).");
         editMgr_->setTimeSignature(num, den);
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, QString("Time signature set to %1/%2.").arg(num).arg(den));
     };
 
@@ -1053,7 +1053,7 @@ void AiToolExecutor::registerHandlers()
             created.append(entry);
         }
 
-        emit editMgr_->editChanged();
+        emitEditChanged();
         return ok(id, created);
     };
 
@@ -1105,6 +1105,11 @@ void AiToolExecutor::registerHandlers()
         auto* clip = editMgr_->addMidiClipToTrack(*track, startBeat, lengthBeats);
         if (!clip) return err(id, "Failed to create MIDI clip.");
 
+        if (input.contains("channel")) {
+            int ch = std::clamp(input["channel"].toInt(1), 1, 16);
+            clip->setMidiChannel(te::MidiChannel(ch));
+        }
+
         if (input.contains("name") && !input["name"].toString().isEmpty())
             clip->setName(juce::String(input["name"].toString().toStdString()));
 
@@ -1117,14 +1122,15 @@ void AiToolExecutor::registerHandlers()
             clipIndex++;
         }
 
-        emit editMgr_->editChanged();
-        emit editMgr_->tracksChanged();
+        emitEditChanged();
+        emitTracksChanged();
 
         QJsonObject result;
         result["clip_index"] = clipIndex;
         result["name"] = QString::fromStdString(clip->getName().toStdString());
         result["start_beat"] = startBeat;
         result["length_beats"] = lengthBeats;
+        result["channel"] = clip->getMidiChannel().getChannelNumber();
         return ok(id, result);
     };
 
@@ -1169,9 +1175,9 @@ void AiToolExecutor::registerHandlers()
             added++;
         }
 
-        emit editMgr_->editChanged();
+        emitEditChanged();
         if (added > 0)
-            emit editMgr_->midiClipModified(midiClip);
+            emitMidiClipModified(midiClip);
 
         QJsonObject result;
         result["added"] = added;
@@ -1198,6 +1204,7 @@ void AiToolExecutor::registerHandlers()
 
             if (auto* mc = dynamic_cast<te::MidiClip*>(clip)) {
                 obj["type"] = "midi";
+                obj["channel"] = mc->getMidiChannel().getChannelNumber();
                 obj["note_count"] = mc->getSequence().getNotes().size();
             } else {
                 obj["type"] = "audio";
@@ -1227,13 +1234,208 @@ void AiToolExecutor::registerHandlers()
         int removed = seq.getNotes().size();
         seq.removeAllNotes(nullptr);
 
-        emit editMgr_->editChanged();
-        emit editMgr_->midiClipModified(midiClip);
+        emitEditChanged();
+        emitMidiClipModified(midiClip);
 
         return ok(id, QString("Removed %1 notes from clip '%2'.")
                       .arg(removed)
                       .arg(QString::fromStdString(midiClip->getName().toStdString())));
     };
+
+    handlers_["set_clip_channel"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* track = resolveTrack(input["track"]);
+        if (!track) return err(id, "Track not found.");
+
+        int clipIdx = input["clip_index"].toInt(-1);
+        if (clipIdx < 0) return err(id, "Invalid clip_index.");
+
+        auto clips = track->getClips();
+        if (clipIdx >= clips.size())
+            return err(id, QString("clip_index %1 out of range (track has %2 clips).").arg(clipIdx).arg(clips.size()));
+
+        auto* midiClip = dynamic_cast<te::MidiClip*>(clips[clipIdx]);
+        if (!midiClip)
+            return err(id, QString("Clip at index %1 is not a MIDI clip.").arg(clipIdx));
+
+        int newChannel = std::clamp(input["channel"].toInt(1), 1, 16);
+        int oldChannel = midiClip->getMidiChannel().getChannelNumber();
+        midiClip->setMidiChannel(te::MidiChannel(newChannel));
+
+        emitEditChanged();
+        emitMidiClipModified(midiClip);
+
+        return ok(id, QString("Moved clip '%1' from channel %2 to channel %3.")
+                      .arg(QString::fromStdString(midiClip->getName().toStdString()))
+                      .arg(oldChannel).arg(newChannel));
+    };
+
+    // ── MIDI Note Reading & Surgical Editing ─────────────────────────────────
+
+    handlers_["get_midi_notes"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* track = resolveTrack(input["track"]);
+        if (!track) return err(id, "Track not found.");
+
+        int clipIdx = input["clip_index"].toInt(-1);
+        if (clipIdx < 0) return err(id, "Invalid clip_index.");
+
+        auto clips = track->getClips();
+        if (clipIdx >= clips.size())
+            return err(id, QString("clip_index %1 out of range (track has %2 clips).").arg(clipIdx).arg(clips.size()));
+
+        auto* midiClip = dynamic_cast<te::MidiClip*>(clips[clipIdx]);
+        if (!midiClip)
+            return err(id, QString("Clip at index %1 is not a MIDI clip.").arg(clipIdx));
+
+        const bool hasChannelFilter = input.contains("channel");
+        const int channelFilter = hasChannelFilter ? input["channel"].toInt(0) : 0;
+        const bool hasNoteMin = input.contains("note_min");
+        const int noteMin = hasNoteMin ? input["note_min"].toInt(0) : 0;
+        const bool hasNoteMax = input.contains("note_max");
+        const int noteMax = hasNoteMax ? input["note_max"].toInt(127) : 127;
+        const bool hasStartMin = input.contains("start_beat_min");
+        const double startBeatMin = hasStartMin ? input["start_beat_min"].toDouble(0.0) : 0.0;
+        const bool hasStartMax = input.contains("start_beat_max");
+        const double startBeatMax = hasStartMax ? input["start_beat_max"].toDouble(100000.0) : 100000.0;
+
+        auto& seq = midiClip->getSequence();
+        QJsonArray notesArr;
+
+        for (auto* note : seq.getNotes()) {
+            int noteNum = note->getNoteNumber();
+            double startBeat = note->getStartBeat().inBeats();
+            int colour = note->getColour();
+            int channel = colour + 1;
+
+            if (hasChannelFilter && channel != channelFilter) continue;
+            if ((hasNoteMin || hasNoteMax) && (noteNum < noteMin || noteNum > noteMax)) continue;
+            if ((hasStartMin || hasStartMax) && (startBeat < startBeatMin || startBeat >= startBeatMax)) continue;
+
+            QJsonObject noteObj;
+            noteObj["note"] = noteNum;
+            noteObj["start_beat"] = startBeat;
+            noteObj["length_beats"] = note->getLengthBeats().inBeats();
+            noteObj["velocity"] = note->getVelocity();
+            noteObj["channel"] = channel;
+            notesArr.append(noteObj);
+        }
+
+        QJsonObject result;
+        result["clip_name"] = QString::fromStdString(midiClip->getName().toStdString());
+        result["clip_channel"] = midiClip->getMidiChannel().getChannelNumber();
+        result["total_notes_in_clip"] = seq.getNotes().size();
+        result["returned_notes"] = notesArr.size();
+        result["notes"] = notesArr;
+        return ok(id, result);
+    };
+
+    handlers_["remove_midi_notes"] = [this](const QJsonObject& input, const QString& id) -> AiToolResult {
+        auto* track = resolveTrack(input["track"]);
+        if (!track) return err(id, "Track not found.");
+
+        int clipIdx = input["clip_index"].toInt(-1);
+        if (clipIdx < 0) return err(id, "Invalid clip_index.");
+
+        auto clips = track->getClips();
+        if (clipIdx >= clips.size())
+            return err(id, QString("clip_index %1 out of range (track has %2 clips).").arg(clipIdx).arg(clips.size()));
+
+        auto* midiClip = dynamic_cast<te::MidiClip*>(clips[clipIdx]);
+        if (!midiClip)
+            return err(id, QString("Clip at index %1 is not a MIDI clip.").arg(clipIdx));
+
+        const bool hasChannelFilter = input.contains("channel");
+        const int channelFilter = hasChannelFilter ? input["channel"].toInt(0) : 0;
+        const bool hasNoteMin = input.contains("note_min");
+        const int noteMin = hasNoteMin ? input["note_min"].toInt(0) : 0;
+        const bool hasNoteMax = input.contains("note_max");
+        const int noteMax = hasNoteMax ? input["note_max"].toInt(127) : 127;
+        const bool hasStartMin = input.contains("start_beat_min");
+        const double startBeatMin = hasStartMin ? input["start_beat_min"].toDouble(0.0) : 0.0;
+        const bool hasStartMax = input.contains("start_beat_max");
+        const double startBeatMax = hasStartMax ? input["start_beat_max"].toDouble(100000.0) : 100000.0;
+
+        if (!hasChannelFilter && !hasNoteMin && !hasNoteMax && !hasStartMin && !hasStartMax)
+            return err(id, "At least one filter (channel, note_min/note_max, or start_beat_min/start_beat_max) is required. Use clear_midi_notes to remove all notes.");
+
+        auto& seq = midiClip->getSequence();
+        QVector<te::MidiNote*> toRemove;
+
+        for (auto* note : seq.getNotes()) {
+            int noteNum = note->getNoteNumber();
+            double startBeat = note->getStartBeat().inBeats();
+            int colour = note->getColour();
+            int channel = colour + 1;
+
+            bool matches = true;
+            if (hasChannelFilter && channel != channelFilter) matches = false;
+            if ((hasNoteMin || hasNoteMax) && (noteNum < noteMin || noteNum > noteMax)) matches = false;
+            if ((hasStartMin || hasStartMax) && (startBeat < startBeatMin || startBeat >= startBeatMax)) matches = false;
+
+            if (matches)
+                toRemove.append(note);
+        }
+
+        int removed = toRemove.size();
+        for (auto* note : toRemove)
+            seq.removeNote(*note, nullptr);
+
+        emitEditChanged();
+        if (removed > 0)
+            emitMidiClipModified(midiClip);
+
+        QJsonObject result;
+        result["removed"] = removed;
+        result["remaining_notes"] = seq.getNotes().size();
+        return ok(id, result);
+    };
+}
+
+// ── Signal batching ─────────────────────────────────────────────────────────
+
+void AiToolExecutor::beginBatch()
+{
+    batching_ = true;
+    dirtyEdit_ = false;
+    dirtyTracks_ = false;
+    dirtyRouting_ = false;
+    dirtyMidi_ = false;
+    lastDirtyMidiClip_ = nullptr;
+}
+
+void AiToolExecutor::endBatch()
+{
+    batching_ = false;
+    if (dirtyTracks_)  emit editMgr_->tracksChanged();
+    else if (dirtyEdit_) emit editMgr_->editChanged();
+    if (dirtyRouting_) emit editMgr_->routingChanged();
+    if (dirtyMidi_ && lastDirtyMidiClip_)
+        emit editMgr_->midiClipModified(lastDirtyMidiClip_);
+    dirtyEdit_ = dirtyTracks_ = dirtyRouting_ = dirtyMidi_ = false;
+    lastDirtyMidiClip_ = nullptr;
+}
+
+void AiToolExecutor::emitEditChanged()
+{
+    if (batching_) { dirtyEdit_ = true; return; }
+    emit editMgr_->editChanged();
+}
+
+void AiToolExecutor::emitTracksChanged()
+{
+    if (batching_) { dirtyTracks_ = true; return; }
+    emit editMgr_->tracksChanged();
+}
+
+void AiToolExecutor::emitRoutingChanged()
+{
+    if (batching_) { dirtyRouting_ = true; return; }
+    emit editMgr_->routingChanged();
+}
+
+void AiToolExecutor::emitMidiClipModified(te::MidiClip* clip)
+{
+    if (batching_) { dirtyMidi_ = true; lastDirtyMidiClip_ = clip; return; }
+    emit editMgr_->midiClipModified(clip);
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────

@@ -354,6 +354,23 @@ void ClipItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
                     nc->getSourceFileReference().setToDirectFileReference(srcFile, false);
                     nc->setStart(endTime, false, true);
                 }
+            } else if (isMidiClip_ && linkedChannelCount_ > 1) {
+                if (auto* mc = dynamic_cast<te::MidiClip*>(clip_)) {
+                    auto* srcTrack = mc->getAudioTrack();
+                    if (srcTrack) {
+                        auto linked = editMgr_->getLinkedMidiClips(srcTrack, mc);
+                        for (auto* linkedClip : linked) {
+                            auto lDur = linkedClip->getPosition().getLength();
+                            auto lPos = tracktion::TimeRange{endTime, endTime + lDur};
+                            if (auto* nc = clipTrack->insertNewClip(
+                                    linkedClip->type, linkedClip->getName(),
+                                    lPos, nullptr)) {
+                                nc->cloneFrom(linkedClip);
+                                nc->setStart(endTime, false, true);
+                            }
+                        }
+                    }
+                }
             } else {
                 auto pos = tracktion::TimeRange{endTime, endTime + clipDuration};
                 if (auto* nc = clipTrack->insertNewClip(
@@ -611,6 +628,25 @@ void ClipItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
                                 newClip->cloneFrom(srcWave);
                                 newClip->getSourceFileReference().setToDirectFileReference(srcFile, false);
                                 newClip->setStart(newStartTime, false, true);
+                            }
+                        } else if (isMidiClip_ && linkedChannelCount_ > 1) {
+                            if (auto* mc = dynamic_cast<te::MidiClip*>(clip_)) {
+                                auto* srcTrack = mc->getAudioTrack();
+                                if (srcTrack) {
+                                    auto linked = editMgr_->getLinkedMidiClips(srcTrack, mc);
+                                    for (auto* linkedClip : linked) {
+                                        auto linkedDuration = linkedClip->getPosition().getLength();
+                                        auto lPos = tracktion::TimeRange{newStartTime, newStartTime + linkedDuration};
+                                        if (auto* newClip = dstClipTrack->insertNewClip(
+                                                linkedClip->type,
+                                                linkedClip->getName(),
+                                                lPos,
+                                                nullptr)) {
+                                            newClip->cloneFrom(linkedClip);
+                                            newClip->setStart(newStartTime, false, true);
+                                        }
+                                    }
+                                }
                             }
                         } else {
                             auto newPos = tracktion::TimeRange{newStartTime, newStartTime + clipDuration};

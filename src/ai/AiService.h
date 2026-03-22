@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "AiTypes.h"
 #include "AiToolDefs.h"
@@ -25,6 +25,11 @@ public:
     void sendMessage(const QString& userText);
     void clearConversation();
 
+    const QVector<AiMessage>& conversationHistory() const { return conversationHistory_; }
+    void loadConversation(const QVector<AiMessage>& messages);
+
+    void requestSessionTitle(const QString& userMessage);
+
     QString apiKey() const;
     void setApiKey(const QString& key);
 
@@ -47,6 +52,7 @@ signals:
     void errorOccurred(const QString& error);
     void busyChanged(bool busy);
     void confirmDestructiveAction(const QString& toolName, const AiToolCall& call);
+    void sessionTitleGenerated(const QString& title);
 
 public slots:
     void executeConfirmedTool(const AiToolCall& call);

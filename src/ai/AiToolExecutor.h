@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "AiTypes.h"
 #include "AiAudioAnalysis.h"
@@ -22,6 +22,9 @@ public:
     AiToolResult execute(const AiToolCall& call);
     bool isDestructive(const QString& toolName) const;
 
+    void beginBatch();
+    void endBatch();
+
 private:
     te::AudioTrack* resolveTrack(const QJsonValue& trackRef) const;
     te::Plugin* resolveEffect(te::AudioTrack* track, const QJsonValue& effectRef) const;
@@ -42,6 +45,18 @@ private:
     AudioEngine* audioEngine_;
     PluginScanner* pluginScanner_;
     AiAudioAnalysis audioAnalysis_;
+
+    bool batching_ = false;
+    bool dirtyEdit_ = false;
+    bool dirtyTracks_ = false;
+    bool dirtyRouting_ = false;
+    bool dirtyMidi_ = false;
+    te::MidiClip* lastDirtyMidiClip_ = nullptr;
+
+    void emitEditChanged();
+    void emitTracksChanged();
+    void emitRoutingChanged();
+    void emitMidiClipModified(te::MidiClip* clip);
 };
 
 } // namespace OpenDaw
