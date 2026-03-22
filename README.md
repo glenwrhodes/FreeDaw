@@ -14,7 +14,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 Built with **Qt 6** for the UI and **Tracktion Engine** (JUCE) for the audio backend.
-Audio and MIDI tracks, a built-in piano roll, VST3 instrument support, bus routing, 8 built-in effects, an **AI assistant powered by Claude** — all free and open source.
+Audio and MIDI tracks, a built-in piano roll, sheet music notation, a destructive audio clip editor, VST3 instrument support, bus routing, 8 built-in effects, an **AI assistant powered by Claude** — all free and open source.
 
 <br>
 
@@ -76,6 +76,59 @@ Grab the latest release from the **[Releases page](https://github.com/glenwrhode
   - Snap modes: Off, 1/4 Beat, 1/2 Beat, Beat, Bar
   - Zoom in / out
   - Right-click context menu: Select All, Delete Selected, Quantize, Add Note Here
+
+<div align="center">
+<img src="resources/piano-roll.png" alt="OpenDaw piano roll editor showing MIDI notes, velocity lane, and channel selector" width="800">
+<br>
+<em>Piano Roll — edit MIDI notes, velocity, and timing with snap-to-grid precision</em>
+</div>
+
+### Sheet Music View
+
+- Renders MIDI clips as standard music notation in a dedicated **Sheet Music** tab (alongside the Mixer, Piano Roll, and other bottom panels)
+- Grand staff display with treble and bass clefs, proper beam grouping, and ledger lines
+- Automatic note spelling with key signature support — choose from all 15 major/minor key signatures via a toolbar dropdown
+- Correctly quantizes MIDI note durations to whole, half, quarter, eighth, and sixteenth notes (with dotted variants)
+- Rests are automatically inserted to fill gaps in each measure
+- Measure numbers and bar lines for easy orientation
+- Zoom slider to adjust the horizontal scale
+- Scrollable score area with click-and-drag panning for navigating longer pieces
+- Opens automatically when you double-click a MIDI clip (alongside the Piano Roll)
+
+<div align="center">
+<img src="resources/sheet-music-view.png" alt="OpenDaw sheet music view showing standard notation with treble and bass clefs, key signature, and measure numbers" width="800">
+<br>
+<em>Sheet Music View — see your MIDI clips rendered as standard notation with key signatures and proper engraving</em>
+</div>
+
+### Audio Clip Editor
+
+- Dedicated waveform editor for audio clips — double-click any audio clip to open the **Audio Clip** tab at the bottom
+- **Destructive editing** with full undo/redo — edits modify the source audio file directly, with a warning banner and confirmation prompt
+- Waveform display with time-based selection (click and drag to select regions)
+- Snap modes: Off, Beat, Bar
+- Mini transport controls: play from start, play/pause, stop, with real-time position display
+- Non-destructive gain slider with normalize and bake-gain buttons
+- Loop toggle, reverse toggle, and auto-tempo detection
+- Selection-based editing operations:
+  - Cut, Copy, Paste, Delete selection
+  - Silence selection
+  - Fade in / Fade out
+  - Normalize selection
+  - Reverse selection
+  - Adjust volume
+  - Insert silence
+  - DC offset removal
+  - Swap channels / Mix to mono
+  - Crossfade
+- Bake clip fades into the audio file
+- Info bar showing BPM, beat count, duration, format (sample rate / bit depth), and file path
+
+<div align="center">
+<img src="resources/audio-clip-editor.png" alt="OpenDaw audio clip editor showing waveform display, editing toolbar, and file browser" width="800">
+<br>
+<em>Audio Clip Editor — destructive waveform editing with cut, fade, normalize, reverse, and more</em>
+</div>
 
 ### VST3 Instrument Support
 
@@ -160,6 +213,12 @@ Add any of these to a track with one click from the Effects panel or mixer FX sl
 OpenDaw ships with a built-in **AI assistant powered by Anthropic's Claude** that can control the entire DAW through natural language. This isn't a chatbot that tells you what buttons to click — it actually **executes operations directly** on your project, calling up to 30 different tools in an autonomous loop until your request is fulfilled.
 
 Press **Ctrl+Shift+Space** from anywhere to open the quick prompt overlay, type what you need, and watch it happen.
+
+<div align="center">
+<img src="resources/ai-assistant.png" alt="OpenDaw AI assistant panel showing a conversation where the AI composed jazz MIDI tracks with walking bass and drum patterns" width="400">
+<br>
+<em>AI Assistant — describe what you want in plain English and watch it build tracks, compose MIDI, set up routing, and more</em>
+</div>
 
 #### Why it matters
 
@@ -305,7 +364,7 @@ The assistant uses **agentic tool use**: when you send a message, it decides whi
 - File > Open Project -- load a `.tracktionedit` file
 - File > Save / Save As -- save your arrangement
 - Edit > Add Audio Track / Add MIDI Track / Remove Selected Track
-- View > Toggle Mixer, Toggle Routing, Toggle Browser, Toggle Effects, Toggle AI Assistant
+- View > Toggle Mixer, Toggle Routing, Toggle Browser, Toggle Effects, Toggle AI Assistant, Toggle Sheet Music
 
 ---
 
@@ -463,7 +522,7 @@ Each track has controls in two places:
 
 ### Routing
 
-1. Switch to the **Routing** tab (tabbed alongside the Mixer and Piano Roll at the bottom).
+1. Switch to the **Routing** tab (tabbed alongside the Mixer, Piano Roll, Audio Clip, and Sheet Music at the bottom).
 2. The view shows your signal chain as draggable nodes: input channels on the left, tracks in the middle, buses and master on the right, and output channels on the far right.
 3. **Create a bus** by clicking the "+ Add Bus" button in the toolbar, or right-click empty space and select "Add Bus".
 4. **Connect tracks to a bus** by dragging a cable from a track's OUT jack to a bus's IN jack, or use the output selector dropdown on the track header.
@@ -479,6 +538,16 @@ Each track has controls in two places:
 4. **Add notes** with Ctrl+click or double-click on the grid. **Drag** notes to move them, **drag edges** to resize.
 5. **Edit velocity** in the velocity lane at the bottom of the Piano Roll -- drag the bars up/down.
 6. **Quantize** notes from the right-click context menu or the Piano Roll toolbar.
+7. **View as sheet music** — switch to the **Sheet Music** tab at the bottom to see your MIDI clip rendered as standard notation. Use the key signature dropdown to change enharmonic spelling.
+
+### Editing audio clips
+
+1. **Double-click an audio clip** in the timeline to open the **Audio Clip** tab at the bottom.
+2. The waveform editor shows the full audio file. **Click and drag** to select a region.
+3. Use the toolbar buttons for **Cut, Copy, Paste, Silence, Fade In/Out, Normalize, Reverse**, and more.
+4. Edits are **destructive** (they modify the source file) but fully undoable — the editor maintains its own undo/redo stack.
+5. Adjust the non-destructive **Gain** slider, or click **Norm** to normalize, then **Bake** to write the gain into the file.
+6. The info bar at the bottom shows BPM, duration, sample rate, bit depth, and the source file path.
 
 ### Using VST3 instruments
 
@@ -567,6 +636,10 @@ AudioMixer/
   resources/
     splash.png                            Splash screen artwork
     routing-view.png                      Routing view screenshot
+    piano-roll.png                        Piano roll screenshot
+    sheet-music-view.png                  Sheet music view screenshot
+    audio-clip-editor.png                 Audio clip editor screenshot
+    ai-assistant.png                      AI assistant panel screenshot
   libs/
     JUCE/                                 JUCE framework (git submodule)
     tracktion_engine/                     Tracktion Engine (git submodule)
@@ -595,6 +668,15 @@ AudioMixer/
         NoteItem.h/cpp                    Individual MIDI note graphics item
         VelocityLane.h/cpp                Per-note velocity editor
         PianoKeyboard.h/cpp               Piano keyboard sidebar
+      sheetmusic/
+        SheetMusicView.h/cpp              Sheet music tab container with toolbar
+        NotationModel.h/cpp               MIDI-to-notation model (measures, beams, rests)
+        ScoreScene.h/cpp                  QGraphicsScene renderer for engraved notation
+      audioclip/
+        AudioClipEditor.h/cpp             Audio clip editor tab with destructive editing
+        AudioWaveformView.h/cpp           Zoomable waveform display with selection
+        AudioFileOperations.h/cpp         Cut, fade, normalize, reverse, etc.
+        AudioFileUndoManager.h/cpp        Undo/redo stack for destructive file edits
       mixer/
         MixerView.h/cpp                   Horizontal mixer panel
         ChannelStrip.h/cpp                Per-track mixer strip with instrument selector
