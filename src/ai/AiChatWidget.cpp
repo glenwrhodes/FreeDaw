@@ -779,7 +779,7 @@ void AiChatWidget::showSettingsDialog()
 
     auto* modelEdit = new QLineEdit(aiService_->model(), dialog);
     modelEdit->setAccessibleName("Model Name");
-    modelEdit->setPlaceholderText("claude-sonnet-4-20250514");
+    modelEdit->setPlaceholderText("claude-opus-4-6");
     layout->addRow("Model:", modelEdit);
 
     auto* confirmCheck = new QCheckBox("Confirm destructive actions", dialog);

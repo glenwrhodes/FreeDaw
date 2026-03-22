@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "app/OpenDawApplication.h"
 #include "ui/timeline/TimelineView.h"
@@ -23,6 +23,7 @@ namespace OpenDaw {
 
 class PianoRollEditor;
 class AudioClipEditor;
+class SheetMusicView;
 
 class ShortcutFilter : public QObject {
     Q_OBJECT
@@ -80,6 +81,7 @@ private:
     PianoRollEditor*   pianoRoll_     = nullptr;
     AudioClipEditor*   audioClipEditor_ = nullptr;
     RoutingView*       routingView_   = nullptr;
+    SheetMusicView*    sheetMusicView_ = nullptr;
     AiChatWidget*      aiChatWidget_  = nullptr;
     AiQuickPrompt*     aiQuickPrompt_ = nullptr;
 
@@ -89,6 +91,7 @@ private:
     QDockWidget* pianoRollDock_       = nullptr;
     QDockWidget* audioClipDock_      = nullptr;
     QDockWidget* routingDock_         = nullptr;
+    QDockWidget* sheetMusicDock_     = nullptr;
     QDockWidget* aiDock_              = nullptr;
 
     QToolBar* transportToolBar_       = nullptr;

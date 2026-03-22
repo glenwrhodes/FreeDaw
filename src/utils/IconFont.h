@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <QChar>
 #include <QFont>
@@ -20,6 +20,8 @@ inline bool registerFonts()
         ok = false;
     if (QFontDatabase::addApplicationFont(":/MaterialSymbolsOutlined.ttf") < 0)
         ok = false;
+    if (QFontDatabase::addApplicationFont(":/Bravura.otf") < 0)
+        ok = false;
     return ok;
 }
 
@@ -35,6 +37,13 @@ inline QFont fontAudio(int pixelSize)
 inline QFont materialIcons(int pixelSize)
 {
     QFont f("Material Icons Outlined");
+    f.setPixelSize(pixelSize);
+    return f;
+}
+
+inline QFont bravuraMusic(int pixelSize)
+{
+    QFont f("Bravura");
     f.setPixelSize(pixelSize);
     return f;
 }

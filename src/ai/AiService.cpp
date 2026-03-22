@@ -7,7 +7,7 @@
 namespace OpenDaw {
 
 static const QString kApiUrl = "https://api.anthropic.com/v1/messages";
-static const QString kDefaultModel = "claude-sonnet-4-20250514";
+static const QString kDefaultModel = "claude-opus-4-6";
 static const int kMaxTokens = 8192;
 
 AiService::AiService(EditManager* editMgr, AudioEngine* audioEngine,

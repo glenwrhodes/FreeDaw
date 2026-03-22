@@ -3,6 +3,7 @@
 #include "ui/effects/PluginEditorWindow.h"
 #include "ui/pianoroll/PianoRollEditor.h"
 #include "ui/audioclip/AudioClipEditor.h"
+#include "ui/sheetmusic/SheetMusicView.h"
 #include "ui/dialogs/ExportDialog.h"
 #include "ui/dialogs/AudioSettingsDialog.h"
 #include "ui/SplashScreen.h"
@@ -383,6 +384,10 @@ void MainWindow::createMenus()
         routingDock_->setVisible(!routingDock_->isVisible());
         if (routingDock_->isVisible()) routingDock_->raise();
     });
+    viewMenu->addAction("Toggle &Sheet Music", this, [this]() {
+        sheetMusicDock_->setVisible(!sheetMusicDock_->isVisible());
+        if (sheetMusicDock_->isVisible()) sheetMusicDock_->raise();
+    });
     viewMenu->addAction("Toggle &AI Assistant", this, [this]() {
         aiDock_->setVisible(!aiDock_->isVisible());
         if (aiDock_->isVisible()) {
@@ -591,6 +596,12 @@ void MainWindow::createToolBar()
         routingToggle->setToolTip("Toggle Routing");
         mainToolBar_->addAction(routingToggle);
     }
+    if (sheetMusicDock_) {
+        auto* sheetMusicToggle = sheetMusicDock_->toggleViewAction();
+        sheetMusicToggle->setIcon(miIcon(icons::mi::LibraryMusic));
+        sheetMusicToggle->setToolTip("Toggle Sheet Music");
+        mainToolBar_->addAction(sheetMusicToggle);
+    }
     if (aiDock_) {
         auto* aiToggle = aiDock_->toggleViewAction();
         aiToggle->setIcon(miIcon(icons::mi::Chat));
@@ -739,9 +750,43 @@ void MainWindow::createDocks()
                     mixerView_->setMasterSelected();
             });
 
+    // Sheet Music dock (bottom, tabbed after routing)
+    sheetMusicDock_ = new QDockWidget("Sheet Music", this);
+    sheetMusicDock_->setAccessibleName("Sheet Music Dock");
+    sheetMusicView_ = new SheetMusicView(sheetMusicDock_);
+    sheetMusicDock_->setWidget(sheetMusicView_);
+    addDockWidget(Qt::BottomDockWidgetArea, sheetMusicDock_);
+
+    connect(&editMgr_, &EditManager::aboutToChangeEdit, this, [this]() {
+        if (sheetMusicView_)
+            sheetMusicView_->setClip(nullptr, nullptr);
+    });
+
+    connect(&editMgr_, &EditManager::editChanged, this, [this]() {
+        if (sheetMusicView_ && sheetMusicView_->clip()) {
+            if (editMgr_.isClipValid(sheetMusicView_->clip()))
+                sheetMusicView_->refresh();
+            else
+                sheetMusicView_->setClip(nullptr, nullptr);
+        }
+    });
+
+    connect(&editMgr_, &EditManager::midiClipModified,
+            this, [this](te::MidiClip* clip) {
+                if (sheetMusicView_ && sheetMusicView_->clip() == clip)
+                    sheetMusicView_->refresh();
+            });
+
+    connect(&editMgr_, &EditManager::midiClipSelected,
+            this, [this](te::MidiClip* clip) {
+                if (sheetMusicView_ && clip)
+                    sheetMusicView_->setClip(clip, &editMgr_);
+            });
+
     tabifyDockWidget(mixerDock_, pianoRollDock_);
     tabifyDockWidget(pianoRollDock_, audioClipDock_);
     tabifyDockWidget(audioClipDock_, routingDock_);
+    tabifyDockWidget(routingDock_, sheetMusicDock_);
     mixerDock_->raise();
 
     connect(&editMgr_, &EditManager::midiClipDoubleClicked,

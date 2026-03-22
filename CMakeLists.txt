@@ -103,6 +103,9 @@ set(OpenDaw_SOURCES
     src/ui/routing/RoutingView.h          src/ui/routing/RoutingView.cpp
     src/ui/routing/RoutingNode.h          src/ui/routing/RoutingNode.cpp
     src/ui/routing/CableItem.h            src/ui/routing/CableItem.cpp
+    src/ui/sheetmusic/SheetMusicView.h    src/ui/sheetmusic/SheetMusicView.cpp
+    src/ui/sheetmusic/NotationModel.h     src/ui/sheetmusic/NotationModel.cpp
+    src/ui/sheetmusic/ScoreScene.h        src/ui/sheetmusic/ScoreScene.cpp
     src/ui/browser/FileBrowserPanel.h    src/ui/browser/FileBrowserPanel.cpp
     src/ui/SplashScreen.h           src/ui/SplashScreen.cpp
     src/utils/WaveformCache.h       src/utils/WaveformCache.cpp
@@ -147,7 +150,8 @@ qt_add_resources(OpenDaw "OpenDaw_resources" PREFIX "/" BASE resources FILES
     resources/icon.png
     resources/fontaudio.ttf
     resources/MaterialSymbolsOutlined.ttf
-    resources/mixerStripBG.png)
+    resources/mixerStripBG.png
+    resources/Bravura.otf)
 target_include_directories(OpenDaw PRIVATE src)
 
 target_compile_definitions(OpenDaw PRIVATE
