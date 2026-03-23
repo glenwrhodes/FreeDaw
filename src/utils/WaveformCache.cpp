@@ -1,4 +1,4 @@
-﻿#include "WaveformCache.h"
+#include "WaveformCache.h"
 #include <algorithm>
 
 namespace OpenDaw {
@@ -52,7 +52,7 @@ WaveformData WaveformCache::getWaveform(const juce::File& file, int numPoints)
     for (int i = 0; i < numPoints; ++i) {
         int64_t start = i * samplesPerPoint;
         int64_t count = std::min(samplesPerPoint,
-                                  reader->lengthInSamples - start);
+                                  int64_t(reader->lengthInSamples - start));
         if (count <= 0) break;
 
         reader->read(&buffer, 0, int(count), start, true, true);

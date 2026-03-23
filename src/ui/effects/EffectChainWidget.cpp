@@ -1,4 +1,4 @@
-﻿#include "EffectChainWidget.h"
+#include "EffectChainWidget.h"
 #include "DelayEffectWidget.h"
 #include "EffectSelectorDialog.h"
 #include "PluginEditorWindow.h"
@@ -157,7 +157,7 @@ void EffectSlotWidget::buildControls()
 
     paramKnobs_.clear();
     const int cols = 4;
-    int maxKnobs = std::min(8, params.size());
+    int maxKnobs = std::min(8, static_cast<int>(params.size()));
     for (int i = 0; i < maxKnobs; ++i) {
         auto* param = params[i];
         auto* knob = new RotaryKnob(this);
