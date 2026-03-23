@@ -218,7 +218,7 @@ jobs:
           Comment=Free, open-source Digital Audio Workstation
           EOF
 
-          cp resources/icon.png OpenDaw.png
+          convert resources/icon.png -resize 256x256 OpenDaw.png
 
           export QMAKE="${{ env.QT_ROOT_DIR }}/bin/qmake"
           export APPIMAGE_EXTRACT_AND_RUN=1
