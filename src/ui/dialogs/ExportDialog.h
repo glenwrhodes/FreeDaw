@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "engine/EditManager.h"
 #include <QDialog>
@@ -24,11 +24,17 @@ public:
 
 private:
     void onBrowse();
+    void onFormatChanged(int index);
+    void updatePathExtension();
 
+    QComboBox* formatCombo_ = nullptr;
     QLineEdit* pathEdit_ = nullptr;
     QPushButton* browseBtn_ = nullptr;
     QComboBox* sampleRateCombo_ = nullptr;
     QComboBox* bitDepthCombo_ = nullptr;
+    QLabel* bitDepthLabel_ = nullptr;
+    QComboBox* oggQualityCombo_ = nullptr;
+    QLabel* oggQualityLabel_ = nullptr;
     QCheckBox* normalizeCheck_ = nullptr;
     QPushButton* exportBtn_ = nullptr;
     QPushButton* cancelBtn_ = nullptr;

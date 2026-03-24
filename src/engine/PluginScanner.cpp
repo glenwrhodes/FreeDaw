@@ -1,4 +1,4 @@
-﻿#include "PluginScanner.h"
+#include "PluginScanner.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <QDebug>
 
@@ -11,19 +11,43 @@ PluginScanWorker::PluginScanWorker(te::Engine& engine)
 
 void PluginScanWorker::doScan()
 {
+    struct FormatInfo {
+        juce::AudioPluginFormat* format;
+        const char*              label;
+    };
+
     juce::VST3PluginFormat vst3;
+#if JUCE_PLUGINHOST_VST
+    juce::VSTPluginFormat  vst2;
+#endif
 
-    auto defaultPaths = vst3.getDefaultLocationsToSearch();
-    auto filesToScan = vst3.searchPathsForPlugins(defaultPaths, true, true);
+    FormatInfo formats[] = {
+        { &vst3, "VST3" },
+#if JUCE_PLUGINHOST_VST
+        { &vst2, "VST2" },
+#endif
+    };
 
-    int total = filesToScan.size();
+    juce::StringArray allFiles;
+    juce::Array<juce::AudioPluginFormat*> fileFormats;
+
+    for (auto& fmt : formats) {
+        auto paths = fmt.format->getDefaultLocationsToSearch();
+        auto files = fmt.format->searchPathsForPlugins(paths, true, true);
+        for (auto& f : files) {
+            allFiles.add(f);
+            fileFormats.add(fmt.format);
+        }
+    }
+
+    int total = allFiles.size();
     for (int i = 0; i < total; ++i) {
         juce::OwnedArray<juce::PluginDescription> descriptions;
         try {
-            vst3.findAllTypesForFile(descriptions, filesToScan[i]);
+            fileFormats[i]->findAllTypesForFile(descriptions, allFiles[i]);
         } catch (...) {
             qWarning() << "[PluginScanner] plugin crashed during scan:"
-                        << filesToScan[i].toRawUTF8();
+                        << allFiles[i].toRawUTF8();
             continue;
         }
 

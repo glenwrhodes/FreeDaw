@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <QGraphicsRectItem>
 #include <QGraphicsScene>
@@ -53,11 +53,19 @@ protected:
     void mouseMoveEvent(QGraphicsSceneMouseEvent* event) override;
     void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
     void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
+    void hoverMoveEvent(QGraphicsSceneHoverEvent* event) override;
+    void hoverLeaveEvent(QGraphicsSceneHoverEvent* event) override;
 
 private:
     bool isNearRightEdge(const QPointF& localPos) const;
     double computeSnappedEndBeatFromSceneX(double sceneX) const;
     void paintMidiNotes(QPainter* painter, const QRectF& r);
+
+    double fadeInWidthPx() const;
+    double fadeOutWidthPx() const;
+    bool isNearFadeInHandle(const QPointF& localPos) const;
+    bool isNearFadeOutHandle(const QPointF& localPos) const;
+    void paintFadeOverlays(QPainter* painter, const QRectF& r);
 
     te::Clip* clip_ = nullptr;
     int trackIndex_ = 0;
@@ -70,6 +78,9 @@ private:
     std::vector<MidiNotePreview> midiNotes_;
     int midiLowestNote_ = 127;
     int midiHighestNote_ = 0;
+
+    enum class FadeDragMode { None, FadeIn, FadeOut };
+    FadeDragMode fadeDragMode_ = FadeDragMode::None;
 
     bool dragging_ = false;
     bool resizingRight_ = false;

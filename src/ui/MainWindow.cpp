@@ -26,6 +26,7 @@
 #include <QShortcutEvent>
 #include <QTimer>
 #include <QtConcurrent/QtConcurrent>
+#include <QDebug>
 
 namespace OpenDaw {
 
@@ -64,6 +65,7 @@ MainWindow::MainWindow(OpenDawApplication& app, QWidget* parent)
     setMinimumSize(900, 600);
 
     applyGlobalStyle();
+    qDebug() << "[MainWindow] style applied";
 
     // Transport bar at the top
     transportBar_ = new TransportBar(&editMgr_, this);
@@ -71,7 +73,9 @@ MainWindow::MainWindow(OpenDawApplication& app, QWidget* parent)
 
     // Timeline as central widget
     timelineView_ = new TimelineView(&editMgr_, this);
+    qDebug() << "[MainWindow] TimelineView created";
     setCentralWidget(timelineView_);
+    qDebug() << "[MainWindow] central widget set";
 
     // Connect snap mode from transport to timeline
     connect(transportBar_, &TransportBar::snapModeRequested,
@@ -105,9 +109,15 @@ MainWindow::MainWindow(OpenDawApplication& app, QWidget* parent)
     setCorner(Qt::TopRightCorner, Qt::RightDockWidgetArea);
     setCorner(Qt::BottomRightCorner, Qt::RightDockWidgetArea);
 
+    qDebug() << "[MainWindow] creating docks";
     createDocks();
+    qDebug() << "[MainWindow] docks done";
+    qDebug() << "[MainWindow] creating menus";
     createMenus();
+    qDebug() << "[MainWindow] menus done";
+    qDebug() << "[MainWindow] creating toolbar";
     createToolBar();
+    qDebug() << "[MainWindow] toolbar done";
     createStatusBar();
 
     resizeDocks({mixerDock_}, {350}, Qt::Vertical);
@@ -331,6 +341,17 @@ void MainWindow::createMenus()
         &MainWindow::onRemoveTrack);
 
     editMenu->addSeparator();
+    editMenu->addAction("&Copy Clips", QKeySequence::Copy, this, [this]() {
+        if (timelineView_) timelineView_->copySelectedClips();
+    });
+    editMenu->addAction("Cu&t Clips", QKeySequence::Cut, this, [this]() {
+        if (timelineView_) timelineView_->cutSelectedClips();
+    });
+    editMenu->addAction("&Paste Clips", QKeySequence::Paste, this, [this]() {
+        if (timelineView_) timelineView_->pasteClips();
+    });
+
+    editMenu->addSeparator();
     editMenu->addAction("AI &Preferences...", this, [this]() {
         if (aiChatWidget_)
             aiChatWidget_->openSettings();
@@ -387,6 +408,9 @@ void MainWindow::createMenus()
     viewMenu->addAction("Toggle &Sheet Music", this, [this]() {
         sheetMusicDock_->setVisible(!sheetMusicDock_->isVisible());
         if (sheetMusicDock_->isVisible()) sheetMusicDock_->raise();
+    });
+    viewMenu->addAction("Toggle Marker/&Tempo Lane", this, [this]() {
+        if (timelineView_) timelineView_->toggleMarkerTempoLane();
     });
     viewMenu->addAction("Toggle &AI Assistant", this, [this]() {
         aiDock_->setVisible(!aiDock_->isVisible());
@@ -612,6 +636,7 @@ void MainWindow::createToolBar()
 
 void MainWindow::createDocks()
 {
+    qDebug() << "[MainWindow] creating mixer dock";
     // Mixer dock (bottom)
     mixerDock_ = new QDockWidget("Mixer", this);
     mixerDock_->setAccessibleName("Mixer Dock");
@@ -643,7 +668,9 @@ void MainWindow::createDocks()
                     effectsDock_->raise();
                 }
             });
+    qDebug() << "[MainWindow] mixer dock done";
 
+    qDebug() << "[MainWindow] creating piano roll dock";
     // Piano Roll dock (bottom, tabbed with mixer)
     pianoRollDock_ = new QDockWidget("Piano Roll", this);
     pianoRollDock_->setAccessibleName("Piano Roll Dock");
@@ -685,7 +712,9 @@ void MainWindow::createDocks()
                 if (pianoRollDock_ && pianoRollDock_->isVisible() && pianoRoll_ && clip)
                     pianoRoll_->setClip(clip, &editMgr_);
             });
+    qDebug() << "[MainWindow] piano roll dock done";
 
+    qDebug() << "[MainWindow] creating audio clip dock";
     // Audio Clip Editor dock (bottom, tabbed with mixer and piano roll)
     audioClipDock_ = new QDockWidget("Audio Clip", this);
     audioClipDock_->setAccessibleName("Audio Clip Editor Dock");
@@ -721,7 +750,9 @@ void MainWindow::createDocks()
                 if (audioClipDock_ && audioClipDock_->isVisible() && audioClipEditor_ && clip)
                     audioClipEditor_->setClip(clip, &editMgr_);
             });
+    qDebug() << "[MainWindow] audio clip dock done";
 
+    qDebug() << "[MainWindow] creating routing dock";
     // Routing view dock (bottom, tabbed with mixer and piano roll)
     routingDock_ = new QDockWidget("Routing", this);
     routingDock_->setAccessibleName("Routing Dock");
@@ -755,7 +786,9 @@ void MainWindow::createDocks()
                 if (mixerView_)
                     mixerView_->setMasterSelected();
             });
+    qDebug() << "[MainWindow] routing dock done";
 
+    qDebug() << "[MainWindow] creating sheet music dock";
     // Sheet Music dock (bottom, tabbed after routing)
     sheetMusicDock_ = new QDockWidget("Sheet Music", this);
     sheetMusicDock_->setAccessibleName("Sheet Music Dock");
@@ -788,6 +821,7 @@ void MainWindow::createDocks()
                 if (sheetMusicView_ && clip)
                     sheetMusicView_->setClip(clip, &editMgr_);
             });
+    qDebug() << "[MainWindow] sheet music dock done";
 
     tabifyDockWidget(mixerDock_, pianoRollDock_);
     tabifyDockWidget(pianoRollDock_, audioClipDock_);
@@ -801,13 +835,16 @@ void MainWindow::createDocks()
     connect(&editMgr_, &EditManager::audioClipDoubleClicked,
             this, &MainWindow::onAudioClipDoubleClicked);
 
+    qDebug() << "[MainWindow] creating browser dock";
     // File browser dock (right, collapsible)
     browserDock_ = new QDockWidget("Browser", this);
     browserDock_->setAccessibleName("File Browser Dock");
     fileBrowser_ = new FileBrowserPanel(browserDock_);
     browserDock_->setWidget(fileBrowser_);
     addDockWidget(Qt::RightDockWidgetArea, browserDock_);
+    qDebug() << "[MainWindow] browser dock done";
 
+    qDebug() << "[MainWindow] creating effects dock";
     // Effects dock (right, tabbed with browser)
     effectsDock_ = new QDockWidget("Effects", this);
     effectsDock_->setAccessibleName("Effects Dock");
@@ -815,7 +852,9 @@ void MainWindow::createDocks()
     effectChain_->setPluginList(&app_.pluginScanner().getPluginList());
     effectsDock_->setWidget(effectChain_);
     addDockWidget(Qt::RightDockWidgetArea, effectsDock_);
+    qDebug() << "[MainWindow] effects dock done";
 
+    qDebug() << "[MainWindow] creating AI dock";
     // AI assistant dock (right, tabbed with browser and effects)
     aiDock_ = new QDockWidget("AI", this);
     aiDock_->setAccessibleName("AI Assistant Dock");
@@ -823,6 +862,7 @@ void MainWindow::createDocks()
                                      &app_.pluginScanner(), aiDock_);
     aiDock_->setWidget(aiChatWidget_);
     addDockWidget(Qt::RightDockWidgetArea, aiDock_);
+    qDebug() << "[MainWindow] AI dock done";
 
     tabifyDockWidget(browserDock_, effectsDock_);
     tabifyDockWidget(effectsDock_, aiDock_);

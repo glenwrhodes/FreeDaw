@@ -1,4 +1,4 @@
-﻿# CLAUDE.md
+# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -60,10 +60,11 @@ main.cpp
 ### UI Layout
 
 `MainWindow` uses Qt dock widgets:
-- **Central widget**: `TimelineView` (arrangement)
-- **Bottom dock**: `MixerView` (channel strips)
-- **Right dock** (tabbed): `EffectChainWidget` + `FileBrowserPanel`
+- **Central widget**: `TimelineView` (arrangement with automation lanes)
+- **Bottom dock** (tabbed): `MixerView`, `PianoRollEditor`, `AudioClipEditor`, `RoutingView`, `SheetMusicView`
+- **Right dock** (tabbed): `EffectChainWidget` + `FileBrowserPanel` + `AiChatWidget`
 - **Top toolbar**: `TransportBar`
+- **Dialogs**: `ExportDialog`, `RecoveryDialog`, `AudioSettingsDialog`
 
 ### Timeline Coordinates
 

@@ -1,4 +1,4 @@
-﻿#include "ThemeManager.h"
+#include "ThemeManager.h"
 
 namespace OpenDaw {
 

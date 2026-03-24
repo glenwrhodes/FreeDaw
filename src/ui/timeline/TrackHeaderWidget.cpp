@@ -9,6 +9,7 @@
 #include <QSignalBlocker>
 #include <QApplication>
 #include <QToolTip>
+#include <QPainter>
 #include <cmath>
 
 namespace {
@@ -42,10 +43,34 @@ TrackHeaderWidget::TrackHeaderWidget(te::AudioTrack* track, EditManager* editMgr
     mainLayout->setContentsMargins(5, 4, 5, 4);
     mainLayout->setSpacing(3);
 
+    collapseBtn_ = new QPushButton(this);
+    collapseBtn_->setAccessibleName("Collapse Track");
+    collapseBtn_->setToolTip("Collapse track");
+    collapseBtn_->setFixedSize(14, 20);
+    collapseBtn_->setText(QString::fromUtf8("\xe2\x96\xbe"));
+    collapseBtn_->setStyleSheet(
+        QString("QPushButton { background: transparent; color: %1; border: none; "
+                "font-size: 10px; padding: 0; }"
+                "QPushButton:hover { color: %2; }")
+            .arg(theme.textDim.name(), theme.text.name()));
+    connect(collapseBtn_, &QPushButton::clicked, this, [this]() {
+        setCollapsed(!collapsed_);
+        emit collapseToggled(track_, collapsed_);
+    });
+
+    gripHandle_ = new QWidget(this);
+    gripHandle_->setFixedSize(12, 20);
+    gripHandle_->setCursor(Qt::OpenHandCursor);
+    gripHandle_->setToolTip("Drag to reorder track");
+    gripHandle_->setAccessibleName("Track Reorder Grip");
+    gripHandle_->installEventFilter(this);
+
     bool isMidi = editMgr_->isMidiTrack(track_);
 
     auto* topRow = new QHBoxLayout();
     topRow->setSpacing(3);
+    topRow->addWidget(collapseBtn_);
+    topRow->addWidget(gripHandle_);
 
     nameLabel_ = new QLabel(
         QString::fromStdString(track_->getName().toStdString()), this);
@@ -428,6 +453,25 @@ void TrackHeaderWidget::setAutomationVisible(bool visible)
         : (QString::fromUtf8("\xe2\x96\xb6") + " Auto"));
 }
 
+void TrackHeaderWidget::setCollapsed(bool collapsed)
+{
+    if (collapsed_ == collapsed) return;
+    collapsed_ = collapsed;
+
+    if (collapseBtn_) {
+        collapseBtn_->setText(collapsed
+            ? QString::fromUtf8("\xe2\x96\xb8")
+            : QString::fromUtf8("\xe2\x96\xbe"));
+        collapseBtn_->setToolTip(collapsed ? "Expand track" : "Collapse track");
+    }
+
+    if (inputCombo_) inputCombo_->setVisible(!collapsed);
+    if (outputCombo_) outputCombo_->setVisible(!collapsed);
+    if (automationBtn_) automationBtn_->setVisible(!collapsed);
+    if (instrumentBtn_) instrumentBtn_->setVisible(!collapsed);
+    if (freezeBtn_) freezeBtn_->setVisible(!collapsed);
+}
+
 void TrackHeaderWidget::setTrackHeight(int h)
 {
     int minH = minimumSizeHint().height();
@@ -482,12 +526,77 @@ void TrackHeaderWidget::mousePressEvent(QMouseEvent* event)
     QWidget::mousePressEvent(event);
 }
 
+void TrackHeaderWidget::mouseMoveEvent(QMouseEvent* event)
+{
+    QWidget::mouseMoveEvent(event);
+}
+
+void TrackHeaderWidget::mouseReleaseEvent(QMouseEvent* event)
+{
+    QWidget::mouseReleaseEvent(event);
+}
+
 bool TrackHeaderWidget::eventFilter(QObject* obj, QEvent* event)
 {
     if (obj == nameLabel_ && event->type() == QEvent::MouseButtonDblClick && track_) {
         startRenameEdit();
         return true;
     }
+
+    if (obj == gripHandle_) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            auto* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::LeftButton) {
+                dragStartPos_ = me->globalPosition().toPoint();
+                draggingToReorder_ = false;
+                gripHandle_->setCursor(Qt::ClosedHandCursor);
+            }
+            return true;
+        }
+        if (event->type() == QEvent::MouseMove) {
+            auto* me = static_cast<QMouseEvent*>(event);
+            if (me->buttons() & Qt::LeftButton) {
+                if (!draggingToReorder_) {
+                    int dist = (me->globalPosition().toPoint() - dragStartPos_).manhattanLength();
+                    if (dist < 6) return true;
+                    draggingToReorder_ = true;
+                    emit dragStarted(this);
+                }
+                emit dragMoved(this, me->globalPosition().toPoint().y());
+            }
+            return true;
+        }
+        if (event->type() == QEvent::MouseButtonRelease) {
+            gripHandle_->setCursor(Qt::OpenHandCursor);
+            if (draggingToReorder_) {
+                draggingToReorder_ = false;
+                emit dragFinished(this);
+            }
+            return true;
+        }
+        if (event->type() == QEvent::Paint) {
+            QPainter p(gripHandle_);
+            p.setRenderHint(QPainter::Antialiasing);
+            QColor dotColor(160, 164, 170);
+            int dotR = 1;
+            int cols = 2, rows = 3;
+            int spacingX = 4, spacingY = 5;
+            int totalW = (cols - 1) * spacingX + dotR * 2;
+            int totalH = (rows - 1) * spacingY + dotR * 2;
+            int startX = (gripHandle_->width() - totalW) / 2;
+            int startY = (gripHandle_->height() - totalH) / 2;
+            for (int r = 0; r < rows; ++r) {
+                for (int c = 0; c < cols; ++c) {
+                    p.setPen(Qt::NoPen);
+                    p.setBrush(dotColor);
+                    p.drawEllipse(QPointF(startX + c * spacingX + dotR,
+                                          startY + r * spacingY + dotR), dotR, dotR);
+                }
+            }
+            return true;
+        }
+    }
+
     return QWidget::eventFilter(obj, event);
 }
 

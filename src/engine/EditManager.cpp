@@ -85,24 +85,35 @@ void EditManager::markDirtyAndNotify()
 
 void EditManager::createDefaultEdit()
 {
+    qDebug() << "[createDefaultEdit] starting";
     teardownCurrentEdit();
+    qDebug() << "[createDefaultEdit] teardown done";
     auto& eng = audioEngine_.engine();
     edit_ = te::createEmptyEdit(eng, juce::File());
+    qDebug() << "[createDefaultEdit] empty edit created";
     edit_->ensureNumberOfAudioTracks(4);
+    qDebug() << "[createDefaultEdit] 4 tracks ensured";
     ensureLevelMetersOnAllTracks();
+    qDebug() << "[createDefaultEdit] level meters done";
     enableAllWaveInputDevices();
+    qDebug() << "[createDefaultEdit] wave inputs enabled";
     edit_->getTransport().ensureContextAllocated();
+    qDebug() << "[createDefaultEdit] context allocated";
 
     auto& arm = edit_->getAutomationRecordManager();
     arm.setReadingAutomation(true);
     arm.setWritingAutomation(false);
+    qDebug() << "[createDefaultEdit] automation manager configured";
 
     currentFile_ = juce::File();
     edit_->getUndoManager().clearUndoHistory();
     hasUnsavedChanges_ = false;
+    qDebug() << "[createDefaultEdit] emitting signals";
     emit editChanged();
     emit tracksChanged();
+    qDebug() << "[createDefaultEdit] starting autosave";
     startAutosave();
+    qDebug() << "[createDefaultEdit] done";
 }
 
 void EditManager::newEdit()
@@ -1214,7 +1225,116 @@ QMap<QString, QPointF> EditManager::loadRoutingLayout() const
     return positions;
 }
 
+// ── Track display order ──────────────────────────────────────────────────────
+
+void EditManager::saveTrackDisplayOrder(const QVector<te::EditItemID>& order)
+{
+    if (!edit_) return;
+    static const juce::Identifier kOrderId("OpenDaw_TRACK_DISPLAY_ORDER");
+    static const juce::Identifier kIdsId("ids");
+
+    auto existing = edit_->state.getChildWithName(kOrderId);
+    if (existing.isValid())
+        edit_->state.removeChild(existing, nullptr);
+
+    juce::String idList;
+    for (int i = 0; i < order.size(); ++i) {
+        if (i > 0) idList += ",";
+        idList += juce::String(order[i].getRawID());
+    }
+
+    juce::ValueTree node(kOrderId);
+    node.setProperty(kIdsId, idList, nullptr);
+    edit_->state.appendChild(node, nullptr);
+}
+
+QVector<te::EditItemID> EditManager::loadTrackDisplayOrder() const
+{
+    QVector<te::EditItemID> order;
+    if (!edit_) return order;
+    static const juce::Identifier kOrderId("OpenDaw_TRACK_DISPLAY_ORDER");
+    static const juce::Identifier kIdsId("ids");
+
+    auto node = edit_->state.getChildWithName(kOrderId);
+    if (!node.isValid()) return order;
+
+    auto idList = node.getProperty(kIdsId).toString();
+    auto tokens = juce::StringArray::fromTokens(idList, ",", "");
+    for (auto& tok : tokens) {
+        int rawId = tok.getIntValue();
+        if (rawId > 0)
+            order.append(te::EditItemID::fromRawID(rawId));
+    }
+    return order;
+}
+
+juce::Array<te::AudioTrack*> EditManager::getAudioTracksInDisplayOrder()
+{
+    auto allTracks = getAudioTracks();
+    auto displayOrder = loadTrackDisplayOrder();
+
+    if (displayOrder.isEmpty())
+        return allTracks;
+
+    juce::Array<te::AudioTrack*> result;
+
+    for (auto& id : displayOrder) {
+        for (auto* track : allTracks) {
+            if (track->itemID == id) {
+                result.add(track);
+                break;
+            }
+        }
+    }
+
+    for (auto* track : allTracks) {
+        if (!result.contains(track))
+            result.add(track);
+    }
+
+    return result;
+}
+
 // ── Automation parameter access ───────────────────────────────────────────────
+
+void EditManager::ensureMarkerTrack()
+{
+    if (edit_)
+        edit_->ensureMarkerTrack();
+}
+
+te::MarkerClip* EditManager::addMarker(const QString& name, tracktion::TimePosition position)
+{
+    if (!edit_) return nullptr;
+    edit_->ensureMarkerTrack();
+    auto& mm = edit_->getMarkerManager();
+    auto dur = tracktion::TimeDuration::fromSeconds(1.0);
+    int id = mm.getNextUniqueID();
+    if (auto clip = mm.createMarker(id, position, dur, nullptr)) {
+        clip->setName(juce::String(name.toUtf8().constData()));
+        return dynamic_cast<te::MarkerClip*>(clip.get());
+    }
+    return nullptr;
+}
+
+void EditManager::removeMarker(te::MarkerClip* marker)
+{
+    if (marker)
+        marker->removeFromParent();
+}
+
+juce::Array<te::MarkerClip*> EditManager::getMarkers() const
+{
+    juce::Array<te::MarkerClip*> result;
+    if (!edit_) return result;
+    if (auto* mt = edit_->getMarkerTrack()) {
+        for (auto* clip : mt->getClips()) {
+            if (auto* mc = dynamic_cast<te::MarkerClip*>(clip))
+                result.add(mc);
+        }
+    }
+    return result;
+}
 
 QVector<te::AutomatableParameter*> EditManager::getAutomatableParamsForTrack(te::AudioTrack* track) const
 {
@@ -1335,8 +1455,15 @@ bool EditManager::exportMix(const ExportSettings& settings,
     params.useMasterPlugins = true;
     params.canRenderInMono = false;
 
-    juce::WavAudioFormat wavFormat;
-    params.audioFormat = &wavFormat;
+    std::unique_ptr<juce::AudioFormat> audioFormat;
+    switch (settings.format) {
+        case ExportFormat::FLAC: audioFormat = std::make_unique<juce::FlacAudioFormat>(); break;
+        case ExportFormat::OGG:  audioFormat = std::make_unique<juce::OggVorbisAudioFormat>(); break;
+        default:                 audioFormat = std::make_unique<juce::WavAudioFormat>(); break;
+    }
+    params.audioFormat = audioFormat.get();
+    if (settings.format == ExportFormat::OGG)
+        params.bitDepth = settings.oggQuality;
 
     std::atomic<float> progress{0.0f};
     auto task = std::make_unique<te::Renderer::RenderTask>(

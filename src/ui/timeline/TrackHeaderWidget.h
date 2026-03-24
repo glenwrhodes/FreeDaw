@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "engine/EditManager.h"
 #include "ui/controls/LevelMeter.h"
@@ -29,6 +29,8 @@ public:
     void setTrackHeight(int h);
     void setSelected(bool sel);
     void setAutomationVisible(bool visible);
+    void setCollapsed(bool collapsed);
+    bool isCollapsed() const { return collapsed_; }
     void refresh();
     bool isSelected() const { return selected_; }
     QSize minimumSizeHint() const override;
@@ -38,9 +40,15 @@ signals:
     void effectInsertRequested(te::AudioTrack* track);
     void instrumentSelectRequested(te::AudioTrack* track);
     void automationToggled(te::AudioTrack* track, bool visible);
+    void collapseToggled(te::AudioTrack* track, bool collapsed);
+    void dragStarted(TrackHeaderWidget* header);
+    void dragMoved(TrackHeaderWidget* header, int globalY);
+    void dragFinished(TrackHeaderWidget* header);
 
 protected:
     void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
     bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
@@ -59,6 +67,7 @@ private:
     te::AudioTrack* track_;
     EditManager* editMgr_;
     bool selected_ = false;
+    bool collapsed_ = false;
 
     QComboBox* inputCombo_ = nullptr;
     QComboBox* outputCombo_ = nullptr;
@@ -72,11 +81,14 @@ private:
     QSlider* volumeSlider_;
     RotaryKnob* panKnob_;
     LevelMeter* meter_;
+    QPushButton* collapseBtn_ = nullptr;
     QPushButton* automationBtn_ = nullptr;
     QFrame* rowSeparator_ = nullptr;
     QTimer meterTimer_;
     bool automationVisible_ = false;
-
+    QWidget* gripHandle_ = nullptr;
+    QPoint dragStartPos_;
+    bool draggingToReorder_ = false;
     te::LevelMeasurer::Client meterClient_;
     te::LevelMeterPlugin* levelMeterPlugin_ = nullptr;
     double lastTrackedPlayheadSecs_ = -1.0;

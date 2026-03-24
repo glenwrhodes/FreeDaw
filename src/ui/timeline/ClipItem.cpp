@@ -6,6 +6,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QGraphicsSceneMouseEvent>
+#include <QGraphicsSceneHoverEvent>
 #include <QCursor>
 #include <QTimer>
 #include <QMenu>
@@ -19,6 +20,7 @@ ClipItem::ClipItem(te::Clip* clip, int trackIndex, double pixelsPerBeat,
       isMidiClip_(dynamic_cast<te::MidiClip*>(clip) != nullptr)
 {
     setFlags(ItemIsSelectable | ItemSendsGeometryChanges);
+    setAcceptHoverEvents(true);
     setCursor(QCursor(Qt::OpenHandCursor));
     updateGeometry(pixelsPerBeat, trackHeight, 0);
     setAcceptedMouseButtons(Qt::LeftButton);
@@ -51,6 +53,94 @@ double ClipItem::computeSnappedEndBeatFromSceneX(double sceneX) const
     }
 
     return std::max(endBeat, startBeat + minLengthBeats);
+}
+
+double ClipItem::fadeInWidthPx() const
+{
+    if (isMidiClip_ || !clip_ || !pixelsPerBeatPtr_) return 0.0;
+    auto* audioClip = dynamic_cast<te::AudioClipBase*>(clip_);
+    if (!audioClip) return 0.0;
+    double fadeSec = audioClip->getFadeIn().inSeconds();
+    if (fadeSec <= 0.0) return 0.0;
+    auto& ts = clip_->edit.tempoSequence;
+    auto clipStart = clip_->getPosition().getStart();
+    auto fadeEnd = clipStart + tracktion::TimeDuration::fromSeconds(fadeSec);
+    double fadeBeats = (ts.toBeats(fadeEnd) - ts.toBeats(clipStart)).inBeats();
+    return std::max(0.0, fadeBeats * *pixelsPerBeatPtr_);
+}
+
+double ClipItem::fadeOutWidthPx() const
+{
+    if (isMidiClip_ || !clip_ || !pixelsPerBeatPtr_) return 0.0;
+    auto* audioClip = dynamic_cast<te::AudioClipBase*>(clip_);
+    if (!audioClip) return 0.0;
+    double fadeSec = audioClip->getFadeOut().inSeconds();
+    if (fadeSec <= 0.0) return 0.0;
+    auto& ts = clip_->edit.tempoSequence;
+    auto clipEnd = clip_->getPosition().getEnd();
+    auto fadeStart = clipEnd - tracktion::TimeDuration::fromSeconds(fadeSec);
+    double fadeBeats = (ts.toBeats(clipEnd) - ts.toBeats(fadeStart)).inBeats();
+    return std::max(0.0, fadeBeats * *pixelsPerBeatPtr_);
+}
+
+bool ClipItem::isNearFadeInHandle(const QPointF& localPos) const
+{
+    constexpr double tolerance = 8.0;
+    double fiw = fadeInWidthPx();
+    double handleX = fiw;
+    return !isMidiClip_ && localPos.x() >= (handleX - tolerance)
+           && localPos.x() <= (handleX + tolerance)
+           && localPos.y() <= rect().height() * 0.5;
+}
+
+bool ClipItem::isNearFadeOutHandle(const QPointF& localPos) const
+{
+    constexpr double tolerance = 8.0;
+    double fow = fadeOutWidthPx();
+    double handleX = rect().width() - fow;
+    return !isMidiClip_ && localPos.x() >= (handleX - tolerance)
+           && localPos.x() <= (handleX + tolerance)
+           && localPos.y() <= rect().height() * 0.5;
+}
+
+void ClipItem::paintFadeOverlays(QPainter* painter, const QRectF& r)
+{
+    if (isMidiClip_) return;
+
+    double fiw = fadeInWidthPx();
+    double fow = fadeOutWidthPx();
+
+    QColor overlay(0, 0, 0, 80);
+    constexpr double handleSize = 6.0;
+    QColor handleColor(255, 255, 255, 200);
+
+    if (fiw > 1.0) {
+        QPainterPath fadeInPath;
+        fadeInPath.moveTo(r.left(), r.top());
+        fadeInPath.lineTo(r.left() + fiw, r.top());
+        fadeInPath.lineTo(r.left(), r.bottom());
+        fadeInPath.closeSubpath();
+        painter->fillPath(fadeInPath, overlay);
+    }
+    // Fade-in handle (top edge at fade boundary)
+    {
+        double hx = r.left() + fiw - handleSize / 2.0;
+        painter->fillRect(QRectF(hx, r.top(), handleSize, handleSize), handleColor);
+    }
+
+    if (fow > 1.0) {
+        QPainterPath fadeOutPath;
+        fadeOutPath.moveTo(r.right(), r.top());
+        fadeOutPath.lineTo(r.right() - fow, r.top());
+        fadeOutPath.lineTo(r.right(), r.bottom());
+        fadeOutPath.closeSubpath();
+        painter->fillPath(fadeOutPath, overlay);
+    }
+    // Fade-out handle (top edge at fade boundary)
+    {
+        double hx = r.right() - fow - handleSize / 2.0;
+        painter->fillRect(QRectF(hx, r.top(), handleSize, handleSize), handleColor);
+    }
 }
 
 void ClipItem::setDragContext(GridSnapper* snapper, EditManager* editMgr,
@@ -263,6 +353,8 @@ void ClipItem::paint(QPainter* painter,
         paintMidiNotes(painter, r);
     }
 
+    paintFadeOverlays(painter, r);
+
     painter->setRenderHint(QPainter::Antialiasing, true);
     painter->setPen(QPen(QColor(theme.border.red(), theme.border.green(),
                                 theme.border.blue(), 140), 0.5));
@@ -401,6 +493,26 @@ void ClipItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
     }
 
     if (event->button() == Qt::LeftButton) {
+        if (isNearFadeInHandle(event->pos()) && pixelsPerBeatPtr_) {
+            fadeDragMode_ = FadeDragMode::FadeIn;
+            dragging_ = false;
+            resizingRight_ = false;
+            duplicateDragging_ = false;
+            setCursor(QCursor(Qt::SizeHorCursor));
+            setSelected(true);
+            event->accept();
+            return;
+        }
+        if (isNearFadeOutHandle(event->pos()) && pixelsPerBeatPtr_) {
+            fadeDragMode_ = FadeDragMode::FadeOut;
+            dragging_ = false;
+            resizingRight_ = false;
+            duplicateDragging_ = false;
+            setCursor(QCursor(Qt::SizeHorCursor));
+            setSelected(true);
+            event->accept();
+            return;
+        }
         if (isNearRightEdge(event->pos()) && pixelsPerBeatPtr_) {
             resizingRight_ = true;
             dragging_ = false;
@@ -489,6 +601,39 @@ void ClipItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
 
 void ClipItem::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 {
+    if (fadeDragMode_ != FadeDragMode::None && clip_ && pixelsPerBeatPtr_) {
+        auto* audioClip = dynamic_cast<te::AudioClipBase*>(clip_);
+        if (!audioClip) { fadeDragMode_ = FadeDragMode::None; return; }
+
+        auto& ts = clip_->edit.tempoSequence;
+        auto clipStart = clip_->getPosition().getStart();
+        auto clipEnd = clip_->getPosition().getEnd();
+        double clipLenSec = (clipEnd - clipStart).inSeconds();
+
+        double localX = event->pos().x();
+
+        if (fadeDragMode_ == FadeDragMode::FadeIn) {
+            double fadeBeats = localX / *pixelsPerBeatPtr_;
+            if (fadeBeats < 0.0) fadeBeats = 0.0;
+            auto fadeEndTime = ts.toTime(ts.toBeats(clipStart) + tracktion::BeatDuration::fromBeats(fadeBeats));
+            double fadeSec = std::max(0.0, (fadeEndTime - clipStart).inSeconds());
+            double maxFade = clipLenSec - audioClip->getFadeOut().inSeconds();
+            fadeSec = std::min(fadeSec, std::max(0.0, maxFade));
+            audioClip->setFadeIn(tracktion::TimeDuration::fromSeconds(fadeSec));
+        } else {
+            double fadeBeats = (rect().width() - localX) / *pixelsPerBeatPtr_;
+            if (fadeBeats < 0.0) fadeBeats = 0.0;
+            auto fadeStartTime = ts.toTime(ts.toBeats(clipEnd) - tracktion::BeatDuration::fromBeats(fadeBeats));
+            double fadeSec = std::max(0.0, (clipEnd - fadeStartTime).inSeconds());
+            double maxFade = clipLenSec - audioClip->getFadeIn().inSeconds();
+            fadeSec = std::min(fadeSec, std::max(0.0, maxFade));
+            audioClip->setFadeOut(tracktion::TimeDuration::fromSeconds(fadeSec));
+        }
+        update();
+        event->accept();
+        return;
+    }
+
     if (resizingRight_ && clip_ && pixelsPerBeatPtr_) {
         const double endBeat = computeSnappedEndBeatFromSceneX(event->scenePos().x());
         const auto& ts = clip_->edit.tempoSequence;
@@ -540,6 +685,15 @@ void ClipItem::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 
 void ClipItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
+    if (event->button() == Qt::LeftButton && fadeDragMode_ != FadeDragMode::None) {
+        fadeDragMode_ = FadeDragMode::None;
+        setCursor(QCursor(Qt::OpenHandCursor));
+        if (editMgr_ && editMgr_->edit())
+            editMgr_->edit()->restartPlayback();
+        event->accept();
+        return;
+    }
+
     if (event->button() == Qt::LeftButton && resizingRight_) {
         resizingRight_ = false;
         resizePreviewSegmentWidthPx_ = 0.0;
@@ -614,7 +768,7 @@ void ClipItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 
             auto newStartTime = ts.toTime(tracktion::BeatPosition::fromBeats(newBeat));
             if (duplicateDragging_) {
-                auto tracks = editMgr_->getAudioTracks();
+                auto tracks = editMgr_->getAudioTracksInDisplayOrder();
                 if (newTrack >= 0 && newTrack < tracks.size()) {
                     if (auto* dstClipTrack = dynamic_cast<te::ClipTrack*>(tracks[newTrack])) {
                         if (auto* srcWave = dynamic_cast<te::WaveAudioClip*>(clip_)) {
@@ -674,7 +828,7 @@ void ClipItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
                 }
 
                 if (newTrack != trackIndex_) {
-                    auto tracks = editMgr_->getAudioTracks();
+                    auto tracks = editMgr_->getAudioTracksInDisplayOrder();
                     if (newTrack >= 0 && newTrack < tracks.size()) {
                         auto* dstTrack = tracks[newTrack];
                         if (dstTrack) {
@@ -705,6 +859,21 @@ void ClipItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
         event->accept();
     }
     QGraphicsRectItem::mouseReleaseEvent(event);
+}
+
+void ClipItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
+{
+    if (isNearFadeInHandle(event->pos()) || isNearFadeOutHandle(event->pos()))
+        setCursor(QCursor(Qt::SizeHorCursor));
+    else if (isNearRightEdge(event->pos()))
+        setCursor(QCursor(Qt::SizeHorCursor));
+    else
+        setCursor(QCursor(Qt::OpenHandCursor));
+}
+
+void ClipItem::hoverLeaveEvent(QGraphicsSceneHoverEvent*)
+{
+    setCursor(QCursor(Qt::OpenHandCursor));
 }
 
 void ClipItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "TimeRuler.h"
 #include "GridSnapper.h"
@@ -6,6 +6,7 @@
 #include "TrackHeaderWidget.h"
 #include "AutomationLaneItem.h"
 #include "AutomationLaneHeader.h"
+#include "MarkerTempoLane.h"
 #include "engine/EditManager.h"
 #include <QWidget>
 #include <QGraphicsView>
@@ -17,6 +18,7 @@
 #include <QHBoxLayout>
 #include <QSplitter>
 #include <QEvent>
+#include <QLabel>
 #include <vector>
 #include <memory>
 
@@ -59,10 +61,11 @@ struct TrackLayoutInfo {
     double yOffset = 0.0;
     double clipRowHeight = 120.0;
     bool automationVisible = false;
+    bool collapsed = false;
     double automationLaneHeight = 80.0;
     te::AutomatableParameter* shownParam = nullptr;
     double totalHeight() const {
-        return clipRowHeight + (automationVisible ? automationLaneHeight : 0.0);
+        return clipRowHeight + ((automationVisible && !collapsed) ? automationLaneHeight : 0.0);
     }
 };
 
@@ -102,8 +105,12 @@ public slots:
     void onLoopToggled(bool enabled);
     void splitSelectedClipsAtPlayhead();
     void deleteSelectedClips();
+    void copySelectedClips();
+    void cutSelectedClips();
+    void pasteClips();
     void setSelectedTrack(te::AudioTrack* track);
     void clearTrackSelection();
+    void toggleMarkerTempoLane();
 
 private:
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -125,6 +132,9 @@ private:
     QHBoxLayout* topRowLayout_;
     QWidget*     headerCorner_;
     TimeRuler*   ruler_;
+
+    MarkerTempoLane* markerTempoLane_ = nullptr;
+    QWidget* markerTempoRow_ = nullptr;
 
     QHBoxLayout* bodyLayout_;
     QScrollArea* headerScrollArea_;
@@ -152,6 +162,14 @@ private:
     bool isMidiClipDrawActive_ = false;
     te::AudioTrack* selectedTrack_ = nullptr;
 
+    // Clipboard for copy/paste
+    struct ClipboardEntry {
+        juce::ValueTree state;
+        int trackOffset = 0;
+    };
+    std::vector<ClipboardEntry> clipboardEntries_;
+    int clipboardSourceTrackIndex_ = 0;
+
     // Automation lane state
     std::vector<TrackLayoutInfo> layout_;
     std::vector<AutomationLaneItem*> automationLaneItems_;
@@ -165,6 +183,7 @@ private:
     void applyLoopRegionToTransport(double inBeat, double outBeat);
     void syncLoopStateFromTransport();
     void toggleAutomation(te::AudioTrack* track, bool visible);
+    void toggleCollapse(te::AudioTrack* track, bool collapsed);
     void onAutomationParamChanged(int trackIndex, te::AutomatableParameter* param);
     int trackIndexAtSceneY(double sceneY) const;
     double trackYOffset(int trackIndex) const;
@@ -174,6 +193,15 @@ private:
     // Track transport state for automation refresh
     bool wasPlaying_ = false;
 
+    // Live track reorder state
+    int reorderDragSourceIndex_ = -1;
+    int reorderCurrentIndex_ = -1;
+    QLabel* reorderGhost_ = nullptr;
+
+    void onTrackDragStarted(TrackHeaderWidget* header);
+    void onTrackDragMoved(TrackHeaderWidget* header, int globalY);
+    void onTrackDragFinished(TrackHeaderWidget* header);
+
     // Lane resize
     bool laneResizing_ = false;
     int laneResizeTrackIndex_ = -1;
@@ -181,6 +209,7 @@ private:
     double laneResizeStartY_ = 0.0;
 
     static constexpr int HEADER_WIDTH = 140;
+    static constexpr double kCollapsedTrackHeight = 76.0;
     static constexpr double kMinLaneHeight = 50.0;
     static constexpr double kMaxLaneHeight = 120.0;
     static constexpr double kDefaultLaneHeight = 80.0;

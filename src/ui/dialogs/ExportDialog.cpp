@@ -1,4 +1,4 @@
-﻿#include "ExportDialog.h"
+#include "ExportDialog.h"
 #include "utils/ThemeManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -23,7 +23,7 @@ ExportDialog::ExportDialog(QWidget* parent)
     mainLayout->setSpacing(12);
     mainLayout->setContentsMargins(16, 16, 16, 16);
 
-    auto* titleLabel = new QLabel("Export Mix to WAV", this);
+    auto* titleLabel = new QLabel("Export Audio", this);
     titleLabel->setAccessibleName("Export Dialog Title");
     titleLabel->setStyleSheet(
         QString("font-size: 14px; font-weight: bold; color: %1;")
@@ -32,6 +32,13 @@ ExportDialog::ExportDialog(QWidget* parent)
 
     auto* form = new QFormLayout();
     form->setSpacing(8);
+
+    formatCombo_ = new QComboBox(this);
+    formatCombo_->setAccessibleName("Export Format");
+    formatCombo_->addItem("WAV (Uncompressed)", static_cast<int>(ExportFormat::WAV));
+    formatCombo_->addItem("FLAC (Lossless)", static_cast<int>(ExportFormat::FLAC));
+    formatCombo_->addItem("OGG Vorbis (Lossy)", static_cast<int>(ExportFormat::OGG));
+    form->addRow("Format:", formatCombo_);
 
     auto* pathRow = new QHBoxLayout();
     pathEdit_ = new QLineEdit(this);
@@ -56,13 +63,30 @@ ExportDialog::ExportDialog(QWidget* parent)
     sampleRateCombo_->setCurrentIndex(0);
     form->addRow("Sample Rate:", sampleRateCombo_);
 
+    bitDepthLabel_ = new QLabel("Bit Depth:", this);
     bitDepthCombo_ = new QComboBox(this);
     bitDepthCombo_->setAccessibleName("Bit Depth");
     bitDepthCombo_->addItem("16-bit", 16);
     bitDepthCombo_->addItem("24-bit", 24);
     bitDepthCombo_->addItem("32-bit (float)", 32);
     bitDepthCombo_->setCurrentIndex(1);
-    form->addRow("Bit Depth:", bitDepthCombo_);
+    form->addRow(bitDepthLabel_, bitDepthCombo_);
+
+    oggQualityLabel_ = new QLabel("Quality:", this);
+    oggQualityCombo_ = new QComboBox(this);
+    oggQualityCombo_->setAccessibleName("OGG Vorbis Quality");
+    for (int i = 0; i <= 10; ++i) {
+        QString label;
+        if (i == 0)       label = "0 (Lowest)";
+        else if (i == 5)  label = "5 (Default)";
+        else if (i == 10) label = "10 (Highest)";
+        else              label = QString::number(i);
+        oggQualityCombo_->addItem(label, i);
+    }
+    oggQualityCombo_->setCurrentIndex(5);
+    form->addRow(oggQualityLabel_, oggQualityCombo_);
+    oggQualityLabel_->setVisible(false);
+    oggQualityCombo_->setVisible(false);
 
     normalizeCheck_ = new QCheckBox("Normalize output", this);
     normalizeCheck_->setAccessibleName("Normalize Output");
@@ -110,14 +134,77 @@ ExportDialog::ExportDialog(QWidget* parent)
         exportBtn_->setEnabled(!text.trimmed().isEmpty());
     });
 
+    connect(formatCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &ExportDialog::onFormatChanged);
+
     mainLayout->addLayout(buttonRow);
 
     QSettings qs;
+    int fmtIdx = formatCombo_->findData(qs.value("export/format", 0));
+    if (fmtIdx >= 0) formatCombo_->setCurrentIndex(fmtIdx);
     int srIdx = sampleRateCombo_->findData(qs.value("export/sampleRate", 44100));
     if (srIdx >= 0) sampleRateCombo_->setCurrentIndex(srIdx);
     int bdIdx = bitDepthCombo_->findData(qs.value("export/bitDepth", 24));
     if (bdIdx >= 0) bitDepthCombo_->setCurrentIndex(bdIdx);
+    int oqIdx = oggQualityCombo_->findData(qs.value("export/oggQuality", 5));
+    if (oqIdx >= 0) oggQualityCombo_->setCurrentIndex(oqIdx);
     normalizeCheck_->setChecked(qs.value("export/normalize", false).toBool());
+
+    onFormatChanged(formatCombo_->currentIndex());
+}
+
+void ExportDialog::onFormatChanged(int)
+{
+    auto fmt = static_cast<ExportFormat>(formatCombo_->currentData().toInt());
+    bool isOgg = (fmt == ExportFormat::OGG);
+    bool isFlac = (fmt == ExportFormat::FLAC);
+
+    bitDepthLabel_->setVisible(!isOgg);
+    bitDepthCombo_->setVisible(!isOgg);
+    oggQualityLabel_->setVisible(isOgg);
+    oggQualityCombo_->setVisible(isOgg);
+
+    if (isFlac) {
+        int prevBitDepth = bitDepthCombo_->currentData().toInt();
+        bitDepthCombo_->clear();
+        bitDepthCombo_->addItem("16-bit", 16);
+        bitDepthCombo_->addItem("24-bit", 24);
+        int idx = bitDepthCombo_->findData(prevBitDepth);
+        bitDepthCombo_->setCurrentIndex(idx >= 0 ? idx : 1);
+    } else if (!isOgg) {
+        int prevBitDepth = bitDepthCombo_->currentData().toInt();
+        bitDepthCombo_->clear();
+        bitDepthCombo_->addItem("16-bit", 16);
+        bitDepthCombo_->addItem("24-bit", 24);
+        bitDepthCombo_->addItem("32-bit (float)", 32);
+        int idx = bitDepthCombo_->findData(prevBitDepth);
+        bitDepthCombo_->setCurrentIndex(idx >= 0 ? idx : 1);
+    }
+
+    updatePathExtension();
+}
+
+void ExportDialog::updatePathExtension()
+{
+    QString path = pathEdit_->text().trimmed();
+    if (path.isEmpty()) return;
+
+    auto fmt = static_cast<ExportFormat>(formatCombo_->currentData().toInt());
+    QString newExt;
+    switch (fmt) {
+        case ExportFormat::FLAC: newExt = ".flac"; break;
+        case ExportFormat::OGG:  newExt = ".ogg"; break;
+        default:                 newExt = ".wav"; break;
+    }
+
+    QStringList exts = {".wav", ".flac", ".ogg"};
+    for (const auto& ext : exts) {
+        if (path.endsWith(ext, Qt::CaseInsensitive)) {
+            path = path.left(path.length() - ext.length()) + newExt;
+            pathEdit_->setText(path);
+            return;
+        }
+    }
 }
 
 ExportSettings ExportDialog::settings() const
@@ -125,13 +212,17 @@ ExportSettings ExportDialog::settings() const
     ExportSettings s;
     s.destFile = juce::File(juce::String(pathEdit_->text().toUtf8().constData()));
     s.sampleRate = sampleRateCombo_->currentData().toDouble();
+    s.format = static_cast<ExportFormat>(formatCombo_->currentData().toInt());
     s.bitDepth = bitDepthCombo_->currentData().toInt();
     s.normalize = normalizeCheck_->isChecked();
+    s.oggQuality = oggQualityCombo_->currentData().toInt();
 
     QSettings qs;
+    qs.setValue("export/format", static_cast<int>(s.format));
     qs.setValue("export/sampleRate", s.sampleRate);
     qs.setValue("export/bitDepth", s.bitDepth);
     qs.setValue("export/normalize", s.normalize);
+    qs.setValue("export/oggQuality", s.oggQuality);
 
     return s;
 }
@@ -140,8 +231,10 @@ void ExportDialog::setExporting(bool exporting)
 {
     exportBtn_->setEnabled(!exporting);
     browseBtn_->setEnabled(!exporting);
+    formatCombo_->setEnabled(!exporting);
     sampleRateCombo_->setEnabled(!exporting);
     bitDepthCombo_->setEnabled(!exporting);
+    oggQualityCombo_->setEnabled(!exporting);
     normalizeCheck_->setEnabled(!exporting);
     progressBar_->setVisible(exporting);
     statusLabel_->setVisible(exporting);
@@ -170,13 +263,36 @@ void ExportDialog::onBrowse()
     if (startDir.isEmpty() || !QDir(startDir).exists())
         startDir = QDir::homePath();
 
+    auto fmt = static_cast<ExportFormat>(formatCombo_->currentData().toInt());
+    QString filter;
+    QString defaultName;
+    switch (fmt) {
+        case ExportFormat::FLAC:
+            filter = "FLAC Audio (*.flac)";
+            defaultName = "/mix.flac";
+            break;
+        case ExportFormat::OGG:
+            filter = "OGG Vorbis Audio (*.ogg)";
+            defaultName = "/mix.ogg";
+            break;
+        default:
+            filter = "WAV Audio (*.wav)";
+            defaultName = "/mix.wav";
+            break;
+    }
+
     QString path = QFileDialog::getSaveFileName(
-        this, "Export Audio", startDir + "/mix.wav",
-        "WAV Audio (*.wav)");
+        this, "Export Audio", startDir + defaultName, filter);
     if (path.isEmpty()) return;
 
-    if (!path.endsWith(".wav", Qt::CaseInsensitive))
-        path += ".wav";
+    QString ext;
+    switch (fmt) {
+        case ExportFormat::FLAC: ext = ".flac"; break;
+        case ExportFormat::OGG:  ext = ".ogg"; break;
+        default:                 ext = ".wav"; break;
+    }
+    if (!path.endsWith(ext, Qt::CaseInsensitive))
+        path += ext;
 
     settings.setValue("paths/lastExportDir", QFileInfo(path).absolutePath());
     pathEdit_->setText(path);

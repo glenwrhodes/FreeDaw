@@ -1245,8 +1245,8 @@ void ScoreScene::drawTripletBracket(QPainter* p, const TripletGroup& tg,
     int first = tg.eventIndices.front();
     int last = tg.eventIndices.back();
 
-    double x1 = beatToX(localMeasureOffset, events[first].beatInMeasure) - kNoteHeadHalfW;
-    double x2 = beatToX(localMeasureOffset, events[last].beatInMeasure) + kNoteHeadHalfW;
+    double x1 = beatToX(localMeasureOffset, events[first].beatInMeasure);
+    double x2 = beatToX(localMeasureOffset, events[last].beatInMeasure);
     double midX = (x1 + x2) / 2.0;
 
     // determine direction: use average staff position

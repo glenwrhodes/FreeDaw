@@ -20,11 +20,15 @@ struct InputSource {
     QString displayName;
 };
 
+enum class ExportFormat { WAV, FLAC, OGG };
+
 struct ExportSettings {
     juce::File destFile;
     double sampleRate = 44100.0;
     int bitDepth = 24;
     bool normalize = false;
+    ExportFormat format = ExportFormat::WAV;
+    int oggQuality = 5;
 };
 
 class EditManager : public QObject {
@@ -104,6 +108,11 @@ public:
     void saveRoutingLayout(const QMap<QString, QPointF>& positions);
     QMap<QString, QPointF> loadRoutingLayout() const;
 
+    // Track display order (decoupled from engine order)
+    void saveTrackDisplayOrder(const QVector<te::EditItemID>& order);
+    QVector<te::EditItemID> loadTrackDisplayOrder() const;
+    juce::Array<te::AudioTrack*> getAudioTracksInDisplayOrder();
+
     void midiPanic();
 
     void suspendEngine();
@@ -150,6 +159,12 @@ public:
     QVector<te::AutomatableParameter*> getAutomatableParamsForTrack(te::AudioTrack* track) const;
     te::AutomatableParameter* getVolumeParam(te::AudioTrack* track) const;
     te::AutomatableParameter* getPanParam(te::AudioTrack* track) const;
+
+    // Markers
+    void ensureMarkerTrack();
+    te::MarkerClip* addMarker(const QString& name, tracktion::TimePosition position);
+    void removeMarker(te::MarkerClip* marker);
+    juce::Array<te::MarkerClip*> getMarkers() const;
 
     // Export / Freeze / Bounce
     bool isRenderInProgress() const { return renderInProgress_; }

@@ -178,6 +178,7 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
 {
     setAccessibleName("Timeline View");
     auto& theme = ThemeManager::instance().current();
+    qDebug() << "[TimelineView] ctor: theme loaded";
 
     auto* outerLayout = new QVBoxLayout(this);
     outerLayout->setContentsMargins(0, 0, 0, 0);
@@ -200,8 +201,29 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
     ruler_ = new TimeRuler(topRow);
     ruler_->setSnapFunction([this](double beat) { return snapper_.snapBeat(beat); });
     topRowLayout_->addWidget(ruler_, 1);
+    qDebug() << "[TimelineView] ctor: ruler created";
 
     outerLayout->addWidget(topRow);
+
+    // ── Marker/Tempo lane (toggleable) ──
+    markerTempoRow_ = new QWidget(this);
+    auto* mtLayout = new QHBoxLayout(markerTempoRow_);
+    mtLayout->setContentsMargins(0, 0, 0, 0);
+    mtLayout->setSpacing(0);
+
+    auto* mtLabel = new QWidget(markerTempoRow_);
+    mtLabel->setFixedSize(HEADER_WIDTH, 70);
+    mtLabel->setAutoFillBackground(true);
+    QPalette mtPal;
+    mtPal.setColor(QPalette::Window, theme.surface);
+    mtLabel->setPalette(mtPal);
+    mtLayout->addWidget(mtLabel);
+
+    markerTempoLane_ = new MarkerTempoLane(editMgr_, &snapper_, markerTempoRow_);
+    mtLayout->addWidget(markerTempoLane_, 1);
+
+    markerTempoRow_->setVisible(false);
+    outerLayout->addWidget(markerTempoRow_);
 
     // ── Body row: track headers (left) + graphics view (right) ──
     auto* bodyRow = new QWidget(this);
@@ -231,6 +253,7 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
     headerVLayout_->setAlignment(Qt::AlignTop);
 
     headerScrollArea_->setWidget(headerContainer_);
+    qDebug() << "[TimelineView] ctor: header container created";
     bodyLayout_->addWidget(headerScrollArea_);
 
     // Timeline graphics view
@@ -250,6 +273,7 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
     headerScrollArea_->installEventFilter(this);
     headerScrollArea_->viewport()->installEventFilter(this);
     bodyLayout_->addWidget(graphicsView_, 1);
+    qDebug() << "[TimelineView] ctor: graphics view created";
 
     outerLayout->addWidget(bodyRow, 1);
 
@@ -265,11 +289,13 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
         loopOverlayItem_->setZValue(90);
         loopOverlayItem_->setVisible(false);
     }
+    qDebug() << "[TimelineView] ctor: playhead and loop overlay created";
 
     // Sync ruler scroll with graphics view horizontal scroll, and expand scene if near edge
     connect(graphicsView_->horizontalScrollBar(), &QScrollBar::valueChanged,
             this, [this](int val) {
                 ruler_->setScrollX(val);
+                if (markerTempoLane_) markerTempoLane_->setScrollX(val);
                 QRectF sr = scene_->sceneRect();
                 double viewRight = val + graphicsView_->viewport()->width();
                 if (viewRight > sr.width() - 200.0) {
@@ -322,6 +348,7 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
         ruler_->setLoopRegion(inBeat, beat);
         applyLoopRegionToTransport(inBeat, beat);
     });
+    qDebug() << "[TimelineView] ctor: ruler connections done";
 
     // Scene drop -> add audio clip
     connect(scene_, &TimelineScene::fileDropped,
@@ -339,6 +366,7 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
             this, &TimelineView::handleBackgroundDragUpdated);
     connect(scene_, &TimelineScene::backgroundDragFinished,
             this, &TimelineView::handleBackgroundDragFinished);
+    qDebug() << "[TimelineView] ctor: scene connections done";
 
     // Double-click on empty area -> create blank MIDI clip on MIDI tracks
     connect(scene_, &TimelineScene::emptyAreaDoubleClicked,
@@ -358,7 +386,7 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
                 });
 
                 int trackIdx = trackIndexAtSceneY(scenePos.y());
-                auto tracks = editMgr_->getAudioTracks();
+                auto tracks = editMgr_->getAudioTracksInDisplayOrder();
                 if (trackIdx >= 0 && trackIdx < tracks.size()) {
                     auto* track = tracks[trackIdx];
                     bool isMidi = editMgr_->isMidiTrack(track);
@@ -415,6 +443,7 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
     connect(&playheadTimer_, &QTimer::timeout,
             this, &TimelineView::updatePlayhead);
     playheadTimer_.start(33);
+    qDebug() << "[TimelineView] ctor: playhead timer started";
 
     snapper_.setBpm(editMgr_->getBpm());
     snapper_.setTimeSig(editMgr_->getTimeSigNumerator(),
@@ -443,6 +472,7 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
 
         layout_.clear();
     });
+    qDebug() << "[TimelineView] ctor: edit signals connected";
 
     connect(editMgr_, &EditManager::tracksChanged,
             this, &TimelineView::onTracksChanged);
@@ -451,21 +481,26 @@ TimelineView::TimelineView(EditManager* editMgr, QWidget* parent)
     connect(editMgr_, &EditManager::routingChanged,
             this, &TimelineView::rebuildTrackHeaders, Qt::QueuedConnection);
 
+    qDebug() << "[TimelineView] ctor: calling onTracksChanged";
     onTracksChanged();
+
 }
 
 void TimelineView::setPixelsPerBeat(double ppb)
 {
     pixelsPerBeat_ = std::clamp(ppb, 5.0, 200.0);
     ruler_->setPixelsPerBeat(pixelsPerBeat_);
+    if (markerTempoLane_) markerTempoLane_->setPixelsPerBeat(pixelsPerBeat_);
     rebuildClips();
 }
 
 void TimelineView::setTrackHeight(double h)
 {
     double minH = 80.0;
-    for (auto* hdr : trackHeaders_)
-        minH = std::max(minH, double(hdr->minimumSizeHint().height()));
+    for (int i = 0; i < static_cast<int>(trackHeaders_.size()); ++i) {
+        if (i < static_cast<int>(layout_.size()) && layout_[i].collapsed) continue;
+        minH = std::max(minH, double(trackHeaders_[i]->minimumSizeHint().height()));
+    }
     trackHeight_ = std::clamp(h, minH, 250.0);
     rebuildClips();
     rebuildTrackHeaders();
@@ -571,7 +606,7 @@ bool TimelineView::eventFilter(QObject* watched, QEvent* event)
             }
             if (keyEvent->key() == Qt::Key_A && selectedTrack_) {
                 int trackIdx = -1;
-                auto tracks = editMgr_->getAudioTracks();
+                auto tracks = editMgr_->getAudioTracksInDisplayOrder();
                 for (int i = 0; i < tracks.size(); ++i) {
                     if (tracks[i] == selectedTrack_) { trackIdx = i; break; }
                 }
@@ -636,6 +671,24 @@ void TimelineView::onTracksChanged()
     onEditChanged();
     qDebug() << "[TimelineView] about to rebuildTrackHeaders";
     rebuildTrackHeaders();
+
+    // Clean up display order to remove deleted track IDs
+    auto displayOrder = editMgr_->loadTrackDisplayOrder();
+    if (!displayOrder.isEmpty()) {
+        auto currentTracks = editMgr_->getAudioTracks();
+        QVector<te::EditItemID> cleanedOrder;
+        for (auto& id : displayOrder) {
+            for (auto* t : currentTracks) {
+                if (t->itemID == id) {
+                    cleanedOrder.append(id);
+                    break;
+                }
+            }
+        }
+        if (cleanedOrder.size() != displayOrder.size())
+            editMgr_->saveTrackDisplayOrder(cleanedOrder);
+    }
+
     qDebug() << "[TimelineView] onTracksChanged done";
 }
 
@@ -659,7 +712,7 @@ void TimelineView::rebuildTrackHeaders()
 
     if (!editMgr_ || !editMgr_->edit()) return;
 
-    auto tracks = editMgr_->getAudioTracks();
+    auto tracks = editMgr_->getAudioTracksInDisplayOrder();
     for (int i = 0; i < tracks.size(); ++i) {
         auto* track = tracks[i];
         qDebug() << "[rebuildTrackHeaders] creating header" << i
@@ -671,17 +724,25 @@ void TimelineView::rebuildTrackHeaders()
                 this, &TimelineView::selectTrack);
         connect(header, &TrackHeaderWidget::automationToggled,
                 this, &TimelineView::toggleAutomation);
+        connect(header, &TrackHeaderWidget::collapseToggled,
+                this, &TimelineView::toggleCollapse);
+        connect(header, &TrackHeaderWidget::dragStarted,
+                this, &TimelineView::onTrackDragStarted);
+        connect(header, &TrackHeaderWidget::dragMoved,
+                this, &TimelineView::onTrackDragMoved);
+        connect(header, &TrackHeaderWidget::dragFinished,
+                this, &TimelineView::onTrackDragFinished);
         header->setSelected(track == selectedTrack_);
 
-        // Sync the automation toggle button to current layout state
-        if (i < static_cast<int>(layout_.size()))
+        if (i < static_cast<int>(layout_.size())) {
+            header->setCollapsed(layout_[i].collapsed);
             header->setAutomationVisible(layout_[i].automationVisible);
+        }
 
         headerVLayout_->addWidget(header);
         trackHeaders_.push_back(header);
 
-        // Add automation lane header if visible
-        if (i < static_cast<int>(layout_.size()) && layout_[i].automationVisible) {
+        if (i < static_cast<int>(layout_.size()) && layout_[i].automationVisible && !layout_[i].collapsed) {
             auto* laneHeader = new AutomationLaneHeader(track, editMgr_, headerContainer_);
             int idx = i;
             connect(laneHeader, &AutomationLaneHeader::parameterChanged,
@@ -701,16 +762,34 @@ void TimelineView::rebuildTrackHeaders()
     }
 
     int minNeeded = 0;
-    for (auto* h : trackHeaders_)
-        minNeeded = std::max(minNeeded, h->minimumSizeHint().height());
+    for (int i = 0; i < static_cast<int>(trackHeaders_.size()); ++i) {
+        if (i < static_cast<int>(layout_.size()) && layout_[i].collapsed) continue;
+        minNeeded = std::max(minNeeded, trackHeaders_[i]->minimumSizeHint().height());
+    }
 
     if (trackHeight_ < minNeeded) {
         trackHeight_ = minNeeded;
         rebuildClips();
     }
 
-    for (auto* h : trackHeaders_)
-        h->setTrackHeight(int(trackHeight_));
+    bool needsRebuild = false;
+    for (int i = 0; i < static_cast<int>(trackHeaders_.size()); ++i) {
+        double h = (i < static_cast<int>(layout_.size())) ? layout_[i].clipRowHeight : trackHeight_;
+        trackHeaders_[i]->setTrackHeight(static_cast<int>(h));
+        int actualH = trackHeaders_[i]->height();
+        if (i < static_cast<int>(layout_.size()) && actualH > layout_[i].clipRowHeight) {
+            layout_[i].clipRowHeight = actualH;
+            needsRebuild = true;
+        }
+    }
+    if (needsRebuild) {
+        double y = 0.0;
+        for (int i = 0; i < static_cast<int>(layout_.size()); ++i) {
+            layout_[i].yOffset = y;
+            y += layout_[i].totalHeight();
+        }
+        rebuildClips();
+    }
 
     qDebug() << "[rebuildTrackHeaders] done, trackHeight =" << trackHeight_;
 }
@@ -721,6 +800,107 @@ void TimelineView::syncHeaderScroll()
     headerScrollArea_->verticalScrollBar()->setValue(vScrollVal);
 }
 
+void TimelineView::toggleMarkerTempoLane()
+{
+    if (markerTempoRow_) {
+        markerTempoRow_->setVisible(!markerTempoRow_->isVisible());
+    }
+}
+
+void TimelineView::onTrackDragStarted(TrackHeaderWidget* header)
+{
+    reorderDragSourceIndex_ = -1;
+    for (int i = 0; i < static_cast<int>(trackHeaders_.size()); ++i) {
+        if (trackHeaders_[i] == header) {
+            reorderDragSourceIndex_ = i;
+            break;
+        }
+    }
+    reorderCurrentIndex_ = reorderDragSourceIndex_;
+
+    if (!reorderGhost_ && header->track()) {
+        reorderGhost_ = new QLabel(this);
+        reorderGhost_->setAttribute(Qt::WA_TransparentForMouseEvents);
+        QString name = QString::fromStdString(header->track()->getName().toStdString());
+        reorderGhost_->setText(name);
+        reorderGhost_->setStyleSheet(
+            "QLabel { background: rgba(0,168,150,180); color: #fff; "
+            "font-size: 11px; font-weight: bold; padding: 4px 10px; "
+            "border-radius: 4px; }");
+        reorderGhost_->adjustSize();
+        reorderGhost_->raise();
+        reorderGhost_->show();
+    }
+}
+
+void TimelineView::onTrackDragMoved(TrackHeaderWidget* /*header*/, int globalY)
+{
+    if (reorderDragSourceIndex_ < 0) return;
+    int n = static_cast<int>(trackHeaders_.size());
+    if (n <= 1) return;
+
+    if (reorderGhost_) {
+        QPoint localPos = mapFromGlobal(QPoint(20, globalY - 10));
+        reorderGhost_->move(localPos);
+    }
+
+    QPoint containerPos = headerContainer_->mapFromGlobal(QPoint(0, globalY));
+    int targetIndex = n - 1;
+    for (int i = 0; i < n; ++i) {
+        auto* h = trackHeaders_[i];
+        int mid = h->geometry().top() + h->height() / 2;
+        if (containerPos.y() < mid) {
+            targetIndex = i;
+            break;
+        }
+    }
+    targetIndex = std::clamp(targetIndex, 0, n - 1);
+
+    if (targetIndex == reorderCurrentIndex_) return;
+
+    auto* movingHeader = trackHeaders_[reorderCurrentIndex_];
+    trackHeaders_.erase(trackHeaders_.begin() + reorderCurrentIndex_);
+    trackHeaders_.insert(trackHeaders_.begin() + targetIndex, movingHeader);
+
+    for (auto* h : trackHeaders_)
+        headerVLayout_->removeWidget(h);
+    for (auto* h : automationLaneHeaders_)
+        headerVLayout_->removeWidget(h);
+    for (auto* h : trackHeaders_)
+        headerVLayout_->addWidget(h);
+
+    reorderCurrentIndex_ = targetIndex;
+}
+
+void TimelineView::onTrackDragFinished(TrackHeaderWidget* /*header*/)
+{
+    if (reorderGhost_) {
+        delete reorderGhost_;
+        reorderGhost_ = nullptr;
+    }
+
+    if (reorderDragSourceIndex_ < 0 || !editMgr_ || !editMgr_->edit()) {
+        reorderDragSourceIndex_ = -1;
+        reorderCurrentIndex_ = -1;
+        return;
+    }
+
+    if (reorderCurrentIndex_ != reorderDragSourceIndex_) {
+        QVector<te::EditItemID> newOrder;
+        for (auto* h : trackHeaders_) {
+            if (h->track())
+                newOrder.append(h->track()->itemID);
+        }
+        editMgr_->saveTrackDisplayOrder(newOrder);
+        emit editMgr_->tracksChanged();
+    }
+
+    reorderDragSourceIndex_ = -1;
+    reorderCurrentIndex_ = -1;
+
+    onTracksChanged();
+}
+
 void TimelineView::rebuildLayout()
 {
     if (!editMgr_ || !editMgr_->edit()) {
@@ -728,34 +908,37 @@ void TimelineView::rebuildLayout()
         return;
     }
 
-    auto tracks = editMgr_->getAudioTracks();
+    auto tracks = editMgr_->getAudioTracksInDisplayOrder();
     int numTracks = tracks.size();
 
-    // Preserve existing automation state
     std::vector<TrackLayoutInfo> oldLayout = layout_;
     layout_.resize(numTracks);
 
     for (int i = 0; i < numTracks; ++i) {
         layout_[i].trackIndex = i;
-        layout_[i].clipRowHeight = trackHeight_;
 
         if (i < static_cast<int>(oldLayout.size())) {
             layout_[i].automationVisible = oldLayout[i].automationVisible;
             layout_[i].automationLaneHeight = oldLayout[i].automationLaneHeight;
             layout_[i].shownParam = oldLayout[i].shownParam;
+            layout_[i].collapsed = oldLayout[i].collapsed;
+            layout_[i].clipRowHeight = oldLayout[i].clipRowHeight;
         } else {
             layout_[i].automationVisible = false;
             layout_[i].automationLaneHeight = kDefaultLaneHeight;
             layout_[i].shownParam = nullptr;
+            layout_[i].collapsed = false;
+            layout_[i].clipRowHeight = trackHeight_;
         }
 
-        // Ensure shownParam defaults to Volume for any track with automation visible
+        if (!layout_[i].collapsed)
+            layout_[i].clipRowHeight = trackHeight_;
+
         if (layout_[i].automationVisible && !layout_[i].shownParam) {
             layout_[i].shownParam = editMgr_->getVolumeParam(tracks[i]);
         }
     }
 
-    // Compute Y offsets
     double y = 0.0;
     for (int i = 0; i < numTracks; ++i) {
         layout_[i].yOffset = y;
@@ -806,11 +989,11 @@ void TimelineView::rebuildAutomationLanes(double sceneWidth)
     cleanupAutomationItems();
     if (!editMgr_ || !editMgr_->edit()) return;
 
-    auto tracks = editMgr_->getAudioTracks();
+    auto tracks = editMgr_->getAudioTracksInDisplayOrder();
     auto& theme = ThemeManager::instance().current();
 
     for (int i = 0; i < static_cast<int>(layout_.size()); ++i) {
-        if (!layout_[i].automationVisible || i >= tracks.size()) continue;
+        if (!layout_[i].automationVisible || layout_[i].collapsed || i >= tracks.size()) continue;
 
         auto* track = tracks[i];
         auto* param = layout_[i].shownParam;
@@ -844,7 +1027,7 @@ void TimelineView::rebuildAutomationLanes(double sceneWidth)
 void TimelineView::toggleAutomation(te::AudioTrack* track, bool visible)
 {
     if (!editMgr_) return;
-    auto tracks = editMgr_->getAudioTracks();
+    auto tracks = editMgr_->getAudioTracksInDisplayOrder();
     for (int i = 0; i < tracks.size(); ++i) {
         if (tracks[i] == track && i < static_cast<int>(layout_.size())) {
             layout_[i].automationVisible = visible;
@@ -853,6 +1036,25 @@ void TimelineView::toggleAutomation(te::AudioTrack* track, bool visible)
 
             // Defer rebuild so the button click handler that triggered this
             // finishes before we delete its owning TrackHeaderWidget.
+            QTimer::singleShot(0, this, [this]() {
+                rebuildLayout();
+                rebuildClips();
+                rebuildTrackHeaders();
+            });
+            return;
+        }
+    }
+}
+
+void TimelineView::toggleCollapse(te::AudioTrack* track, bool collapsed)
+{
+    if (!editMgr_) return;
+    auto tracks = editMgr_->getAudioTracksInDisplayOrder();
+    for (int i = 0; i < tracks.size(); ++i) {
+        if (tracks[i] == track && i < static_cast<int>(layout_.size())) {
+            layout_[i].collapsed = collapsed;
+            layout_[i].clipRowHeight = collapsed ? kCollapsedTrackHeight : trackHeight_;
+
             QTimer::singleShot(0, this, [this]() {
                 rebuildLayout();
                 rebuildClips();
@@ -898,7 +1100,7 @@ void TimelineView::rebuildClips()
 
     rebuildLayout();
 
-    auto tracks = editMgr_->getAudioTracks();
+    auto tracks = editMgr_->getAudioTracksInDisplayOrder();
     int numTracks = tracks.size();
     qDebug() << "[rebuildClips] numTracks:" << numTracks;
 
@@ -924,16 +1126,16 @@ void TimelineView::rebuildClips()
 
     for (int i = 0; i < numTracks; ++i) {
         double y = trackYOffset(i);
+        double thisH = (i < static_cast<int>(layout_.size())) ? layout_[i].clipRowHeight : trackHeight_;
         QColor bg = (i % 2 == 0) ? theme.trackBackground
                                   : theme.trackBackground.lighter(108);
-        auto* bgItem = scene_->addRect(0, y, sceneWidth, trackHeight_,
+        auto* bgItem = scene_->addRect(0, y, sceneWidth, thisH,
                                         QPen(Qt::NoPen), QBrush(bg));
         bgItem->setZValue(-2);
         trackBgItems_.push_back(bgItem);
 
-        // Automation lane background
-        if (i < static_cast<int>(layout_.size()) && layout_[i].automationVisible) {
-            double laneY = y + trackHeight_;
+        if (i < static_cast<int>(layout_.size()) && layout_[i].automationVisible && !layout_[i].collapsed) {
+            double laneY = y + thisH;
             double laneH = layout_[i].automationLaneHeight;
             QColor laneBg = theme.surface.darker(110);
             auto* laneBgItem = scene_->addRect(0, laneY, sceneWidth, laneH,
@@ -962,6 +1164,7 @@ void TimelineView::rebuildClips()
 
     for (int ti = 0; ti < numTracks; ++ti) {
         auto* track = tracks[ti];
+        double clipH = (ti < static_cast<int>(layout_.size())) ? layout_[ti].clipRowHeight : trackHeight_;
         int clipIdx = 0;
         for (auto* clip : track->getClips()) {
             if (auto* mc = dynamic_cast<te::MidiClip*>(clip)) {
@@ -971,7 +1174,7 @@ void TimelineView::rebuildClips()
 
             qDebug() << "[rebuildClips] track" << ti << "clip" << clipIdx
                      << QString::fromStdString(clip->getName().toStdString());
-            auto* item = new ClipItem(clip, ti, pixelsPerBeat_, trackHeight_);
+            auto* item = new ClipItem(clip, ti, pixelsPerBeat_, clipH);
             item->setDragContext(&snapper_, editMgr_,
                                 &pixelsPerBeat_, &trackHeight_, numTracks,
                                 [this]() { rebuildClips(); });
@@ -989,10 +1192,10 @@ void TimelineView::rebuildClips()
                     50, 4096);
                 item->loadWaveform(waveformPoints);
             }
-            item->updateGeometry(pixelsPerBeat_, trackHeight_, 0);
+            item->updateGeometry(pixelsPerBeat_, clipH, 0);
             double yOff = trackYOffset(ti);
             item->setPos(item->pos().x(), yOff);
-            item->setRect(0, 0, item->rect().width(), trackHeight_ - 2);
+            item->setRect(0, 0, item->rect().width(), clipH - 2);
             item->setZValue(1);
             scene_->addItem(item);
             clipItems_.push_back(item);
@@ -1052,6 +1255,11 @@ void TimelineView::updatePlayhead()
             lane->rebuildFromCurve();
     }
     wasPlaying_ = isPlaying;
+
+    if (markerTempoLane_ && markerTempoLane_->isVisible()) {
+        double playBeat = ts.toBeats(editMgr_->transport().getPosition()).inBeats();
+        markerTempoLane_->setPlayheadBeat(playBeat);
+    }
 
     if (isPlaying) {
         graphicsView_->ensureVisible(x, graphicsView_->mapToScene(
@@ -1160,7 +1368,7 @@ void TimelineView::handleFileDrop(const QString& path, double xPos, int yPos)
     beat = snapper_.snapBeat(beat);
     if (beat < 0) beat = 0;
 
-    auto tracks = editMgr_->getAudioTracks();
+    auto tracks = editMgr_->getAudioTracksInDisplayOrder();
     if (trackIdx < 0) trackIdx = 0;
     if (trackIdx >= tracks.size()) trackIdx = tracks.size() - 1;
 
@@ -1276,6 +1484,68 @@ void TimelineView::deleteSelectedClips()
     emit selectedClipsDeleted();
 }
 
+void TimelineView::copySelectedClips()
+{
+    if (!editMgr_ || !editMgr_->edit()) return;
+
+    clipboardEntries_.clear();
+
+    for (auto* item : clipItems_) {
+        if (!item || !item->isSelected() || !item->clip()) continue;
+        auto* clip = item->clip();
+        clip->flushStateToValueTree();
+        ClipboardEntry entry;
+        entry.state = clip->state.createCopy();
+        entry.trackOffset = item->trackIndex();
+        clipboardEntries_.push_back(entry);
+    }
+
+    if (!clipboardEntries_.empty())
+        clipboardSourceTrackIndex_ = clipboardEntries_.front().trackOffset;
+}
+
+void TimelineView::cutSelectedClips()
+{
+    copySelectedClips();
+    if (!clipboardEntries_.empty())
+        deleteSelectedClips();
+}
+
+void TimelineView::pasteClips()
+{
+    if (clipboardEntries_.empty() || !editMgr_ || !editMgr_->edit()) return;
+
+    auto& transport = editMgr_->edit()->getTransport();
+    auto playheadTime = transport.getPosition();
+    auto& ts = editMgr_->edit()->tempoSequence;
+    double playheadBeat = ts.toBeats(playheadTime).inBeats();
+
+    auto tracks = editMgr_->getAudioTracksInDisplayOrder();
+    if (tracks.isEmpty()) return;
+
+    for (auto& entry : clipboardEntries_) {
+        int targetTrackIdx = entry.trackOffset;
+        if (targetTrackIdx < 0) targetTrackIdx = 0;
+        if (targetTrackIdx >= tracks.size()) targetTrackIdx = tracks.size() - 1;
+
+        auto* dstTrack = dynamic_cast<te::ClipTrack*>(tracks[targetTrackIdx]);
+        if (!dstTrack) continue;
+
+        auto newState = entry.state.createCopy();
+        te::EditItemID::remapIDs(newState, nullptr, *editMgr_->edit());
+
+        dstTrack->state.appendChild(newState, &editMgr_->edit()->getUndoManager());
+        auto newClipId = te::EditItemID::fromID(newState);
+
+        if (auto* newClip = dstTrack->findClipForID(newClipId)) {
+            newClip->setStart(ts.toTime(tracktion::BeatPosition::fromBeats(playheadBeat)),
+                              false, true);
+        }
+    }
+
+    rebuildClips();
+}
+
 void TimelineView::selectTrack(te::AudioTrack* track)
 {
     selectedTrack_ = track;
@@ -1307,7 +1577,7 @@ void TimelineView::handleEmptyAreaDoubleClick(double sceneX, double sceneY)
     beat = snapper_.snapBeat(beat);
     if (beat < 0) beat = 0;
 
-    auto tracks = editMgr_->getAudioTracks();
+    auto tracks = editMgr_->getAudioTracksInDisplayOrder();
     if (trackIdx < 0 || trackIdx >= tracks.size() || tracks.isEmpty()) return;
 
     auto* track = tracks[trackIdx];
@@ -1331,7 +1601,7 @@ void TimelineView::handleBackgroundDragStarted(QPointF startScenePos)
     if (!editMgr_ || !editMgr_->edit())
         return;
 
-    auto tracks = editMgr_->getAudioTracks();
+    auto tracks = editMgr_->getAudioTracksInDisplayOrder();
     if (tracks.isEmpty())
         return;
 
@@ -1354,7 +1624,8 @@ void TimelineView::handleBackgroundDragStarted(QPointF startScenePos)
     QColor fill = theme.midiClipBody;
     fill.setAlpha(95);
 
-    midiClipDrawPreviewItem_ = scene_->addRect(0, 0, 1.0, trackHeight_ - 2.0, pen, QBrush(fill));
+    double previewH = (trackIdx < static_cast<int>(layout_.size())) ? layout_[trackIdx].clipRowHeight : trackHeight_;
+    midiClipDrawPreviewItem_ = scene_->addRect(0, 0, 1.0, previewH - 2.0, pen, QBrush(fill));
     midiClipDrawPreviewItem_->setZValue(1.2);
     midiClipDrawPreviewItem_->setPos(midiClipDrawStartBeat_ * pixelsPerBeat_,
                                      trackYOffset(trackIdx));
@@ -1365,7 +1636,7 @@ void TimelineView::handleBackgroundDragUpdated(QPointF, QPointF currentScenePos)
     if (!isMidiClipDrawActive_ || !midiClipDrawPreviewItem_ || !midiClipDrawTrack_)
         return;
 
-    auto tracks = editMgr_->getAudioTracks();
+    auto tracks = editMgr_->getAudioTracksInDisplayOrder();
     int trackIdx = -1;
     for (int i = 0; i < tracks.size(); ++i) {
         if (tracks[i] == midiClipDrawTrack_) {
@@ -1386,7 +1657,8 @@ void TimelineView::handleBackgroundDragUpdated(QPointF, QPointF currentScenePos)
     const double rightBeat = std::max(midiClipDrawStartBeat_, endBeat);
     const double widthPx = std::max(1.0, (rightBeat - leftBeat) * pixelsPerBeat_);
 
-    midiClipDrawPreviewItem_->setRect(0, 0, widthPx, trackHeight_ - 2.0);
+    double previewH = (trackIdx < static_cast<int>(layout_.size())) ? layout_[trackIdx].clipRowHeight : trackHeight_;
+    midiClipDrawPreviewItem_->setRect(0, 0, widthPx, previewH - 2.0);
     midiClipDrawPreviewItem_->setPos(leftBeat * pixelsPerBeat_, trackYOffset(trackIdx));
 
     const double rightEdgePx = rightBeat * pixelsPerBeat_ + 120.0;

@@ -14,11 +14,11 @@
 [![macOS](https://img.shields.io/badge/macOS-000000.svg?logo=apple)](https://github.com/glenwrhodes/OpenDaw/releases/latest)
 [![Linux](https://img.shields.io/badge/Linux-FCC624.svg?logo=linux&logoColor=black)](https://github.com/glenwrhodes/OpenDaw/releases/latest)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg?logo=cplusplus)](https://en.cppreference.com/w/cpp/20)
-[![Qt 6](https://img.shields.io/badge/Qt-6.8%2B-41CD52.svg?logo=qt)](https://www.qt.io/)
+[![Qt 6](https://img.shields.io/badge/Qt-6.10%2B-41CD52.svg?logo=qt)](https://www.qt.io/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 Built with **Qt 6** for the UI and **Tracktion Engine** (JUCE) for the audio backend.
-Audio and MIDI tracks, a built-in piano roll, sheet music notation, a destructive audio clip editor, VST3 instrument support, bus routing, 8 built-in effects, an **AI assistant powered by Claude** — all free and open source.
+Audio and MIDI tracks, a built-in piano roll, sheet music notation, a destructive audio clip editor, VST3 instrument support, bus routing, track automation, audio export, 8 built-in effects, an **AI assistant powered by Claude** — all free and open source.
 
 <br>
 
@@ -61,11 +61,28 @@ Grab the latest release from the **[Releases page](https://github.com/glenwrhode
 - Move clips between tracks by dragging up/down
 - Split clips at the playhead (S key or toolbar button)
 - Delete selected clips (Delete / Backspace)
-- Clip context menu: Edit in Piano Roll, Quantize, Duplicate, Delete
+- **Non-destructive clip fades** — drag fade-in and fade-out handles at the top corners of any audio clip
+- **Clip copy/paste** — Ctrl+C / Ctrl+X / Ctrl+V to copy, cut, and paste clips at the playhead position
+- **User-assignable clip colors** — right-click any clip > Set Color to pick a custom color
+- Clip context menu: Edit in Piano Roll, Quantize, Duplicate, Set Color, Delete
 - Timeline context menu: Add Audio Track, Add MIDI Track, Create Empty MIDI Clip, Remove Track
 - Grid snapping with 5 modes: Off, 1/4 Beat, 1/2 Beat, Beat, Bar
 - Horizontal and vertical zoom (Ctrl+= / Ctrl+-)
+- Drag the right edge of a clip to loop it (non-destructive clip looping)
+- Freeze tracks to reduce CPU load; bounce MIDI tracks to audio via the track context menu
 - Animated playhead cursor that tracks playback in real time
+
+### Track Automation
+
+- Toggle automation lanes per track from the track header
+- Automate any parameter: volume, pan, and all effect parameters
+- Add breakpoints by double-clicking the automation lane
+- Freehand drawing tool for painting automation curves
+- Drag individual points or rubber-band select and move groups of points
+- Drag curve segments between points to reshape them
+- Automation lanes resize vertically by dragging the lane border
+- Bypass automation per parameter via the lane header
+- Parameter selector dropdown to switch which parameter the lane displays
 
 ### MIDI & Piano Roll
 
@@ -79,6 +96,7 @@ Grab the latest release from the **[Releases page](https://github.com/glenwrhode
   - Select all notes (Ctrl+A)
   - Quantize notes to grid
   - Velocity lane for per-note velocity editing
+  - **CC lane** for MIDI continuous controller editing (modulation, expression, sustain, etc.) with freehand and line draw tools
   - Snap modes: Off, 1/4 Beat, 1/2 Beat, Beat, Bar
   - Zoom in / out
   - Right-click context menu: Select All, Delete Selected, Quantize, Add Note Here
@@ -136,13 +154,15 @@ Grab the latest release from the **[Releases page](https://github.com/glenwrhode
 <em>Audio Clip Editor — destructive waveform editing with cut, fade, normalize, reverse, and more</em>
 </div>
 
-### VST3 Instrument Support
+### VST3 Plugin Support
 
 - Scan for installed VST3 plugins (Edit > Scan VST Plugins)
 - Plugin list cached to `%AppData%/OpenDaw/plugin-cache.xml`
-- Assign VST3 instruments to MIDI tracks via a searchable selector dialog
+- **VST3 instruments** — assign to MIDI tracks via a searchable selector dialog
+- **VST3 effects** — add scanned VST3 effect plugins to any track's effect chain alongside built-in effects
 - Open native plugin editor windows for full parameter control
 - Instrument button on MIDI track headers and mixer channel strips (click to open editor, right-click to change instrument)
+- VST3 plugin parameters are automatable via the automation lane system
 
 ### Transport
 
@@ -152,6 +172,34 @@ Grab the latest release from the **[Releases page](https://github.com/glenwrhode
 - BPM control (20-300 BPM)
 - Time signature control (numerator / denominator)
 - Dual position display: elapsed time (mm:ss.ms) and bars.beats.ticks
+- MIDI Panic (Ctrl+Shift+P) — sends all-notes-off on every channel to silence stuck notes
+
+### Export Audio
+
+- File > Export Audio (Ctrl+Shift+E) opens the export dialog
+- **Three export formats**: WAV (uncompressed), FLAC (lossless), OGG Vorbis (lossy)
+- WAV: configurable bit depth (16 / 24 / 32-bit float)
+- FLAC: configurable bit depth (16 / 24)
+- OGG: configurable quality (0-10)
+- Sample rate: 44.1 / 48 / 88.2 / 96 kHz
+- Optional normalize on export
+- Progress bar with cancel support during rendering
+- Remembers format, quality, and export directory between sessions
+
+### Audio Settings
+
+- Edit > Audio Settings opens the device configuration dialog
+- Select audio driver type (WASAPI, ASIO, DirectSound)
+- Choose output device, sample rate, and buffer size
+- Shows calculated latency in milliseconds
+- Settings persist across sessions
+
+### Autosave & Recovery
+
+- OpenDaw automatically saves your work periodically in the background
+- If the application closes unexpectedly, a recovery dialog appears on next launch
+- Lists all recoverable sessions with timestamps
+- Choose to restore a previous session or discard recovery data
 
 ### Track Headers (left panel)
 
@@ -161,6 +209,7 @@ Grab the latest release from the **[Releases page](https://github.com/glenwrhode
 - Instrument button on MIDI tracks (opens VST editor)
 - Horizontal volume slider and pan knob per track
 - Real-time level meters (green/yellow/red) that react to playback audio
+- **Drag to reorder** — drag track headers up/down to rearrange track order
 - Vertically synchronized with the timeline scroll
 
 ### Mixer (bottom panel)
@@ -170,6 +219,7 @@ Grab the latest release from the **[Releases page](https://github.com/glenwrhode
 - Master channel strip on the right
 - Instrument selector on MIDI track channel strips
 - Two FX insert slots per track (quick-add Reverb, EQ, Compressor)
+- Drag channel strips to reorder tracks directly in the mixer
 - Always left-aligned, horizontally scrollable
 
 ### Built-in Effects
@@ -181,7 +231,7 @@ Add any of these to a track with one click from the Effects panel or mixer FX sl
 | Reverb | Room size, damping, wet/dry |
 | EQ | 4-band equalizer with per-band gain |
 | Compressor | Threshold, ratio, attack, release |
-| Delay | Delay time, feedback, mix |
+| Delay | Delay time, feedback, mix (with tempo-sync mode) |
 | Chorus | Rate, depth, mix |
 | Phaser | Rate, depth, feedback |
 | Low Pass Filter | Cutoff frequency |
@@ -194,7 +244,7 @@ Add any of these to a track with one click from the Effects panel or mixer FX sl
 - Color-coded cables show signal flow at a glance
 - **Bus tracks** — create buses to submix groups of tracks, with independent effects processing
 - Route any track's output to Master or to a bus
-- Sidechain input support on bus tracks
+- Sidechain input support on bus tracks with per-effect sidechain source selector
 - Rename input devices with custom labels
 - Auto-layout button or freely drag nodes to arrange the view
 - Right-click cables to disconnect; right-click empty space to add buses
@@ -352,7 +402,9 @@ The assistant uses **agentic tool use**: when you send a message, it decides whi
 | **Track properties** | Mute, solo, volume, pan, mono, record arm |
 | **Routing** | Assign inputs, set outputs to master or buses, disconnect |
 | **Effects** | Add/remove built-in effects, set parameters, bypass |
+| **MIDI composition** | Create MIDI clips, add notes with pitch/timing/velocity/duration |
 | **Transport** | Play, stop, record, seek, tempo, time signature |
+| **Analysis** | Track levels, frequency balance, stereo image, transients, masking |
 | **Project** | Save, undo, redo, get project info |
 
 **Key features:**
@@ -361,6 +413,8 @@ The assistant uses **agentic tool use**: when you send a message, it decides whi
 - **Destructive action safety** — optionally prompts for confirmation before deleting tracks or removing effects (on by default)
 - **Tool output toggle** — click "Tools: OFF/ON" to show or hide detailed tool call information (off by default for a clean experience)
 - **Dynamic project awareness** — the system prompt is rebuilt with your current project state at each conversation, so the AI always knows exactly what tracks, effects, and routing you have
+- **Persistent chat sessions** — conversations are saved alongside your project file and restored when you reopen the project
+- **Audio analysis** — the AI can analyze track and master levels, frequency balance, stereo image, transients, and inter-track masking to give mix advice grounded in actual measurements
 - **Conversation memory** — the AI remembers what you've discussed and done within a session
 - **Privacy-first** — bring your own Anthropic API key, stored locally in app settings, never sent anywhere except Anthropic's API
 
@@ -369,8 +423,13 @@ The assistant uses **agentic tool use**: when you send a message, it decides whi
 - File > New Project -- start fresh with 4 empty audio tracks
 - File > Open Project -- load a `.tracktionedit` file
 - File > Save / Save As -- save your arrangement
+- File > Export Audio -- mix down to WAV (Ctrl+Shift+E)
 - Edit > Add Audio Track / Add MIDI Track / Remove Selected Track
-- View > Toggle Mixer, Toggle Routing, Toggle Browser, Toggle Effects, Toggle AI Assistant, Toggle Sheet Music
+- Edit > Audio Settings -- configure audio device, sample rate, buffer size
+- Edit > Scan VST Plugins -- scan for installed VST3 instruments
+- View > Toggle Mixer, Toggle Routing, Toggle Browser, Toggle Effects, Toggle AI Assistant, Toggle Sheet Music, Toggle Piano Roll, Toggle Audio Clip Editor
+- Transport > MIDI Panic (Ctrl+Shift+P) -- silence stuck notes
+- Help > About OpenDaw
 
 ---
 
@@ -381,7 +440,7 @@ You need the following installed on Windows:
 | Tool | Version | Notes |
 |------|---------|-------|
 | **Visual Studio 2022** | Community or higher | Provides the MSVC C++ compiler |
-| **Qt 6.8+** | MSVC 2022 64-bit kit | Install via [Qt Online Installer](https://www.qt.io/download-qt-installer) or `aqtinstall` |
+| **Qt 6.10+** | MSVC 2022 64-bit kit | Install via [Qt Online Installer](https://www.qt.io/download-qt-installer) or `aqtinstall` |
 | **CMake** | 3.22+ | Bundled with Qt at `c:\qt\Tools\CMake_64\` |
 | **Ninja** | 1.10+ | Bundled with Qt at `c:\qt\Tools\Ninja\` |
 | **Git** | 2.x | For cloning and submodule management |
@@ -404,8 +463,8 @@ All commands are for **PowerShell on Windows**.
 ### 1. Clone the repository with submodules
 
 ```powershell
-git clone --recurse-submodules https://github.com/grhod/AudioMixer.git
-cd AudioMixer
+git clone --recurse-submodules https://github.com/glenwrhodes/OpenDaw.git
+cd OpenDaw
 ```
 
 If you already cloned without submodules:
@@ -588,12 +647,13 @@ Each track has controls in two places:
 
 7. **Clear conversation.** Click **Clear** to start a fresh conversation. The AI will re-read your current project state at the start of the next message.
 
-### Saving and loading
+### Saving, loading, and exporting
 
 - **File > Save As** (Ctrl+Shift+S) -- save your project as a `.tracktionedit` file.
 - **File > Save** (Ctrl+S) -- save to the current file.
 - **File > Open** (Ctrl+O) -- load a previously saved project.
 - **File > New** (Ctrl+N) -- start a fresh empty project.
+- **File > Export Audio** (Ctrl+Shift+E) -- mix down your project to WAV, FLAC, or OGG Vorbis. Choose format, sample rate, bit depth (or quality for OGG), and whether to normalize.
 
 ### Keyboard shortcuts
 
@@ -611,6 +671,11 @@ Each track has controls in two places:
 | Ctrl+O | Open project |
 | Ctrl+S | Save project |
 | Ctrl+Shift+S | Save As |
+| Ctrl+C | Copy selected clips |
+| Ctrl+X | Cut selected clips |
+| Ctrl+V | Paste clips at playhead |
+| Ctrl+Shift+E | Export audio |
+| Ctrl+Shift+P | MIDI Panic (all notes off) |
 | Ctrl+Q | Quit |
 | Ctrl+= | Zoom in (timeline) |
 | Ctrl+- | Zoom out (timeline) |
@@ -634,46 +699,64 @@ AudioMixer/
   README.md                               This file
   LICENSE                                 GPLv3 license
   CONTRIBUTING.md                         Contribution guidelines
+  build.ps1                               PowerShell build script (incremental / -Clean)
   .github/
     workflows/
       release.yml                         CI/CD: build + release on tag push
   installer/
-    OpenDaw.iss                           Inno Setup installer script
+    opendaw.iss                           Inno Setup installer script
   resources/
     splash.png                            Splash screen artwork
+    icon.png                              Application icon (PNG)
+    OpenDaw.ico                           Windows application icon
     routing-view.png                      Routing view screenshot
     piano-roll.png                        Piano roll screenshot
     sheet-music-view.png                  Sheet music view screenshot
     audio-clip-editor.png                 Audio clip editor screenshot
     ai-assistant.png                      AI assistant panel screenshot
+    fontaudio.ttf                         Icon font for audio controls
+    MaterialSymbolsOutlined.ttf           Material Design icon font
+    Bravura.otf                           SMuFL music notation font
+    mixerStripBG.png                      Mixer channel strip background
   libs/
     JUCE/                                 JUCE framework (git submodule)
     tracktion_engine/                     Tracktion Engine (git submodule)
   src/
     main.cpp                              Entry point, JUCE-Qt bridge
     app/
-      OpenDawApplication.h/cpp            Application lifecycle
+      OpenDawApplication.h/cpp            Application lifecycle, recovery check
       JuceQtBridge.h/cpp                  QTimer-based JUCE message pump
     engine/
       AudioEngine.h/cpp                   Wraps tracktion::engine::Engine, MIDI device enumeration
-      EditManager.h/cpp                   Manages the current Edit (project)
+      EditManager.h/cpp                   Manages the current Edit: tracks, clips, routing, export, autosave
       PluginScanner.h/cpp                 VST3 plugin scanning and cache
     ui/
       MainWindow.h/cpp                    Main window with menus, docks, toolbar
-        SplashScreen.h/cpp                Borderless splash screen (click to dismiss)
+      SplashScreen.h/cpp                  Borderless splash screen (click to dismiss)
+      dialogs/
+        ExportDialog.h/cpp                Audio export dialog (WAV, sample rate, bit depth, normalize)
+        RecoveryDialog.h/cpp              Crash recovery session picker
+        AudioSettingsDialog.h/cpp         Audio device and buffer configuration
       timeline/
-        TimelineView.h/cpp                Arrangement view with track headers
+        TimelineView.h/cpp                Arrangement view with track headers and automation
         TimeRuler.h/cpp                   Beat/bar ruler with click and drag
         TrackHeaderWidget.h/cpp           Per-track controls, level meter, instrument button
         TrackLane.h/cpp                   Track lane data model
         ClipItem.h/cpp                    Audio/MIDI clip with snapped dragging
         GridSnapper.h/cpp                 Snap-to-grid logic
+        AutomationLaneItem.h/cpp          Parameter automation lane (curve, points, freehand draw)
+        AutomationPointItem.h/cpp         Draggable automation breakpoint
+        AutomationLaneHeader.h/cpp        Parameter selector, bypass, close for automation lane
+        EnvelopeUtils.h                   Beat/pixel/value math and envelope path building
       pianoroll/
         PianoRollEditor.h/cpp             Piano roll dock widget container
+        PianoRollRuler.h/cpp              Beat/bar ruler for the piano roll
         NoteGrid.h/cpp                    Note editing grid (add, move, resize, delete)
         NoteItem.h/cpp                    Individual MIDI note graphics item
         VelocityLane.h/cpp                Per-note velocity editor
+        CcLane.h/cpp                      MIDI CC editor lane (freehand / line draw)
         PianoKeyboard.h/cpp               Piano keyboard sidebar
+        ChannelColors.h                   16 fixed colors for MIDI channels 1-16
       sheetmusic/
         SheetMusicView.h/cpp              Sheet music tab container with toolbar
         NotationModel.h/cpp               MIDI-to-notation model (measures, beams, rests)
@@ -683,6 +766,7 @@ AudioMixer/
         AudioWaveformView.h/cpp           Zoomable waveform display with selection
         AudioFileOperations.h/cpp         Cut, fade, normalize, reverse, etc.
         AudioFileUndoManager.h/cpp        Undo/redo stack for destructive file edits
+        WaveformSelection.h               Selection model for audio waveform view
       mixer/
         MixerView.h/cpp                   Horizontal mixer panel
         ChannelStrip.h/cpp                Per-track mixer strip with instrument selector
@@ -695,6 +779,7 @@ AudioMixer/
         WaveformWidget.h/cpp              Waveform rendering widget
       effects/
         EffectChainWidget.h/cpp           Per-track effect chain editor
+        DelayEffectWidget.h/cpp           Delay effect UI with tempo-sync mode
         EffectSelectorDialog.h/cpp        Effect picker dialog
         PluginEditorWindow.h/cpp          Native VST plugin editor window
         VstSelectorDialog.h/cpp           Searchable VST instrument selector
@@ -710,10 +795,13 @@ AudioMixer/
       AiToolExecutor.h/cpp                Dispatches tool calls to engine APIs
       AiService.h/cpp                     Anthropic API client with SSE streaming
       AiChatWidget.h/cpp                  Chat panel UI with streaming & markdown
+      AiChatStore.h/cpp                   Persistent chat sessions (saved alongside project)
       AiQuickPrompt.h/cpp                 Ctrl+Shift+Space overlay prompt
+      AiAudioAnalysis.h/cpp               Mix analysis: levels, spectrum, stereo, transients, masking
     utils/
       WaveformCache.h/cpp                 Audio file waveform thumbnail cache
       ThemeManager.h/cpp                  Dark theme color management
+      IconFont.h                          Icon font registration and glyph constants
 ```
 
 ## Architecture

@@ -1,4 +1,5 @@
-﻿#include <QApplication>
+#include <QApplication>
+#include <QDebug>
 #include <QFile>
 #include <QFileInfo>
 #include <QDateTime>
@@ -109,13 +110,18 @@ int main(int argc, char* argv[])
 
     juce::ScopedJuceInitialiser_GUI juceInit;
 
+    qDebug() << "[main] creating app";
     OpenDaw::OpenDawApplication app;
+    qDebug() << "[main] calling initialize";
     if (!app.initialize())
         return 1;
+    qDebug() << "[main] initialize done, checking recovery";
 
     app.checkRecovery(splash);
+    qDebug() << "[main] recovery check done, showing main window";
 
     app.showMainWindow();
+    qDebug() << "[main] main window shown";
 
     // Load a .tracktionedit file passed as a command-line argument (drag-onto-exe)
     QString fileToLoad;

@@ -72,6 +72,7 @@ set(OpenDaw_SOURCES
     src/ui/timeline/AutomationLaneItem.h  src/ui/timeline/AutomationLaneItem.cpp
     src/ui/timeline/AutomationPointItem.h src/ui/timeline/AutomationPointItem.cpp
     src/ui/timeline/AutomationLaneHeader.h src/ui/timeline/AutomationLaneHeader.cpp
+    src/ui/timeline/MarkerTempoLane.h     src/ui/timeline/MarkerTempoLane.cpp
     src/ui/mixer/MixerView.h        src/ui/mixer/MixerView.cpp
     src/ui/mixer/ChannelStrip.h     src/ui/mixer/ChannelStrip.cpp
     src/ui/transport/TransportBar.h src/ui/transport/TransportBar.cpp
@@ -152,9 +153,10 @@ qt_add_resources(OpenDaw "OpenDaw_resources" PREFIX "/" BASE resources FILES
     resources/MaterialSymbolsOutlined.ttf
     resources/mixerStripBG.png
     resources/Bravura.otf)
-target_include_directories(OpenDaw PRIVATE src)
+target_include_directories(OpenDaw PRIVATE src ${CMAKE_SOURCE_DIR}/libs/vst2sdk)
 
 target_compile_definitions(OpenDaw PRIVATE
+    JUCE_PLUGINHOST_VST=1
     JUCE_PLUGINHOST_VST3=1
     JUCE_PLUGINHOST_LADSPA=0
     JUCE_USE_CURL=0
