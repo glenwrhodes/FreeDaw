@@ -132,6 +132,38 @@ jobs:
         run: |
           "${{ env.QT_ROOT_DIR }}/bin/macdeployqt" "build/OpenDaw_artefacts/Release/OpenDaw.app"
 
+      - name: Import signing certificate
+        if: ${{ secrets.MACOS_CERTIFICATE != '' }}
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          MACOS_KEYCHAIN_PWD: ${{ secrets.MACOS_KEYCHAIN_PWD }}
+        run: |
+          echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "$MACOS_KEYCHAIN_PWD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$MACOS_KEYCHAIN_PWD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_KEYCHAIN_PWD" build.keychain
+          rm certificate.p12
+
+      - name: Code-sign app bundle
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          APP="build/OpenDaw_artefacts/Release/OpenDaw.app"
+          if [ -n "$MACOS_SIGNING_IDENTITY" ]; then
+            echo "Signing with Developer ID: $MACOS_SIGNING_IDENTITY"
+            codesign --force --deep --options runtime \
+              --sign "$MACOS_SIGNING_IDENTITY" \
+              --timestamp \
+              "$APP"
+          else
+            echo "No signing identity found — applying ad-hoc signature"
+            codesign --force --deep --sign - "$APP"
+          fi
+          codesign --verify --verbose "$APP"
+
       - name: Package DMG
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
@@ -139,6 +171,31 @@ jobs:
             -srcfolder "build/OpenDaw_artefacts/Release/OpenDaw.app" \
             -ov -format UDZO \
             "OpenDaw-v${VERSION}-mac.dmg"
+
+      - name: Sign DMG
+        if: ${{ secrets.MACOS_SIGNING_IDENTITY != '' }}
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp \
+            "OpenDaw-v${VERSION}-mac.dmg"
+
+      - name: Notarize DMG
+        if: ${{ secrets.MACOS_NOTARIZE_APPLE_ID != '' }}
+        env:
+          MACOS_NOTARIZE_APPLE_ID: ${{ secrets.MACOS_NOTARIZE_APPLE_ID }}
+          MACOS_NOTARIZE_PASSWORD: ${{ secrets.MACOS_NOTARIZE_PASSWORD }}
+          MACOS_NOTARIZE_TEAM_ID: ${{ secrets.MACOS_NOTARIZE_TEAM_ID }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          DMG="OpenDaw-v${VERSION}-mac.dmg"
+          xcrun notarytool submit "$DMG" \
+            --apple-id "$MACOS_NOTARIZE_APPLE_ID" \
+            --password "$MACOS_NOTARIZE_PASSWORD" \
+            --team-id "$MACOS_NOTARIZE_TEAM_ID" \
+            --wait --timeout 600
+          xcrun stapler staple "$DMG"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
