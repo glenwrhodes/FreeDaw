@@ -313,10 +313,16 @@ bool transcodeToMp3(const QString& inputWavPath,
     outCodecCtx->sample_rate = inCodecCtx->sample_rate;
     outCodecCtx->sample_fmt = AV_SAMPLE_FMT_S16P;
 
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(57, 28, 100)
     AVChannelLayout stereo = AV_CHANNEL_LAYOUT_STEREO;
     AVChannelLayout mono = AV_CHANNEL_LAYOUT_MONO;
     av_channel_layout_copy(&outCodecCtx->ch_layout,
                            inCodecCtx->ch_layout.nb_channels >= 2 ? &stereo : &mono);
+#else
+    outCodecCtx->channels = inCodecCtx->channels >= 2 ? 2 : 1;
+    outCodecCtx->channel_layout = outCodecCtx->channels == 2
+        ? AV_CH_LAYOUT_STEREO : AV_CH_LAYOUT_MONO;
+#endif
 
     if (outFmtCtx->oformat->flags & AVFMT_GLOBALHEADER)
         outCodecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
@@ -333,6 +339,7 @@ bool transcodeToMp3(const QString& inputWavPath,
     outStream->time_base = { 1, outCodecCtx->sample_rate };
 
     SwrContext* swrCtx = nullptr;
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(57, 28, 100)
     if (inCodecCtx->sample_fmt != outCodecCtx->sample_fmt ||
         inCodecCtx->sample_rate != outCodecCtx->sample_rate ||
         av_channel_layout_compare(&inCodecCtx->ch_layout, &outCodecCtx->ch_layout) != 0)
@@ -343,6 +350,20 @@ bool transcodeToMp3(const QString& inputWavPath,
                             0, nullptr);
         swr_init(swrCtx);
     }
+#else
+    if (inCodecCtx->sample_fmt != outCodecCtx->sample_fmt ||
+        inCodecCtx->sample_rate != outCodecCtx->sample_rate ||
+        inCodecCtx->channel_layout != outCodecCtx->channel_layout)
+    {
+        swrCtx = swr_alloc_set_opts(nullptr,
+                                    static_cast<int64_t>(outCodecCtx->channel_layout),
+                                    outCodecCtx->sample_fmt, outCodecCtx->sample_rate,
+                                    static_cast<int64_t>(inCodecCtx->channel_layout),
+                                    inCodecCtx->sample_fmt, inCodecCtx->sample_rate,
+                                    0, nullptr);
+        swr_init(swrCtx);
+    }
+#endif
 
     if (!(outFmtCtx->oformat->flags & AVFMT_NOFILE))
         avio_open(&outFmtCtx->pb, outPath.c_str(), AVIO_FLAG_WRITE);
@@ -366,7 +387,12 @@ bool transcodeToMp3(const QString& inputWavPath,
     AVFrame* resampledFrame = av_frame_alloc();
 
     resampledFrame->format = outCodecCtx->sample_fmt;
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(57, 28, 100)
     av_channel_layout_copy(&resampledFrame->ch_layout, &outCodecCtx->ch_layout);
+#else
+    resampledFrame->channels = outCodecCtx->channels;
+    resampledFrame->channel_layout = outCodecCtx->channel_layout;
+#endif
     resampledFrame->sample_rate = outCodecCtx->sample_rate;
     resampledFrame->nb_samples = outCodecCtx->frame_size > 0 ? outCodecCtx->frame_size : 1152;
     av_frame_get_buffer(resampledFrame, 0);

@@ -72,13 +72,9 @@ void VideoThumbnailCache::renderFilmstrip(const std::vector<double>& frameTimes,
             });
 
         if (rid.load() != myId) {
-            qDebug() << "[VideoThumbnailCache] render cancelled, id=" << myId;
             self->rendering_.store(false);
             return;
         }
-
-        qDebug() << "[VideoThumbnailCache] render complete: "
-                 << frames.size() << "frames, id=" << myId;
 
         int totalWidth = 0;
         for (const auto& f : frames)
